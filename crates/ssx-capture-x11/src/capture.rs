@@ -106,14 +106,13 @@ impl X11Capture {
     /// out to be dead (server restarted).
     fn with_session<T>(&self, f: impl Fn(&Session) -> X11Result<T>) -> Result<T> {
         let (session, reused) = {
-            let mut guard = self.session.lock().unwrap_or_else(|p| p.into_inner());
-            match guard.as_ref() {
-                Some(s) => (Arc::clone(s), true),
-                None => {
-                    let s = Arc::new(Session::connect(&self.config)?);
-                    *guard = Some(Arc::clone(&s));
-                    (s, false)
-                }
+            let mut guard = self.session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some(s) = guard.as_ref() {
+                (Arc::clone(s), true)
+            } else {
+                let s = Arc::new(Session::connect(&self.config)?);
+                *guard = Some(Arc::clone(&s));
+                (s, false)
             }
         };
         match f(&session) {
@@ -128,7 +127,8 @@ impl X11Capture {
                     // Report the original failure: it explains what broke.
                     Err(_) => return Err(e.into()),
                 };
-                *self.session.lock().unwrap_or_else(|p| p.into_inner()) = Some(Arc::clone(&fresh));
+                *self.session.lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
+                    Some(Arc::clone(&fresh));
                 match f(&fresh) {
                     Err(e2) => {
                         if e2.is_fatal() {
@@ -144,7 +144,7 @@ impl X11Capture {
     }
 
     fn forget(&self, dead: &Arc<Session>) {
-        let mut guard = self.session.lock().unwrap_or_else(|p| p.into_inner());
+        let mut guard = self.session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if guard.as_ref().is_some_and(|cur| Arc::ptr_eq(cur, dead)) {
             *guard = None;
         }
@@ -152,7 +152,7 @@ impl X11Capture {
 }
 
 /// Grabs `area` of the root window and adds the cursor if requested.
-fn grab_root(s: &Session, area: Area, opts: &CaptureOptions, scale: f64) -> X11Result<Frame> {
+fn grab_root(s: &Session, area: Area, opts: CaptureOptions, scale: f64) -> X11Result<Frame> {
     let mut frame =
         s.grab(s.root, s.root_depth, s.root_visual, area, Point::new(area.x, area.y))?;
     frame.scale_factor = scale;
@@ -209,7 +209,7 @@ impl CaptureBackend for X11Capture {
                 return Err(X11Error::Malformed("monitor lies outside the screen"));
             };
             let area = Area { x: r.x, y: r.y, width: r.width, height: r.height };
-            grab_root(s, area, opts, monitor.scale_factor)
+            grab_root(s, area, *opts, monitor.scale_factor)
         })
     }
 
@@ -217,7 +217,7 @@ impl CaptureBackend for X11Capture {
         self.with_session(|s| {
             let (w, h) = s.root_size()?;
             let area = Area { x: 0, y: 0, width: w, height: h };
-            grab_root(s, area, opts, s.scale_factor())
+            grab_root(s, area, *opts, s.scale_factor())
         })
     }
 
@@ -234,18 +234,18 @@ impl CaptureBackend for X11Capture {
                 return Ok(None);
             };
             let area = Area { x: r.x, y: r.y, width: r.width, height: r.height };
-            grab_root(s, area, opts, s.scale_factor()).map(Some)
+            grab_root(s, area, *opts, s.scale_factor()).map(Some)
         })?;
         frame.ok_or(CaptureError::InvalidRegion(region))
     }
 
     fn capture_window(&self, window_id: &str, opts: &CaptureOptions) -> Result<Frame> {
         let win: Window = parse_window_id(window_id)?;
-        self.with_session(|s| capture_window(s, win, opts))
+        self.with_session(|s| capture_window(s, win, *opts))
     }
 }
 
-fn capture_window(s: &Session, win: Window, opts: &CaptureOptions) -> X11Result<Frame> {
+fn capture_window(s: &Session, win: Window, opts: CaptureOptions) -> X11Result<Frame> {
     let info = s.window_info(win, None)?.ok_or(X11Error::NoSuchWindow(win))?;
     if info.minimized || !s.is_viewable(win)? {
         return Err(X11Error::NotViewable(win));

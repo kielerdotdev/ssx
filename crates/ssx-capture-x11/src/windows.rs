@@ -5,7 +5,7 @@
 //!   to the root's viewable, non-override-redirect children.
 //! * Title: `_NET_WM_NAME` (UTF-8), else `WM_NAME` (Latin-1 or UTF-8 depending on its type).
 //! * App name: the *class* half of `WM_CLASS` (`instance\0Class\0`), else the instance.
-//! * Minimised: `_NET_WM_STATE_HIDDEN`, or `WM_STATE` == IconicState.
+//! * Minimised: `_NET_WM_STATE_HIDDEN`, or `WM_STATE` == `IconicState`.
 //! * Geometry: the client window's origin translated to root coordinates, extended by
 //!   `_NET_FRAME_EXTENTS` (left, right, top, bottom) so the rectangle includes the window
 //!   manager's decorations, which is what users expect from "capture window". Client-side
@@ -19,6 +19,9 @@ use crate::{
     error::{X11Error, X11Result},
     session::{Property, Session},
 };
+
+/// `WM_STATE` value of a minimised (iconified) window.
+const ICONIC_STATE: u32 = 3;
 
 /// Formats a window id the way `xwininfo`/`xdotool` print it.
 pub(crate) fn format_window_id(w: Window) -> String {
@@ -79,7 +82,9 @@ impl Session {
             .map_err(|e| X11Error::from_reply("QueryTree", e))?;
         let mut list = Vec::new();
         for child in tree.children {
-            let Ok(Ok(attrs)) = self.conn.get_window_attributes(child).map(|c| c.reply()) else {
+            let Ok(Ok(attrs)) =
+                self.conn.get_window_attributes(child).map(x11rb::cookie::Cookie::reply)
+            else {
                 continue;
             };
             if attrs.map_state == MapState::VIEWABLE
@@ -191,12 +196,11 @@ impl Session {
     }
 
     fn is_minimized(&self, win: Window) -> X11Result<bool> {
-        if let Some(p) = self.property(win, self.atoms.net_wm_state, AtomEnum::ATOM, 4096)? {
-            if p.words().contains(&self.atoms.net_wm_state_hidden) {
-                return Ok(true);
-            }
+        if let Some(p) = self.property(win, self.atoms.net_wm_state, AtomEnum::ATOM, 4096)?
+            && p.words().contains(&self.atoms.net_wm_state_hidden)
+        {
+            return Ok(true);
         }
-        const ICONIC_STATE: u32 = 3;
         Ok(self
             .property(win, self.atoms.wm_state, self.atoms.wm_state, 8)?
             .and_then(|p| p.words().first().copied())

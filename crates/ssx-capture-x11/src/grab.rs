@@ -35,7 +35,7 @@ impl Session {
         let visual = self.visuals.get(&visual).ok_or_else(|| {
             X11Error::UnsupportedVisual(format!("visual {visual:#x} is not advertised"))
         })?;
-        PixelLayout::new(format, self.msb_first, visual)
+        PixelLayout::new(*format, self.msb_first, visual)
     }
 
     fn plain_chunk_budget(&self) -> usize {

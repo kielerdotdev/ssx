@@ -3,7 +3,7 @@
 //! The wire layout of `GetImage` data is *not* fixed: it depends on the pixmap format the
 //! server advertises for the drawable's depth (bits per pixel, scanline padding), the
 //! server's image byte order, and the visual's channel masks. Real servers mostly use
-//! little-endian 32 bpp with `0xff0000/0x00ff00/0x0000ff` masks, but 16-bit (RGB565, 555),
+//! little-endian 32 bpp with `0x00ff_0000/0x00ff00/0x0000ff` masks, but 16-bit (RGB565, 555),
 //! packed 24 bpp, 30-bit (10 bpc) and big-endian servers all exist, so this module decodes
 //! the general case and keeps a fast path for the common one. It is pure (no X
 //! connection), which is what lets the odd layouts be unit-tested on any machine.
@@ -67,7 +67,7 @@ pub(crate) struct PixelLayout {
 
 impl PixelLayout {
     /// Builds the layout for a drawable of `format.depth` using `visual`'s masks.
-    pub(crate) fn new(format: &Format, msb_first: bool, visual: &Visualtype) -> X11Result<Self> {
+    pub(crate) fn new(format: Format, msb_first: bool, visual: &Visualtype) -> X11Result<Self> {
         if !matches!(visual.class, VisualClass::TRUE_COLOR | VisualClass::DIRECT_COLOR) {
             return Err(X11Error::UnsupportedVisual(format!(
                 "visual class {:?} (depth {}); only TrueColor/DirectColor screens can be captured",
@@ -201,9 +201,9 @@ mod tests {
     #[test]
     fn depth24_le_fast_path_forces_opaque_alpha() {
         let l = PixelLayout::new(
-            &fmt(24, 32, 32),
+            fmt(24, 32, 32),
             false,
-            &visual(VisualClass::TRUE_COLOR, 0xff0000, 0xff00, 0xff),
+            &visual(VisualClass::TRUE_COLOR, 0x00ff_0000, 0xff00, 0xff),
         )
         .unwrap();
         assert!(l.is_bgra8_le());
@@ -215,9 +215,9 @@ mod tests {
     #[test]
     fn depth32_alpha_channel_is_ignored() {
         let l = PixelLayout::new(
-            &fmt(32, 32, 32),
+            fmt(32, 32, 32),
             false,
-            &visual(VisualClass::TRUE_COLOR, 0xff0000, 0xff00, 0xff),
+            &visual(VisualClass::TRUE_COLOR, 0x00ff_0000, 0xff00, 0xff),
         )
         .unwrap();
         let out = decode(&l, &[10, 20, 30, 0x40], 1, 1);
@@ -228,9 +228,9 @@ mod tests {
     fn big_endian_server_32bpp() {
         // Value 0x00RRGGBB stored most significant byte first.
         let l = PixelLayout::new(
-            &fmt(24, 32, 32),
+            fmt(24, 32, 32),
             true,
-            &visual(VisualClass::TRUE_COLOR, 0xff0000, 0xff00, 0xff),
+            &visual(VisualClass::TRUE_COLOR, 0x00ff_0000, 0xff00, 0xff),
         )
         .unwrap();
         assert!(!l.is_bgra8_le());
@@ -242,9 +242,9 @@ mod tests {
     fn rgb_ordered_visual_is_swizzled() {
         // Masks reversed (RGBA-in-memory servers): red in the low byte.
         let l = PixelLayout::new(
-            &fmt(24, 32, 32),
+            fmt(24, 32, 32),
             false,
-            &visual(VisualClass::TRUE_COLOR, 0xff, 0xff00, 0xff0000),
+            &visual(VisualClass::TRUE_COLOR, 0xff, 0xff00, 0x00ff_0000),
         )
         .unwrap();
         let out = decode(&l, &[0xaa, 0xbb, 0xcc, 0], 1, 1);
@@ -253,8 +253,8 @@ mod tests {
 
     #[test]
     fn packed_24bpp_both_byte_orders() {
-        let v = visual(VisualClass::TRUE_COLOR, 0xff0000, 0xff00, 0xff);
-        let le = PixelLayout::new(&fmt(24, 24, 32), false, &v).unwrap();
+        let v = visual(VisualClass::TRUE_COLOR, 0x00ff_0000, 0xff00, 0xff);
+        let le = PixelLayout::new(fmt(24, 24, 32), false, &v).unwrap();
         // Row stride: 2 px * 24 bit = 48 bit, padded to 64 bit = 8 bytes.
         assert_eq!(le.row_stride(2), 8);
         let data = [3, 2, 1, 6, 5, 4, 0xee, 0xee, /* row 2 */ 9, 8, 7, 12, 11, 10, 0xee, 0xee];
@@ -262,7 +262,7 @@ mod tests {
             decode(&le, &data, 2, 2),
             [3, 2, 1, 255, 6, 5, 4, 255, 9, 8, 7, 255, 12, 11, 10, 255]
         );
-        let be = PixelLayout::new(&fmt(24, 24, 32), true, &v).unwrap();
+        let be = PixelLayout::new(fmt(24, 24, 32), true, &v).unwrap();
         // MSB first: bytes are R,G,B.
         assert_eq!(decode(&be, &[1, 2, 3, 4, 5, 6, 0, 0], 2, 1), [3, 2, 1, 255, 6, 5, 4, 255]);
     }
@@ -270,7 +270,7 @@ mod tests {
     #[test]
     fn rgb565_expands_to_full_range() {
         let l = PixelLayout::new(
-            &fmt(16, 16, 32),
+            fmt(16, 16, 32),
             false,
             &visual(VisualClass::TRUE_COLOR, 0xf800, 0x07e0, 0x001f),
         )
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn rgb555_middle_values_round() {
         let l = PixelLayout::new(
-            &fmt(15, 16, 16),
+            fmt(15, 16, 16),
             false,
             &visual(VisualClass::TRUE_COLOR, 0x7c00, 0x03e0, 0x001f),
         )
@@ -304,12 +304,12 @@ mod tests {
     #[test]
     fn ten_bit_channels_scale_down() {
         let l = PixelLayout::new(
-            &fmt(30, 32, 32),
+            fmt(30, 32, 32),
             false,
             &visual(VisualClass::TRUE_COLOR, 0x3ff0_0000, 0x000f_fc00, 0x0000_03ff),
         )
         .unwrap();
-        let v: u32 = (0x3ff << 20) | (0x200 << 10) | 0;
+        let v: u32 = (0x3ff << 20) | (0x200 << 10);
         let out = decode(&l, &v.to_le_bytes(), 1, 1);
         assert_eq!(out, [0, 128, 255, 255]);
     }
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn palette_visuals_are_rejected_with_a_clear_error() {
         let err =
-            PixelLayout::new(&fmt(8, 8, 8), false, &visual(VisualClass::PSEUDO_COLOR, 0, 0, 0))
+            PixelLayout::new(fmt(8, 8, 8), false, &visual(VisualClass::PSEUDO_COLOR, 0, 0, 0))
                 .unwrap_err();
         assert!(err.to_string().contains("TrueColor"), "{err}");
     }
@@ -325,20 +325,20 @@ mod tests {
     #[test]
     fn bad_masks_are_rejected() {
         let v = visual(VisualClass::TRUE_COLOR, 0xf0f0, 0xff00, 0xff);
-        assert!(PixelLayout::new(&fmt(24, 32, 32), false, &v).is_err());
+        assert!(PixelLayout::new(fmt(24, 32, 32), false, &v).is_err());
         let v = visual(VisualClass::TRUE_COLOR, 0, 0xff00, 0xff);
-        assert!(PixelLayout::new(&fmt(24, 32, 32), false, &v).is_err());
-        let v = visual(VisualClass::TRUE_COLOR, 0xff0000, 0xff00, 0xff);
-        assert!(PixelLayout::new(&fmt(24, 8, 8), false, &v).is_err(), "8 bpp unsupported");
-        assert!(PixelLayout::new(&fmt(24, 32, 64), false, &v).is_err());
+        assert!(PixelLayout::new(fmt(24, 32, 32), false, &v).is_err());
+        let v = visual(VisualClass::TRUE_COLOR, 0x00ff_0000, 0xff00, 0xff);
+        assert!(PixelLayout::new(fmt(24, 8, 8), false, &v).is_err(), "8 bpp unsupported");
+        assert!(PixelLayout::new(fmt(24, 32, 64), false, &v).is_err());
     }
 
     #[test]
     fn short_data_is_an_error_not_a_panic() {
         let l = PixelLayout::new(
-            &fmt(24, 32, 32),
+            fmt(24, 32, 32),
             false,
-            &visual(VisualClass::TRUE_COLOR, 0xff0000, 0xff00, 0xff),
+            &visual(VisualClass::TRUE_COLOR, 0x00ff_0000, 0xff00, 0xff),
         )
         .unwrap();
         let mut out = vec![0u8; 8];
@@ -351,9 +351,9 @@ mod tests {
     #[test]
     fn last_row_may_omit_padding() {
         let l = PixelLayout::new(
-            &fmt(24, 24, 32),
+            fmt(24, 24, 32),
             false,
-            &visual(VisualClass::TRUE_COLOR, 0xff0000, 0xff00, 0xff),
+            &visual(VisualClass::TRUE_COLOR, 0x00ff_0000, 0xff00, 0xff),
         )
         .unwrap();
         // 1 px wide: stride 4, row bytes 3; two rows need 4 + 3 bytes.
@@ -363,12 +363,12 @@ mod tests {
 
     #[test]
     fn stride_math_for_odd_widths() {
-        let v = visual(VisualClass::TRUE_COLOR, 0xff0000, 0xff00, 0xff);
-        let l = PixelLayout::new(&fmt(24, 24, 32), false, &v).unwrap();
+        let v = visual(VisualClass::TRUE_COLOR, 0x00ff_0000, 0xff00, 0xff);
+        let l = PixelLayout::new(fmt(24, 24, 32), false, &v).unwrap();
         assert_eq!(l.row_stride(1), 4);
         assert_eq!(l.row_stride(3), 12);
         assert_eq!(l.row_stride(0), 0);
-        let l = PixelLayout::new(&fmt(24, 24, 8), false, &v).unwrap();
+        let l = PixelLayout::new(fmt(24, 24, 8), false, &v).unwrap();
         assert_eq!(l.row_stride(3), 9);
     }
 }

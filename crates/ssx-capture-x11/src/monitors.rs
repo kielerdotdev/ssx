@@ -186,11 +186,12 @@ impl Session {
                     continue;
                 };
                 outputs.push(String::from_utf8_lossy(&info.name).into_owned());
-                if refresh_hz.is_none() && info.crtc != 0 {
-                    if let Some((hz, rot)) = self.crtc_details(info.crtc, resources.as_ref()) {
-                        refresh_hz = hz;
-                        rotation = rot;
-                    }
+                if refresh_hz.is_none()
+                    && info.crtc != 0
+                    && let Some((hz, rot)) = self.crtc_details(info.crtc, resources.as_ref())
+                {
+                    refresh_hz = hz;
+                    rotation = rot;
                 }
             }
             out.push(X11Monitor {

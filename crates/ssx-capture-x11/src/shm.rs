@@ -52,13 +52,13 @@ mod imp {
             self.config.use_shm
                 && self.ext.shm_fd
                 && !matches!(
-                    *self.shm.lock().unwrap_or_else(|p| p.into_inner()),
+                    *self.shm.lock().unwrap_or_else(std::sync::PoisonError::into_inner),
                     ShmState::Disabled
                 )
         }
 
         pub(crate) fn disable_shm(&self) {
-            let mut state = self.shm.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.shm.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if let ShmState::Ready(seg) = std::mem::take(&mut *state) {
                 self.detach(&seg);
             }
@@ -98,7 +98,7 @@ mod imp {
             rows: u16,
             bytes: usize,
         ) -> X11Result<Vec<u8>> {
-            let mut state = self.shm.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.shm.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             let need_new = match &*state {
                 ShmState::Ready(seg) => seg.size < bytes,
                 _ => true,
@@ -140,7 +140,7 @@ mod imp {
         }
 
         pub(crate) fn release_shm(&self) {
-            let mut state = self.shm.lock().unwrap_or_else(|p| p.into_inner());
+            let mut state = self.shm.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if let ShmState::Ready(seg) = &*state {
                 self.detach(seg);
             }

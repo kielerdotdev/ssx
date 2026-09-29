@@ -231,11 +231,10 @@ fn query_extensions(conn: &RustConnection) -> Extensions {
     let mut ext = Extensions::default();
     let present = |name: &'static str| matches!(conn.extension_information(name), Ok(Some(_)));
 
-    if present(x11rb::protocol::shm::X11_EXTENSION_NAME) {
-        if let Some(v) = x11rb::protocol::shm::query_version(conn).ok().and_then(|c| c.reply().ok())
-        {
-            ext.shm_fd = (v.major_version, v.minor_version) >= (1, 2);
-        }
+    if present(x11rb::protocol::shm::X11_EXTENSION_NAME)
+        && let Some(v) = x11rb::protocol::shm::query_version(conn).ok().and_then(|c| c.reply().ok())
+    {
+        ext.shm_fd = (v.major_version, v.minor_version) >= (1, 2);
     }
     if present(xfixes::X11_EXTENSION_NAME) {
         ext.xfixes = xfixes::query_version(conn, 2, 0).ok().and_then(|c| c.reply().ok()).is_some();

@@ -77,8 +77,7 @@ pub(crate) fn blend_cursor(frame: &mut Frame, cursor: &CursorImage) {
             if a == 0 && argb == 0 {
                 continue;
             }
-            let src =
-                [(argb & 0xff) as u32, ((argb >> 8) & 0xff) as u32, ((argb >> 16) & 0xff) as u32];
+            let src = [(argb & 0xff), ((argb >> 8) & 0xff), ((argb >> 16) & 0xff)];
             let Some(px) = row.get_mut(dx as usize * 4..dx as usize * 4 + 4) else { continue };
             for (d, s) in px.iter_mut().zip(src) {
                 // Premultiplied source over destination, rounded to nearest.

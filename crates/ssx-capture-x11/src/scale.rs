@@ -56,7 +56,7 @@ pub(crate) fn parse_xsettings(data: &[u8]) -> Vec<(String, XSetting)> {
             break; // last-change serial
         }
         let value = match kind {
-            0 => cur.u32().map(|v| XSetting::Int(v as i32)),
+            0 => cur.u32().map(|v| XSetting::Int(v.cast_signed())),
             1 => {
                 let Some(len) = cur.u32() else { break };
                 let v = cur
@@ -122,25 +122,24 @@ impl Session {
     fn try_scale_factor(&self) -> X11Result<f64> {
         let xsettings = self.read_xsettings()?;
         let lookup = |name: &str| xsettings.iter().find(|(n, _)| n == name).map(|(_, v)| v);
-        if let Some(XSetting::Int(dpi1024)) = lookup("Xft/DPI") {
-            if *dpi1024 > 0 {
-                return Ok(dpi_to_scale(f64::from(*dpi1024) / 1024.0));
-            }
+        if let Some(XSetting::Int(dpi1024)) = lookup("Xft/DPI")
+            && *dpi1024 > 0
+        {
+            return Ok(dpi_to_scale(f64::from(*dpi1024) / 1024.0));
         }
         if let Some(rm) = self.property(
             self.root,
             self.atoms.resource_manager,
             x11rb::protocol::xproto::AtomEnum::STRING,
             1 << 20,
-        )? {
-            if let Some(dpi) = parse_xft_dpi(&String::from_utf8_lossy(&rm.value)) {
-                return Ok(dpi_to_scale(dpi));
-            }
+        )? && let Some(dpi) = parse_xft_dpi(&String::from_utf8_lossy(&rm.value))
+        {
+            return Ok(dpi_to_scale(dpi));
         }
-        if let Some(XSetting::Int(f)) = lookup("Gdk/WindowScalingFactor") {
-            if *f >= 1 {
-                return Ok(f64::from(*f).clamp(1.0, 8.0));
-            }
+        if let Some(XSetting::Int(f)) = lookup("Gdk/WindowScalingFactor")
+            && *f >= 1
+        {
+            return Ok(f64::from(*f).clamp(1.0, 8.0));
         }
         Ok(1.0)
     }
@@ -186,7 +185,7 @@ mod tests {
             b.push(0);
             b.extend(w16(name.len() as u16));
             b.extend(name.as_bytes());
-            while b.len() % 4 != 0 {
+            while !b.len().is_multiple_of(4) {
                 b.push(0);
             }
             b.extend(w32(1));
@@ -195,7 +194,7 @@ mod tests {
                 XSetting::String(s) => {
                     b.extend(w32(s.len() as u32));
                     b.extend(s.as_bytes());
-                    while b.len() % 4 != 0 {
+                    while !b.len().is_multiple_of(4) {
                         b.push(0);
                     }
                 }
