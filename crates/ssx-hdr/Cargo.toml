@@ -1,5 +1,6 @@
 [package]
 name = "ssx-hdr"
+description = "CPU reference HDR (scRGB) to SDR (sRGB) conversion for ssx screenshots."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +10,14 @@ publish = false
 
 [dependencies]
 ssx-types.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+half.workspace = true
+rayon.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
 
 [lints]
 workspace = true
