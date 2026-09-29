@@ -22,22 +22,13 @@
 //! in request fields) before any network traffic happens.
 
 use base64::Engine as _;
-use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 
 use super::jsonpath::{self, JsonPathError};
 use crate::nameparser::NameParser;
+pub use crate::util::url_encode;
 
 /// Maximum call nesting depth.
 pub const MAX_DEPTH: usize = 48;
-
-/// Everything except the RFC 3986 unreserved characters is percent-encoded, like ShareX's
-/// `URLHelpers.URLEncode`.
-const URL_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC.remove(b'-').remove(b'.').remove(b'_').remove(b'~');
-
-/// Percent-encode `s` (UTF-8, uppercase hex, unreserved characters untouched).
-pub fn url_encode(s: &str) -> String {
-    utf8_percent_encode(s, URL_ENCODE_SET).to_string()
-}
 
 /// Escape `s` so that it renders back to exactly `s` (no call is started, `\` is kept).
 pub fn escape_literal(s: &str) -> String {

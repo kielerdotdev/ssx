@@ -13,7 +13,7 @@ default = ["sxcu", "s3", "oauth"]
 # ShareX `.sxcu` custom uploader engine (pulls in a lookaround-capable regex engine and XPath).
 sxcu = ["dep:fancy-regex", "dep:sxd-document", "dep:sxd-xpath"]
 # S3-compatible uploader and the in-crate AWS Signature V4 implementation.
-s3 = ["dep:hmac", "dep:sha2"]
+s3 = ["dep:sha2"]
 # OAuth2 loopback (PKCE) helper.
 oauth = ["dep:sha2"]
 
@@ -24,7 +24,6 @@ bytes = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 fancy-regex = { version = "0.16", optional = true }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
-hmac = { version = "0.12", optional = true }
 httpdate = "1"
 indexmap = { version = "2", features = ["serde"] }
 mime_guess = "2"
