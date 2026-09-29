@@ -603,7 +603,7 @@ mod tests {
         cfg.key_template = "%rn{5}/{filename}".into();
         let u = up(cfg);
         let key = u.object_key(&UploadRequest::from_bytes(vec![1], "f%y.png", UploadKind::Image), &NameParser::default()).unwrap();
-        assert!(key.len() == 5 + 1 + 6 && key.ends_with("/f%y.png"), "file names are never re-expanded: {key}");
+        assert!(key.len() == 5 + 1 + 7 && key.ends_with("/f%y.png"), "file names are never re-expanded: {key}");
 
         let mut cfg = S3Config::aws("b", "us-east-1");
         cfg.key_template = "x".repeat(1100);
