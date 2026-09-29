@@ -24,5 +24,5 @@
 // pub mod history;
 // pub mod ipc;
 pub mod pattern;
-// pub mod settings;
+pub mod settings;
 // pub mod workflow;
