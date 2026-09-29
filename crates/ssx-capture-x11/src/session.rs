@@ -10,9 +10,8 @@ use std::{collections::HashMap, sync::Mutex};
 use x11rb::{
     connection::{Connection, RequestConnection},
     protocol::{
-        composite, randr,
+        composite, randr, xfixes,
         xproto::{self, Atom, AtomEnum, ConnectionExt as _, Format, ImageOrder, Visualtype},
-        xfixes,
     },
     rust_connection::RustConnection,
 };
@@ -120,10 +119,8 @@ impl Session {
         let formats = setup.pixmap_formats.clone();
 
         let atoms = Atoms::intern(&conn)?;
-        let xsettings_selection = conn
-            .intern_atom(false, format!("_XSETTINGS_S{screen_num}").as_bytes())?
-            .reply()?
-            .atom;
+        let xsettings_selection =
+            conn.intern_atom(false, format!("_XSETTINGS_S{screen_num}").as_bytes())?.reply()?.atom;
         let cm_selection =
             conn.intern_atom(false, format!("_NET_WM_CM_S{screen_num}").as_bytes())?.reply()?.atom;
 
@@ -169,9 +166,7 @@ impl Session {
     ) -> X11Result<Option<Property>> {
         let type_ = type_.into();
         let mut value = Vec::new();
-        let mut result_type = 0;
-        let mut format = 0;
-        loop {
+        let (result_type, format) = loop {
             let offset = u32::try_from(value.len() / 4).unwrap_or(u32::MAX);
             let reply = self
                 .conn
@@ -188,23 +183,20 @@ impl Session {
             if reply.type_ == u32::from(AtomEnum::NONE) {
                 return Ok(None);
             }
-            result_type = reply.type_;
-            format = reply.format;
             value.extend_from_slice(&reply.value);
             if reply.bytes_after == 0 || value.len() >= max_bytes {
-                break;
+                break (reply.type_, reply.format);
             }
-        }
+        };
         value.truncate(max_bytes);
         Ok(Some(Property { type_: result_type, format, value }))
     }
 
     /// The pixmap format the server uses for `depth`.
     pub(crate) fn format_for_depth(&self, depth: u8) -> X11Result<&Format> {
-        self.formats
-            .iter()
-            .find(|f| f.depth == depth)
-            .ok_or_else(|| X11Error::UnsupportedVisual(format!("no pixmap format for depth {depth}")))
+        self.formats.iter().find(|f| f.depth == depth).ok_or_else(|| {
+            X11Error::UnsupportedVisual(format!("no pixmap format for depth {depth}"))
+        })
     }
 
     /// Whether a compositing manager currently owns `_NET_WM_CM_Sn`.

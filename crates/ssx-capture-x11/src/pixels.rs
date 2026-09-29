@@ -258,7 +258,10 @@ mod tests {
         // Row stride: 2 px * 24 bit = 48 bit, padded to 64 bit = 8 bytes.
         assert_eq!(le.row_stride(2), 8);
         let data = [3, 2, 1, 6, 5, 4, 0xee, 0xee, /* row 2 */ 9, 8, 7, 12, 11, 10, 0xee, 0xee];
-        assert_eq!(decode(&le, &data, 2, 2), [3, 2, 1, 255, 6, 5, 4, 255, 9, 8, 7, 255, 12, 11, 10, 255]);
+        assert_eq!(
+            decode(&le, &data, 2, 2),
+            [3, 2, 1, 255, 6, 5, 4, 255, 9, 8, 7, 255, 12, 11, 10, 255]
+        );
         let be = PixelLayout::new(&fmt(24, 24, 32), true, &v).unwrap();
         // MSB first: bytes are R,G,B.
         assert_eq!(decode(&be, &[1, 2, 3, 4, 5, 6, 0, 0], 2, 1), [3, 2, 1, 255, 6, 5, 4, 255]);
@@ -313,8 +316,9 @@ mod tests {
 
     #[test]
     fn palette_visuals_are_rejected_with_a_clear_error() {
-        let err = PixelLayout::new(&fmt(8, 8, 8), false, &visual(VisualClass::PSEUDO_COLOR, 0, 0, 0))
-            .unwrap_err();
+        let err =
+            PixelLayout::new(&fmt(8, 8, 8), false, &visual(VisualClass::PSEUDO_COLOR, 0, 0, 0))
+                .unwrap_err();
         assert!(err.to_string().contains("TrueColor"), "{err}");
     }
 
