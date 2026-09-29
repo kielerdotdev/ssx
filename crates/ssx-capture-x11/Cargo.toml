@@ -13,3 +13,11 @@ ssx-capture.workspace = true
 
 [lints]
 workspace = true
+
+[target.'cfg(all(unix, not(target_vendor = "apple")))'.dependencies]
+thiserror.workspace = true
+tracing.workspace = true
+x11rb = { version = "0.14", features = ["shm", "randr", "xfixes", "composite"] }
+
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+rustix = { version = "1", features = ["fs"] }
