@@ -1,0 +1,72 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/kielerdotdev/ssx"
+authors = ["ssx contributors"]
+
+[workspace.dependencies]
+# Internal crates
+ssx-types = { path = "crates/ssx-types" }
+ssx-hdr = { path = "crates/ssx-hdr" }
+ssx-capture = { path = "crates/ssx-capture" }
+ssx-capture-win = { path = "crates/ssx-capture-win" }
+ssx-capture-x11 = { path = "crates/ssx-capture-x11" }
+ssx-capture-wayland = { path = "crates/ssx-capture-wayland" }
+ssx-platform = { path = "crates/ssx-platform" }
+ssx-editor = { path = "crates/ssx-editor" }
+ssx-upload = { path = "crates/ssx-upload" }
+ssx-core = { path = "crates/ssx-core" }
+ssx-ipc = { path = "crates/ssx-ipc" }
+ssx-shell = { path = "crates/ssx-shell" }
+ssx-hotkeys = { path = "crates/ssx-hotkeys" }
+
+# Shared third-party versions (crates may also pin their own)
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp", "gif"] }
+half = "2"
+rayon = "1"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Pragmatic pedantic exceptions: image/pixel maths casts constantly and intentionally.
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+cast_lossless = "allow"
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+too_many_lines = "allow"
+similar_names = "allow"
+return_self_not_must_use = "allow"
+needless_pass_by_value = "allow"
+missing_fields_in_debug = "allow"
+struct_excessive_bools = "allow"
+many_single_char_names = "allow"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"

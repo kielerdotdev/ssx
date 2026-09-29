@@ -1,0 +1,16 @@
+[package]
+name = "ssx-capture"
+description = "Backend-agnostic screen-capture API: the CaptureBackend trait, options, errors and desktop compositing."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+ssx-types.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
