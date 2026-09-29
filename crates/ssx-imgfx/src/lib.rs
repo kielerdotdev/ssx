@@ -76,6 +76,66 @@ impl PointF {
     pub const fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
+
+    /// Euclidean distance to `o`.
+    pub fn distance(self, o: PointF) -> f32 {
+        (self - o).length()
+    }
+
+    /// Length of the vector from the origin.
+    pub fn length(self) -> f32 {
+        self.x.hypot(self.y)
+    }
+
+    /// Linear interpolation towards `o` (`t = 0` is `self`, `t = 1` is `o`).
+    pub fn lerp(self, o: PointF, t: f32) -> PointF {
+        PointF::new(self.x + (o.x - self.x) * t, self.y + (o.y - self.y) * t)
+    }
+
+    /// Dot product.
+    pub fn dot(self, o: PointF) -> f32 {
+        self.x * o.x + self.y * o.y
+    }
+
+    /// Rotates about `centre` by `radians` (clockwise on screen, y down).
+    pub fn rotate_about(self, centre: PointF, radians: f32) -> PointF {
+        let (s, c) = radians.sin_cos();
+        let d = self - centre;
+        PointF::new(centre.x + d.x * c - d.y * s, centre.y + d.x * s + d.y * c)
+    }
+
+    /// `true` when both coordinates are finite.
+    pub fn is_finite(self) -> bool {
+        self.x.is_finite() && self.y.is_finite()
+    }
+}
+
+impl std::ops::Add for PointF {
+    type Output = PointF;
+    fn add(self, o: PointF) -> PointF {
+        PointF::new(self.x + o.x, self.y + o.y)
+    }
+}
+
+impl std::ops::Sub for PointF {
+    type Output = PointF;
+    fn sub(self, o: PointF) -> PointF {
+        PointF::new(self.x - o.x, self.y - o.y)
+    }
+}
+
+impl std::ops::Mul<f32> for PointF {
+    type Output = PointF;
+    fn mul(self, k: f32) -> PointF {
+        PointF::new(self.x * k, self.y * k)
+    }
+}
+
+impl std::ops::Neg for PointF {
+    type Output = PointF;
+    fn neg(self) -> PointF {
+        PointF::new(-self.x, -self.y)
+    }
 }
 
 /// Errors from effect operations. Geometry problems are never errors (they clip).
