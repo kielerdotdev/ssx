@@ -1,0 +1,19 @@
+{
+  "Version": "14.1.0",
+  "Name": "Lensdump",
+  "DestinationType": "ImageUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://lensdump.com/api/1/upload",
+  "Headers": {
+    "X-API-Key": "lensdump-api-key"
+  },
+  "Body": "MultipartFormData",
+  "Arguments": {
+    "format": "json"
+  },
+  "FileFormName": "source",
+  "URL": "{json:image.url}",
+  "ThumbnailURL": "{json:image.thumb.url}",
+  "DeletionURL": "{json:image.delete_url}",
+  "ErrorMessage": "{json:error.message}"
+}

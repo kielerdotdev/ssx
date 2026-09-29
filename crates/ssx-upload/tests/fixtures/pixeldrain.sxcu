@@ -1,0 +1,14 @@
+{
+  "Version": "14.1.0",
+  "Name": "pixeldrain.com",
+  "DestinationType": "ImageUploader, TextUploader, FileUploader",
+  "RequestMethod": "PUT",
+  "RequestURL": "https://pixeldrain.com/api/file/{filename}",
+  "Headers": {
+    "Authorization": "Basic {base64::my-api-key}"
+  },
+  "Body": "Binary",
+  "URL": "https://pixeldrain.com/u/{json:id}",
+  "ThumbnailURL": "https://pixeldrain.com/api/file/{json:id}/thumbnail",
+  "ErrorMessage": "{json:message}"
+}

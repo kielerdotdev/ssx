@@ -1,0 +1,15 @@
+{
+  "Version": "14.1.0",
+  "Name": "XML API",
+  "DestinationType": "ImageUploader, FileUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://xml.example.com/upload.php",
+  "Body": "MultipartFormData",
+  "Arguments": {
+    "apikey": "xml-key"
+  },
+  "FileFormName": "userfile",
+  "URL": "{xml:/response/file/url}",
+  "ThumbnailURL": "{xml:/response/file/thumb}",
+  "ErrorMessage": "{xml:/response/error/message}"
+}

@@ -1,0 +1,14 @@
+{
+  "Version": "14.0.0",
+  "Name": "Uguu (pomf compatible)",
+  "DestinationType": "ImageUploader, TextUploader, FileUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://uguu.se/upload",
+  "Parameters": {
+    "output": "json"
+  },
+  "Body": "MultipartFormData",
+  "FileFormName": "files[]",
+  "URL": "{json:files[0].url}",
+  "ErrorMessage": "{json:description}"
+}

@@ -1,0 +1,10 @@
+{
+  "Version": "14.1.0",
+  "Name": "Redirecting host",
+  "DestinationType": "ImageUploader, FileUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://redirect.example.com/upload",
+  "Body": "MultipartFormData",
+  "FileFormName": "file",
+  "URL": "{responseurl}"
+}

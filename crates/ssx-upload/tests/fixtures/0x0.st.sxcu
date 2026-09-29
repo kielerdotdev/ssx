@@ -1,0 +1,18 @@
+{
+  "Version": "14.0.1",
+  "Name": "0x0.st",
+  "DestinationType": "ImageUploader, TextUploader, FileUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://0x0.st",
+  "Headers": {
+    "User-Agent": "ShareX/16.0"
+  },
+  "Body": "MultipartFormData",
+  "Arguments": {
+    "secret": "%ra{12}"
+  },
+  "FileFormName": "file",
+  "URL": "{response}",
+  "DeletionURL": "{header:X-Token}",
+  "ErrorMessage": "{response}"
+}

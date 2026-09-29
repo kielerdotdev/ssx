@@ -1,0 +1,16 @@
+{
+  "Version": "14.1.0",
+  "Name": "dpaste.com",
+  "DestinationType": "TextUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://dpaste.com/api/v2/",
+  "Body": "FormURLEncoded",
+  "Arguments": {
+    "content": "{input}",
+    "syntax": "text",
+    "expiry_days": "7",
+    "title": "{filename}"
+  },
+  "URL": "{response}",
+  "ErrorMessage": "{response}"
+}

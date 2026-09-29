@@ -679,19 +679,19 @@ impl CustomUploader {
             if name.is_empty() {
                 r.error("Parameters contains an empty name");
             }
-            check_template(r, &format!("Parameters.{name}"), value, false);
+            check_named_template(r, &format!("Parameters.{name}"), value);
         }
         for (name, value) in &self.arguments {
             if name.is_empty() {
                 r.error("Arguments contains an empty name");
             }
-            check_template(r, &format!("Arguments.{name}"), value, false);
+            check_named_template(r, &format!("Arguments.{name}"), value);
         }
         for (name, value) in &self.headers {
             if reqwest::header::HeaderName::from_bytes(name.as_bytes()).is_err() {
                 r.error(format!("Headers: '{name}' is not a valid HTTP header name"));
             }
-            check_template(r, &format!("Headers.{name}"), value, false);
+            check_named_template(r, &format!("Headers.{name}"), value);
         }
     }
 }
@@ -706,6 +706,13 @@ fn host_of(url: &str) -> Option<String> {
     let fixed = if url.contains("://") { url.to_owned() } else { format!("https://{url}") };
     let host = url::Url::parse(&fixed).ok()?.host_str()?.to_owned();
     Some(host.strip_prefix("www.").map_or(host.clone(), str::to_owned))
+}
+
+/// Like [`check_template`] for fields ShareX runs through the `%` name parser first, so
+/// that `%rn{8}` is not mistaken for a `{8}` call.
+fn check_named_template(r: &mut ValidationReport, field: &str, text: &str) {
+    let expanded = template::expand_names_keeping_escapes(text, &crate::nameparser::NameParser::text());
+    check_template(r, field, &expanded, false);
 }
 
 fn check_template(r: &mut ValidationReport, field: &str, text: &str, response_side: bool) {

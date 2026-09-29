@@ -1,0 +1,18 @@
+{
+  "Version": "13.0.0",
+  "Name": "Legacy $ syntax",
+  "DestinationType": "ImageUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://legacy.example.com/api/upload",
+  "Headers": {
+    "X-Client": "$filename$"
+  },
+  "Body": "MultipartFormData",
+  "Arguments": {
+    "source": "sharex",
+    "note": "a {literal} brace"
+  },
+  "FileFormName": "image",
+  "URL": "$json:data.url$",
+  "ErrorMessage": "$json:error$"
+}

@@ -1,0 +1,16 @@
+{
+  "Version": "14.1.0",
+  "Name": "Imgur (anonymous)",
+  "DestinationType": "ImageUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://api.imgur.com/3/image",
+  "Headers": {
+    "Authorization": "Client-ID 1a2b3c4d5e6f7a8"
+  },
+  "Body": "MultipartFormData",
+  "FileFormName": "image",
+  "URL": "{json:data.link}",
+  "ThumbnailURL": "https://i.imgur.com/{json:data.id}m.jpg",
+  "DeletionURL": "https://imgur.com/delete/{json:data.deletehash}",
+  "ErrorMessage": "{json:data.error}"
+}

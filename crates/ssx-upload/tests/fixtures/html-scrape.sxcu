@@ -1,0 +1,12 @@
+{
+  "Version": "14.1.0",
+  "Name": "HTML scraper",
+  "DestinationType": "ImageUploader, FileUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://files.example.com/upload",
+  "Body": "MultipartFormData",
+  "FileFormName": "upload",
+  "URL": "{regex:href=\"(https://files[.]example[.]com/d/[^\"]+)\"|1}",
+  "ThumbnailURL": "{regex:<img src=\"(?<thumb>[^\"]+)\"|thumb}",
+  "ErrorMessage": "{regex:<p class=\"error\">(.+?)</p>|1}"
+}
