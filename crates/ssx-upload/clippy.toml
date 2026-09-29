@@ -1,0 +1,7 @@
+# Product and protocol names that appear throughout the docs; ".." keeps clippy's defaults.
+doc-valid-idents = [
+    "ShareX", "OAuth2", "OAuth", "SigV4", "WebDAV", "MinIO", "PutObject", "TinyURL", "YOURLS",
+    "SFTP", "FTP", "PKCE", "JSONPath", "XPath", "GitHub", "CloudFlare", "Cloudflare", "R2",
+    "B2", "Wasabi", "UNSIGNED-PAYLOAD", "HMAC-SHA256", "SHA-256", "SecretStore", "UploadContext",
+    "..",
+]

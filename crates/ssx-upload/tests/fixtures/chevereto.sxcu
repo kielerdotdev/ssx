@@ -1,0 +1,13 @@
+{
+  "Version": "14.0.0",
+  "Name": "Chevereto (query in RequestURL)",
+  "DestinationType": "ImageUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://chevereto.example.com/api/1/upload?key=chv_abcdef&format=json",
+  "Body": "MultipartFormData",
+  "FileFormName": "source",
+  "URL": "{json:image.url}",
+  "ThumbnailURL": "{json:image.thumb.url}",
+  "DeletionURL": "{json:image.delete_url}",
+  "ErrorMessage": "{json:error.message}"
+}

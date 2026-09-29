@@ -1,0 +1,14 @@
+{
+  "Version": "14.1.0",
+  "Name": "transfer.sh",
+  "DestinationType": "ImageUploader, TextUploader, FileUploader",
+  "RequestMethod": "PUT",
+  "RequestURL": "https://transfer.sh/{filename}",
+  "Headers": {
+    "Max-Downloads": "5",
+    "Max-Days": "7"
+  },
+  "Body": "Binary",
+  "URL": "{response}",
+  "DeletionURL": "{header:X-Url-Delete}"
+}

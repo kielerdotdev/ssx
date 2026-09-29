@@ -1,0 +1,9 @@
+{
+  "Version": "14.1.0",
+  "Name": "is.gd",
+  "DestinationType": "URLShortener",
+  "RequestMethod": "GET",
+  "RequestURL": "https://is.gd/create.php?format=simple&url={input}",
+  "URL": "{response}",
+  "ErrorMessage": "{response}"
+}

@@ -1,0 +1,17 @@
+{
+  "Version": "14.0.0",
+  "Name": "sxcu.net",
+  "DestinationType": "ImageUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://sxcu.net/api/files/create",
+  "Body": "MultipartFormData",
+  "Arguments": {
+    "noembed": "",
+    "collection": "0123abcd"
+  },
+  "FileFormName": "file",
+  "URL": "{json:url}",
+  "ThumbnailURL": "{json:thumb}",
+  "DeletionURL": "{json:del_url}",
+  "ErrorMessage": "{json:error}"
+}

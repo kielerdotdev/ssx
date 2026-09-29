@@ -1,0 +1,16 @@
+{
+  "Version": "14.1.0",
+  "Name": "Generic paste API (bearer)",
+  "DestinationType": "TextUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://paste.example.com/api/v1/pastes",
+  "Headers": {
+    "Authorization": "Bearer sk_live_9f8e7d6c",
+    "Accept": "application/json"
+  },
+  "Body": "JSON",
+  "Data": "{\n  \"title\": \"{filename}\",\n  \"content\": \"{input}\",\n  \"expires\": \"1d\"\n}",
+  "URL": "https://paste.example.com/{json:data.slug}",
+  "DeletionURL": "https://paste.example.com/api/v1/pastes/{json:data.slug}?token={json:data.delete_token}",
+  "ErrorMessage": "{json:errors[0].detail}"
+}

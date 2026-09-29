@@ -1,0 +1,10 @@
+{
+  "Version": "14.1.0",
+  "Name": "x0.at",
+  "DestinationType": "ImageUploader, FileUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://x0.at",
+  "Body": "MultipartFormData",
+  "FileFormName": "file",
+  "URL": "{response}"
+}
