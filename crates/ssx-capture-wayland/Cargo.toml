@@ -1,5 +1,6 @@
 [package]
 name = "ssx-capture-wayland"
+description = "Direct-protocol Wayland capture backend for wlroots compositors (sway, Hyprland): ext-image-copy-capture-v1 and wlr-screencopy-v1."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,6 +11,21 @@ publish = false
 [dependencies]
 ssx-types.workspace = true
 ssx-capture.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging", "unstable"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+rustix = { version = "1", features = ["fs", "event", "time"] }
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+wayland-server = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "server", "staging", "unstable"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client", "server"] }
+tempfile = "3"
 
 [lints]
 workspace = true
