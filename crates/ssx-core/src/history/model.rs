@@ -233,11 +233,15 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 
 /// Streaming hex SHA-256 of a file.
 pub fn sha256_file(path: &Path) -> std::io::Result<String> {
-    let mut f = std::fs::File::open(path)?;
+    sha256_reader(&mut std::fs::File::open(path)?)
+}
+
+/// Streaming hex SHA-256 of everything `reader` yields.
+pub fn sha256_reader(reader: &mut dyn Read) -> std::io::Result<String> {
     let mut h = Sha256::new();
     let mut buf = vec![0u8; 64 * 1024];
     loop {
-        let n = f.read(&mut buf)?;
+        let n = reader.read(&mut buf)?;
         if n == 0 {
             break;
         }

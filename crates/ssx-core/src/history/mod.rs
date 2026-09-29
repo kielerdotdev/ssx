@@ -33,7 +33,7 @@ use rusqlite::{Connection, OpenFlags, params, params_from_iter, types::Value};
 
 pub use model::{
     Entry, EntryKind, NewEntry, Orphan, PrunePolicy, Query, UploadInfo, now_ms, sha256_file,
-    sha256_hex,
+    sha256_hex, sha256_reader,
 };
 pub use schema::SCHEMA_VERSION;
 pub use thumbnail::{

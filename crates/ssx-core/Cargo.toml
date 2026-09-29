@@ -24,6 +24,10 @@ sha2 = "0.10"
 qrcode = { version = "0.14", default-features = false }
 unicode-segmentation = "1"
 
+[features]
+# Mock services and helpers for testing code that drives the workflow engine.
+testing = []
+
 [dev-dependencies]
 tempfile = "3"
 proptest = { version = "1", default-features = false, features = ["std"] }
