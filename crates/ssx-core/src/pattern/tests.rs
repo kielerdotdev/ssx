@@ -271,7 +271,7 @@ fn random_tokens_shape() {
     let s = f.text("%rna{200}");
     assert!(s.chars().all(|c| !"01OIl".contains(c) && c.is_ascii_alphanumeric()), "{s}");
     assert_eq!(f.text("%ra").chars().count(), 1);
-    assert_eq!(f.text("%remoji{3}").chars().filter(|c| !c.is_ascii()).count() >= 3, true);
+    assert!(f.text("%remoji{3}").chars().filter(|c| !c.is_ascii()).count() >= 3);
 }
 
 #[test]
@@ -321,9 +321,9 @@ fn guid_tokens() {
 #[test]
 fn random_file_line() {
     let mut f = Fixture::new();
-    f.env.files.insert("words.txt".into(), vec!["".into(), "  alpha  ".into(), "".into()]);
+    f.env.files.insert("words.txt".into(), vec![String::new(), "  alpha  ".into(), String::new()]);
     assert_eq!(f.text("%rf{words.txt}"), "alpha");
-    f.env.files.insert("empty.txt".into(), vec!["".into(), "  ".into()]);
+    f.env.files.insert("empty.txt".into(), vec![String::new(), "  ".into()]);
     let err = Pattern::parse("%rf{empty.txt}").render(&f.ctx(), PatternKind::Text).unwrap_err();
     assert!(matches!(err, PatternError::EmptyRandomFile(_)));
     let err = Pattern::parse("%rf{missing.txt}").render(&f.ctx(), PatternKind::Text).unwrap_err();
@@ -395,7 +395,7 @@ fn render_file_name_adds_extension_and_respects_limits() {
     let long = "x".repeat(1000);
     let n = render_file_name(&long, "png", &f.ctx()).unwrap();
     assert_eq!(n.len(), 255);
-    assert!(n.ends_with(".png"));
+    assert_eq!(n.rsplit('.').next(), Some("png"));
     // max_name_len applies to the stem only
     f.options.max_name_len = Some(3);
     assert_eq!(render_file_name("abcdef", "png", &f.ctx()).unwrap(), "abc.png");

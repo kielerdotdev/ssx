@@ -303,7 +303,9 @@ pub enum CodecError {
     #[error("message has no protocol version (`v`)")]
     MissingVersion,
     /// The peer speaks a newer protocol.
-    #[error("peer uses protocol version {found}, this build supports up to {supported}; upgrade ssx")]
+    #[error(
+        "peer uses protocol version {found}, this build supports up to {supported}; upgrade ssx"
+    )]
     UnsupportedVersion {
         /// Version in the message.
         found: u32,
@@ -326,7 +328,9 @@ impl CodecError {
     /// connection itself is broken.
     pub fn error_code(&self) -> Option<ErrorCode> {
         match self {
-            Self::Malformed(_) | Self::MissingVersion | Self::LineTooLong => Some(ErrorCode::InvalidRequest),
+            Self::Malformed(_) | Self::MissingVersion | Self::LineTooLong => {
+                Some(ErrorCode::InvalidRequest)
+            }
             Self::UnsupportedVersion { .. } => Some(ErrorCode::VersionMismatch),
             Self::Encode(_) | Self::Io(_) => None,
         }
@@ -363,13 +367,22 @@ pub fn decode_line<T: DeserializeOwned>(line: &str) -> Result<T, CodecError> {
         serde_json::from_str(line).map_err(|e| CodecError::Malformed(e.to_string()))?;
     match probe.v {
         None => return Err(CodecError::MissingVersion),
-        Some(serde_json::Value::Number(n)) => match n.as_u64().and_then(|v| u32::try_from(v).ok()) {
-            Some(v) if v > PROTOCOL_VERSION => {
-                return Err(CodecError::UnsupportedVersion { found: v, supported: PROTOCOL_VERSION });
+        Some(serde_json::Value::Number(n)) => {
+            match n.as_u64().and_then(|v| u32::try_from(v).ok()) {
+                Some(v) if v > PROTOCOL_VERSION => {
+                    return Err(CodecError::UnsupportedVersion {
+                        found: v,
+                        supported: PROTOCOL_VERSION,
+                    });
+                }
+                Some(_) => {}
+                None => {
+                    return Err(CodecError::Malformed(
+                        "`v` must be a small whole number".to_owned(),
+                    ));
+                }
             }
-            Some(_) => {}
-            None => return Err(CodecError::Malformed("`v` must be a small whole number".to_owned())),
-        },
+        }
         Some(_) => return Err(CodecError::Malformed("`v` must be a number".to_owned())),
     }
     serde_json::from_str(line).map_err(|e| CodecError::Malformed(e.to_string()))
@@ -393,7 +406,8 @@ impl<R: BufRead> LineReader<R> {
     pub fn read_line(&mut self) -> Result<Option<String>, CodecError> {
         loop {
             let mut buf = Vec::new();
-            let n = (&mut self.inner).take(MAX_LINE_BYTES as u64 + 1).read_until(b'\n', &mut buf)?;
+            let n =
+                (&mut self.inner).take(MAX_LINE_BYTES as u64 + 1).read_until(b'\n', &mut buf)?;
             if n == 0 {
                 return Ok(None);
             }
@@ -480,11 +494,29 @@ mod tests {
             Request::Ping,
             Request::RunWorkflow { id: Some("capture-region".into()), name: None, wait: false },
             Request::RunWorkflow { id: None, name: Some("Region".into()), wait: true },
-            Request::PostFiles { paths: vec!["/a b/c.png".into(), "/日本/ファイル.txt".into()], action: PostAction::Upload, wait: false },
+            Request::PostFiles {
+                paths: vec!["/a b/c.png".into(), "/日本/ファイル.txt".into()],
+                action: PostAction::Upload,
+                wait: false,
+            },
             Request::PostFiles { paths: vec![], action: PostAction::Edit, wait: true },
-            Request::PostFiles { paths: vec!["/x".into()], action: PostAction::Workflow { workflow: "w".into() }, wait: false },
-            Request::Capture { target: CaptureKind::Region, workflow: None, delay_ms: None, wait: false },
-            Request::Capture { target: CaptureKind::LastRegion, workflow: Some("w".into()), delay_ms: Some(2500), wait: true },
+            Request::PostFiles {
+                paths: vec!["/x".into()],
+                action: PostAction::Workflow { workflow: "w".into() },
+                wait: false,
+            },
+            Request::Capture {
+                target: CaptureKind::Region,
+                workflow: None,
+                delay_ms: None,
+                wait: false,
+            },
+            Request::Capture {
+                target: CaptureKind::LastRegion,
+                workflow: Some("w".into()),
+                delay_ms: Some(2500),
+                wait: true,
+            },
             Request::ListWorkflows,
             Request::CancelRun { run_id: u64::MAX },
             Request::StopRecording,
@@ -501,11 +533,22 @@ mod tests {
                 outcome: Outcome::PartialSuccess,
                 message: "1 of 2 uploaded".into(),
                 items: vec![
-                    ItemSummary { path: Some("/a.png".into()), url: Some("https://x/a".into()), error: None },
+                    ItemSummary {
+                        path: Some("/a.png".into()),
+                        url: Some("https://x/a".into()),
+                        error: None,
+                    },
                     ItemSummary { path: None, url: None, error: Some("upload: offline".into()) },
                 ],
             }),
-            Response::Workflows { workflows: vec![WorkflowInfo { id: "a".into(), name: "A".into(), cli_name: Some("a".into()), hotkey: None }] },
+            Response::Workflows {
+                workflows: vec![WorkflowInfo {
+                    id: "a".into(),
+                    name: "A".into(),
+                    cli_name: Some("a".into()),
+                    hotkey: None,
+                }],
+            },
             Response::Ok,
             Response::error(ErrorCode::UnknownWorkflow, "no workflow named \"x\""),
         ]
@@ -537,15 +580,33 @@ mod tests {
         let cases: Vec<(RequestEnvelope, &str)> = vec![
             (RequestEnvelope::new(1, Request::Ping), r#"{"v":1,"seq":1,"type":"ping"}"#),
             (
-                RequestEnvelope::new(7, Request::PostFiles { paths: vec!["/a.png".into()], action: PostAction::Upload, wait: false }),
+                RequestEnvelope::new(
+                    7,
+                    Request::PostFiles {
+                        paths: vec!["/a.png".into()],
+                        action: PostAction::Upload,
+                        wait: false,
+                    },
+                ),
                 r#"{"v":1,"seq":7,"type":"post_files","paths":["/a.png"],"action":{"kind":"upload"},"wait":false}"#,
             ),
             (
-                RequestEnvelope::new(2, Request::RunWorkflow { id: None, name: Some("region".into()), wait: true }),
+                RequestEnvelope::new(
+                    2,
+                    Request::RunWorkflow { id: None, name: Some("region".into()), wait: true },
+                ),
                 r#"{"v":1,"seq":2,"type":"run_workflow","name":"region","wait":true}"#,
             ),
             (
-                RequestEnvelope::new(3, Request::Capture { target: CaptureKind::LastRegion, workflow: None, delay_ms: Some(10), wait: false }),
+                RequestEnvelope::new(
+                    3,
+                    Request::Capture {
+                        target: CaptureKind::LastRegion,
+                        workflow: None,
+                        delay_ms: Some(10),
+                        wait: false,
+                    },
+                ),
                 r#"{"v":1,"seq":3,"type":"capture","target":"last_region","delay_ms":10,"wait":false}"#,
             ),
         ];
@@ -555,11 +616,15 @@ mod tests {
             assert_eq!(back, env);
         }
         assert_eq!(
-            encode_line(&ResponseEnvelope::new(7, Response::Accepted { run_id: 3 })).unwrap().trim_end(),
+            encode_line(&ResponseEnvelope::new(7, Response::Accepted { run_id: 3 }))
+                .unwrap()
+                .trim_end(),
             r#"{"v":1,"seq":7,"type":"accepted","run_id":3}"#
         );
         assert_eq!(
-            encode_line(&ResponseEnvelope::new(0, Response::error(ErrorCode::Busy, "b"))).unwrap().trim_end(),
+            encode_line(&ResponseEnvelope::new(0, Response::error(ErrorCode::Busy, "b")))
+                .unwrap()
+                .trim_end(),
             r#"{"v":1,"seq":0,"type":"error","code":"busy","message":"b"}"#
         );
         assert_eq!(
@@ -570,16 +635,31 @@ mod tests {
 
     #[test]
     fn optional_fields_default_and_unknown_fields_are_ignored() {
-        let r: RequestEnvelope = decode_line(r#"{"v":1,"type":"run_workflow","id":"x","future_field":{"a":[1,2]}}"#).unwrap();
+        let r: RequestEnvelope =
+            decode_line(r#"{"v":1,"type":"run_workflow","id":"x","future_field":{"a":[1,2]}}"#)
+                .unwrap();
         assert_eq!(r.seq, 0, "missing correlation number defaults to 0");
-        assert_eq!(r.request, Request::RunWorkflow { id: Some("x".into()), name: None, wait: false });
-        let r: RequestEnvelope = decode_line(r#"{"v":1,"seq":5,"type":"capture","target":"window"}"#).unwrap();
-        assert_eq!(r.request, Request::Capture { target: CaptureKind::Window, workflow: None, delay_ms: None, wait: false });
+        assert_eq!(
+            r.request,
+            Request::RunWorkflow { id: Some("x".into()), name: None, wait: false }
+        );
+        let r: RequestEnvelope =
+            decode_line(r#"{"v":1,"seq":5,"type":"capture","target":"window"}"#).unwrap();
+        assert_eq!(
+            r.request,
+            Request::Capture {
+                target: CaptureKind::Window,
+                workflow: None,
+                delay_ms: None,
+                wait: false
+            }
+        );
     }
 
     #[test]
     fn newer_versions_are_refused_before_the_body_is_parsed() {
-        let e = decode_line::<RequestEnvelope>(r#"{"v":2,"seq":1,"type":"teleport","x":1}"#).unwrap_err();
+        let e = decode_line::<RequestEnvelope>(r#"{"v":2,"seq":1,"type":"teleport","x":1}"#)
+            .unwrap_err();
         assert!(matches!(e, CodecError::UnsupportedVersion { found: 2, supported: 1 }), "{e}");
         assert_eq!(e.error_code(), Some(ErrorCode::VersionMismatch));
         assert!(e.to_string().contains("upgrade ssx"));
@@ -595,7 +675,10 @@ mod tests {
             (r#"{"v":99999999999,"type":"ping"}"#, "Malformed"),
             (r#"{"v":1,"type":"teleport"}"#, "Malformed"),
             (r#"{"v":1}"#, "Malformed"),
-            (r#"{"v":1,"type":"post_files","paths":"nope","action":{"kind":"upload"}}"#, "Malformed"),
+            (
+                r#"{"v":1,"type":"post_files","paths":"nope","action":{"kind":"upload"}}"#,
+                "Malformed",
+            ),
             (r#"{"v":1,"type":"post_files","paths":[],"action":{"kind":"explode"}}"#, "Malformed"),
             ("not json", "Malformed"),
             ("", "Malformed"),
@@ -611,7 +694,11 @@ mod tests {
 
     #[test]
     fn workflow_ref_validation() {
-        let r = |id: Option<&str>, name: Option<&str>| Request::RunWorkflow { id: id.map(Into::into), name: name.map(Into::into), wait: false };
+        let r = |id: Option<&str>, name: Option<&str>| Request::RunWorkflow {
+            id: id.map(Into::into),
+            name: name.map(Into::into),
+            wait: false,
+        };
         assert_eq!(r(Some("a"), None).workflow_ref().unwrap(), WorkflowRef::Id("a"));
         assert_eq!(r(None, Some("b")).workflow_ref().unwrap(), WorkflowRef::Name("b"));
         assert!(r(Some("a"), Some("b")).workflow_ref().unwrap_err().contains("not both"));
@@ -632,7 +719,10 @@ mod tests {
         {
             use std::{ffi::OsString, os::unix::ffi::OsStringExt};
             let bad = PathBuf::from(OsString::from_vec(vec![b'/', 0xFF, 0xFE]));
-            let env = RequestEnvelope::new(1, Request::PostFiles { paths: vec![bad], action: PostAction::Upload, wait: false });
+            let env = RequestEnvelope::new(
+                1,
+                Request::PostFiles { paths: vec![bad], action: PostAction::Upload, wait: false },
+            );
             let e = encode_line(&env).unwrap_err();
             assert!(matches!(e, CodecError::Encode(_)), "{e}");
             assert!(e.to_string().contains("UTF-8"));
@@ -642,7 +732,11 @@ mod tests {
 
     #[test]
     fn oversized_messages_are_refused_on_encode() {
-        let big = Request::PostFiles { paths: vec![PathBuf::from("x".repeat(MAX_LINE_BYTES))], action: PostAction::Upload, wait: false };
+        let big = Request::PostFiles {
+            paths: vec![PathBuf::from("x".repeat(MAX_LINE_BYTES))],
+            action: PostAction::Upload,
+            wait: false,
+        };
         assert!(matches!(encode_line(&RequestEnvelope::new(1, big)), Err(CodecError::Encode(_))));
     }
 
@@ -722,9 +816,13 @@ mod tests {
 
     #[test]
     fn invalid_utf8_is_malformed() {
-        let mut rd = reader(b"{\"v\":1,\"type\":\"\xFF\"}\n{\"v\":1,\"seq\":1,\"type\":\"ping\"}\n");
+        let mut rd =
+            reader(b"{\"v\":1,\"type\":\"\xFF\"}\n{\"v\":1,\"seq\":1,\"type\":\"ping\"}\n");
         assert!(matches!(rd.read_message::<RequestEnvelope>(), Err(CodecError::Malformed(_))));
-        assert!(rd.read_message::<RequestEnvelope>().unwrap().is_some(), "next line still readable");
+        assert!(
+            rd.read_message::<RequestEnvelope>().unwrap().is_some(),
+            "next line still readable"
+        );
     }
 
     #[test]
@@ -740,11 +838,15 @@ mod tests {
                 Ok(1)
             }
         }
-        let mut rd = LineReader::new(io::BufReader::with_capacity(1, Trickle(b"{\"v\":1,\"seq\":4,\"type\":\"ping\"}\n".to_vec(), 0)));
+        let mut rd = LineReader::new(io::BufReader::with_capacity(
+            1,
+            Trickle(b"{\"v\":1,\"seq\":4,\"type\":\"ping\"}\n".to_vec(), 0),
+        ));
         assert_eq!(rd.read_message::<RequestEnvelope>().unwrap().unwrap().seq, 4);
     }
 
     #[test]
+    #[allow(clippy::items_after_statements)] // the stub types are local to this test
     fn io_errors_propagate() {
         struct Broken;
         impl Read for Broken {
@@ -765,7 +867,10 @@ mod tests {
                 Ok(())
             }
         }
-        assert!(matches!(LineWriter::new(BrokenWrite).write_message(&Request::Ping), Err(CodecError::Io(_))));
+        assert!(matches!(
+            LineWriter::new(BrokenWrite).write_message(&Request::Ping),
+            Err(CodecError::Io(_))
+        ));
     }
 
     proptest! {
@@ -796,10 +901,7 @@ mod tests {
         fn reader_handles_arbitrary_bytes(bytes in proptest::collection::vec(any::<u8>(), 0..300)) {
             let mut rd = LineReader::new(Cursor::new(bytes));
             for _ in 0..400 {
-                match rd.read_message::<RequestEnvelope>() {
-                    Ok(None) => break,
-                    Ok(Some(_)) | Err(_) => {}
-                }
+                if let Ok(None) = rd.read_message::<RequestEnvelope>() { break }
             }
         }
     }

@@ -13,9 +13,9 @@ use std::{
 };
 
 use super::{
-    CancelToken, Captured, CaptureRequest, CaptureTarget, ClipboardContent, Event, EventSink,
-    FailureKind, Outcome, RecordKind, RecordRequest, RunReport, ServiceError, Services,
-    SkipReason, StepFailure, StepKind, StepReport, StepStatus,
+    CancelToken, CaptureRequest, CaptureTarget, Captured, ClipboardContent, Event, EventSink,
+    FailureKind, Outcome, RecordKind, RecordRequest, RunReport, ServiceError, Services, SkipReason,
+    StepFailure, StepKind, StepReport, StepStatus,
     item::{Item, Origin, extension_of, is_image_ext, is_video_ext},
 };
 use crate::{
@@ -220,7 +220,10 @@ impl<'a> Run<'a> {
                 (
                     StepStatus::Failed(StepFailure {
                         kind: FailureKind::Internal,
-                        message: format!("internal error: a service panicked ({})", panic_message(&*p)),
+                        message: format!(
+                            "internal error: a service panicked ({})",
+                            panic_message(&*p)
+                        ),
                         retryable: false,
                     }),
                     None,
@@ -327,16 +330,12 @@ impl Engine {
         sink: &dyn EventSink,
         cancel: &CancelToken,
     ) -> RunReport {
-        let mut run = Run {
-            engine: self,
-            wf,
-            svc,
-            sink,
-            cancel,
-            batch: false,
-            protected: HashSet::new(),
-        };
-        sink.event(Event::RunStarted { workflow_id: wf.id.clone(), workflow_name: wf.name.clone() });
+        let mut run =
+            Run { engine: self, wf, svc, sink, cancel, batch: false, protected: HashSet::new() };
+        sink.event(Event::RunStarted {
+            workflow_id: wf.id.clone(),
+            workflow_name: wf.name.clone(),
+        });
         let mut run_steps: Vec<StepReport> = Vec::new();
 
         let items = self.acquire(&mut run, input, &mut run_steps);
@@ -361,10 +360,15 @@ impl Engine {
 
     // ---- input ---------------------------------------------------------------------
 
-    fn acquire(&self, run: &mut Run<'_>, input: Input, run_steps: &mut Vec<StepReport>) -> Vec<Item> {
+    fn acquire(
+        &self,
+        run: &mut Run<'_>,
+        input: Input,
+        run_steps: &mut Vec<StepReport>,
+    ) -> Vec<Item> {
         match input {
-            Input::Image(captured) => vec![self.image_item(0, captured)],
-            Input::Files(paths) => self.file_items(run, paths, run_steps),
+            Input::Image(captured) => vec![Self::image_item(0, captured)],
+            Input::Files(paths) => Self::file_items(run, paths, run_steps),
             Input::Recorded(path) => {
                 let mut item = Item::new(0, Origin::Recording, EntryKind::Video);
                 item.input_path = Some(path.clone());
@@ -381,9 +385,9 @@ impl Engine {
                 | InputKind::CaptureLastRegion => {
                     self.capture(run, run_steps).into_iter().collect()
                 }
-                InputKind::Clipboard => self.from_clipboard(run, run_steps),
+                InputKind::Clipboard => Self::read_clipboard_input(run, run_steps),
                 InputKind::RecordScreen | InputKind::RecordGif => {
-                    self.invalid_input(
+                    Self::invalid_input(
                         run,
                         run_steps,
                         StepKind::Record,
@@ -392,7 +396,7 @@ impl Engine {
                     Vec::new()
                 }
                 InputKind::Files => {
-                    self.invalid_input(
+                    Self::invalid_input(
                         run,
                         run_steps,
                         StepKind::LoadFile,
@@ -404,11 +408,11 @@ impl Engine {
         }
     }
 
-    fn invalid_input(&self, run: &Run<'_>, run_steps: &mut Vec<StepReport>, kind: StepKind, msg: &str) {
+    fn invalid_input(run: &Run<'_>, run_steps: &mut Vec<StepReport>, kind: StepKind, msg: &str) {
         run_steps.push(run.step(None, kind, || Err(StepEnd::fail(FailureKind::Invalid, msg))));
     }
 
-    fn image_item(&self, index: usize, captured: Captured) -> Item {
+    fn image_item(index: usize, captured: Captured) -> Item {
         let mut item = Item::new(index, Origin::Image, EntryKind::Image);
         item.frame = Some(captured.frame);
         item.window_title = captured.window_title;
@@ -451,10 +455,10 @@ impl Engine {
             Ok(Some(detail))
         });
         run_steps.push(report);
-        captured.map(|c| self.image_item(0, c))
+        captured.map(|c| Self::image_item(0, c))
     }
 
-    fn from_clipboard(&self, run: &mut Run<'_>, run_steps: &mut Vec<StepReport>) -> Vec<Item> {
+    fn read_clipboard_input(run: &mut Run<'_>, run_steps: &mut Vec<StepReport>) -> Vec<Item> {
         let mut content: Option<ClipboardContent> = None;
         let report = run.step(None, StepKind::ReadClipboard, || {
             let c = run.svc.clipboard.read()?;
@@ -482,10 +486,13 @@ impl Engine {
         match content {
             Some(ClipboardContent::Image(frame)) => {
                 if frame.is_sdr8() {
-                    vec![self.image_item(0, Captured::new(frame))]
+                    vec![Self::image_item(0, Captured::new(frame))]
                 } else {
                     run_steps.push(run.step(None, StepKind::ReadClipboard, || {
-                        Err(StepEnd::fail(FailureKind::Invalid, "the clipboard image is not 8-bit sRGB"))
+                        Err(StepEnd::fail(
+                            FailureKind::Invalid,
+                            "the clipboard image is not 8-bit sRGB",
+                        ))
                     }));
                     Vec::new()
                 }
@@ -495,14 +502,18 @@ impl Engine {
                 item.text = Some(text);
                 vec![item]
             }
-            Some(ClipboardContent::Files(paths)) => self.file_items(run, paths, run_steps),
+            Some(ClipboardContent::Files(paths)) => Self::file_items(run, paths, run_steps),
             Some(ClipboardContent::Empty) | None => Vec::new(),
         }
     }
 
-    fn file_items(&self, run: &mut Run<'_>, paths: Vec<PathBuf>, run_steps: &mut Vec<StepReport>) -> Vec<Item> {
+    fn file_items(
+        run: &mut Run<'_>,
+        paths: Vec<PathBuf>,
+        run_steps: &mut Vec<StepReport>,
+    ) -> Vec<Item> {
         if paths.is_empty() {
-            self.invalid_input(run, run_steps, StepKind::LoadFile, "no files were given");
+            Self::invalid_input(run, run_steps, StepKind::LoadFile, "no files were given");
             return Vec::new();
         }
         run.protected = paths.iter().cloned().collect();
@@ -526,8 +537,14 @@ impl Engine {
             .collect()
     }
 
-    fn record(&self, run: &Run<'_>, stop: &CancelToken, run_steps: &mut Vec<StepReport>) -> Option<Item> {
-        let kind = if run.wf.input == InputKind::RecordGif { RecordKind::Gif } else { RecordKind::Video };
+    fn record(
+        &self,
+        run: &Run<'_>,
+        stop: &CancelToken,
+        run_steps: &mut Vec<StepReport>,
+    ) -> Option<Item> {
+        let kind =
+            if run.wf.input == InputKind::RecordGif { RecordKind::Gif } else { RecordKind::Video };
         let mut video = None;
         let report = run.step(None, StepKind::Record, || {
             let inputs = crate::pattern::NameInputs::default();
@@ -593,7 +610,8 @@ impl Engine {
                             let taken = slot.lock().unwrap_or_else(PoisonError::into_inner).take();
                             if let Some(item) = taken {
                                 let result = run.process_item(item);
-                                *done[i].lock().unwrap_or_else(PoisonError::into_inner) = Some(result);
+                                *done[i].lock().unwrap_or_else(PoisonError::into_inner) =
+                                    Some(result);
                             }
                         }
                     });
@@ -609,20 +627,22 @@ impl Engine {
             .enumerate()
             .map(|(index, (p, d))| {
                 let finished = d.into_inner().unwrap_or_else(PoisonError::into_inner);
-                match finished {
-                    Some(item) => item,
-                    None => {
-                        let left = p.into_inner().unwrap_or_else(PoisonError::into_inner);
-                        match left {
-                            Some(item) => run.process_item(item),
-                            // A worker took it but died outside a step: unreachable in
-                            // practice because steps catch panics. Report, never lose it.
-                            None => {
-                                let mut lost = Item::new(index, Origin::UserFile, EntryKind::File);
-                                lost.push(run.skipped(Some(index), StepKind::LoadFile, SkipReason::ItemFailed));
-                                lost
-                            }
-                        }
+                if let Some(item) = finished {
+                    item
+                } else {
+                    let left = p.into_inner().unwrap_or_else(PoisonError::into_inner);
+                    if let Some(item) = left {
+                        run.process_item(item)
+                    } else {
+                        // A worker took it but died outside a step: unreachable in
+                        // practice because steps catch panics. Report, never lose it.
+                        let mut lost = Item::new(index, Origin::UserFile, EntryKind::File);
+                        lost.push(run.skipped(
+                            Some(index),
+                            StepKind::LoadFile,
+                            SkipReason::ItemFailed,
+                        ));
+                        lost
                     }
                 }
             })
@@ -631,11 +651,17 @@ impl Engine {
 }
 
 /// Derives the run outcome from the items and run-level steps.
-pub(super) fn compute_outcome(items: &[Item], run_steps: &[StepReport], cancel: &CancelToken) -> Outcome {
+pub(super) fn compute_outcome(
+    items: &[Item],
+    run_steps: &[StepReport],
+    cancel: &CancelToken,
+) -> Outcome {
     let saw_cancel = items.iter().flat_map(|i| i.steps.iter()).chain(run_steps.iter()).any(|s| {
         matches!(s.status, StepStatus::Cancelled | StepStatus::Skipped(SkipReason::Cancelled))
     });
-    if saw_cancel && (cancel.is_cancelled() || items.is_empty() || items.iter().all(|i| i.cancelled)) {
+    if saw_cancel
+        && (cancel.is_cancelled() || items.is_empty() || items.iter().all(|i| i.cancelled))
+    {
         return Outcome::Cancelled;
     }
     if items.is_empty() {

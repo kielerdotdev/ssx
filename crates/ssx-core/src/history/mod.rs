@@ -142,8 +142,8 @@ pub struct History {
     path: Option<PathBuf>,
 }
 
-fn opt_str(v: &Option<String>, max: usize) -> Option<String> {
-    v.as_deref().map(|s| truncate_bytes(s, max).to_owned())
+fn opt_str(v: Option<&str>, max: usize) -> Option<String> {
+    v.map(|s| truncate_bytes(s, max).to_owned())
 }
 
 fn to_i64(v: u64) -> i64 {
@@ -299,20 +299,20 @@ impl History {
 
     /// Inserts an entry and returns its id.
     pub fn insert(&self, e: &NewEntry) -> Result<i64, HistoryError> {
-        if let Some(t) = &e.thumbnail {
-            if t.len() > MAX_THUMBNAIL_BYTES {
-                return Err(HistoryError::Invalid(format!(
-                    "thumbnail is {} bytes; the limit is {MAX_THUMBNAIL_BYTES} (use history::thumbnail_from_frame)",
-                    t.len()
-                )));
-            }
+        if let Some(t) = &e.thumbnail
+            && t.len() > MAX_THUMBNAIL_BYTES
+        {
+            return Err(HistoryError::Invalid(format!(
+                "thumbnail is {} bytes; the limit is {MAX_THUMBNAIL_BYTES} (use history::thumbnail_from_frame)",
+                t.len()
+            )));
         }
-        if let Some(h) = &e.sha256 {
-            if h.len() != 64 || !h.bytes().all(|b| b.is_ascii_hexdigit()) {
-                return Err(HistoryError::Invalid(format!(
-                    "sha256 must be 64 hex characters, got {h:?}"
-                )));
-            }
+        if let Some(h) = &e.sha256
+            && (h.len() != 64 || !h.bytes().all(|b| b.is_ascii_hexdigit()))
+        {
+            return Err(HistoryError::Invalid(format!(
+                "sha256 must be 64 hex characters, got {h:?}"
+            )));
         }
         let conn = self.lock();
         conn.execute(
@@ -325,18 +325,18 @@ impl History {
                 e.kind.as_str(),
                 e.local_path.as_ref().map(|p| p.to_string_lossy().into_owned()),
                 e.thumbnail,
-                opt_str(&e.upload_url, MAX_FIELD_BYTES),
-                opt_str(&e.thumbnail_url, MAX_FIELD_BYTES),
-                opt_str(&e.deletion_url, MAX_FIELD_BYTES),
-                opt_str(&e.uploader, 256),
-                opt_str(&e.window_title, 1024),
-                opt_str(&e.process_name, 256),
+                opt_str(e.upload_url.as_deref(), MAX_FIELD_BYTES),
+                opt_str(e.thumbnail_url.as_deref(), MAX_FIELD_BYTES),
+                opt_str(e.deletion_url.as_deref(), MAX_FIELD_BYTES),
+                opt_str(e.uploader.as_deref(), 256),
+                opt_str(e.window_title.as_deref(), 1024),
+                opt_str(e.process_name.as_deref(), 256),
                 e.width,
                 e.height,
                 e.size_bytes.map(to_i64),
                 e.sha256.as_deref().map(str::to_ascii_lowercase),
-                opt_str(&e.workflow_id, 128),
-                opt_str(&e.note, MAX_NOTE_BYTES),
+                opt_str(e.workflow_id.as_deref(), 128),
+                opt_str(e.note.as_deref(), MAX_NOTE_BYTES),
             ],
         )?;
         Ok(conn.last_insert_rowid())
@@ -466,7 +466,7 @@ impl History {
     pub fn list(&self, q: &Query) -> Result<Vec<Entry>, HistoryError> {
         let (where_sql, mut args) = self.build_where(q);
         let limit = q.limit.clamp(1, 1000);
-        args.push(Value::Integer(limit as i64));
+        args.push(Value::Integer(i64::try_from(limit).unwrap_or(1000)));
         args.push(Value::Integer(i64::try_from(q.offset).unwrap_or(i64::MAX)));
         let thumb = if q.thumbnails { ", thumbnail" } else { "" };
         let sql = format!(
@@ -504,10 +504,10 @@ impl History {
             "UPDATE entries SET upload_url = ?2, thumbnail_url = ?3, deletion_url = ?4, uploader = ?5 WHERE id = ?1",
             params![
                 id,
-                opt_str(&info.url, MAX_FIELD_BYTES),
-                opt_str(&info.thumbnail_url, MAX_FIELD_BYTES),
-                opt_str(&info.deletion_url, MAX_FIELD_BYTES),
-                opt_str(&info.uploader, 256),
+                opt_str(info.url.as_deref(), MAX_FIELD_BYTES),
+                opt_str(info.thumbnail_url.as_deref(), MAX_FIELD_BYTES),
+                opt_str(info.deletion_url.as_deref(), MAX_FIELD_BYTES),
+                opt_str(info.uploader.as_deref(), 256),
             ],
         )?;
         Ok(n > 0)

@@ -72,10 +72,10 @@ pub fn is_windows_reserved(name: &str) -> bool {
     for prefix in ["COM", "LPT"] {
         if let Some(rest) = upper.strip_prefix(prefix) {
             let mut chars = rest.chars();
-            if let (Some(d), None) = (chars.next(), chars.next()) {
-                if matches!(d, '0'..='9' | '\u{b9}' | '\u{b2}' | '\u{b3}') {
-                    return true;
-                }
+            if let (Some(d), None) = (chars.next(), chars.next())
+                && matches!(d, '0'..='9' | '\u{b9}' | '\u{b2}' | '\u{b3}')
+            {
+                return true;
             }
         }
     }
@@ -165,7 +165,8 @@ pub fn sanitize_file_name(name: &str, opts: &SanitizeOptions) -> String {
         } else {
             format!("{shortened}{ext}")
         };
-        s = s.trim_end_matches(['.', ' ']).to_owned();
+        let keep = s.trim_end_matches(['.', ' ']).len();
+        s.truncate(keep);
         if is_windows_reserved(&s) {
             s.insert(0, '_');
         }
@@ -272,16 +273,16 @@ mod tests {
         let long = format!("{}.png", "a".repeat(400));
         let out = s(&long);
         assert_eq!(out.len(), 255);
-        assert!(out.ends_with(".png"));
+        assert_eq!(out.rsplit('.').next(), Some("png"));
 
         // 4-byte emoji family (ZWJ sequence) must not be split.
         let family = "👨‍👩‍👧‍👦";
         let name = format!("{}.png", family.repeat(30));
         let out = s(&name);
         assert!(out.len() <= 255);
-        assert!(out.ends_with(".png"));
+        assert_eq!(out.rsplit('.').next(), Some("png"));
         let stem = out.strip_suffix(".png").unwrap_or("");
-        assert!(stem.len() % family.len() == 0, "cut inside a grapheme: {stem:?}");
+        assert!(stem.len().is_multiple_of(family.len()), "cut inside a grapheme: {stem:?}");
     }
 
     #[test]

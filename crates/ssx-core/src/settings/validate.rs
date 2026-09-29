@@ -145,13 +145,13 @@ fn validate_general(s: &Settings, out: &mut Sink) {
             format!("{} exceeds the 255-character limit of common file systems; use 0 to only apply the OS limit", g.max_file_name_len),
         );
     }
-    if let Some(dir) = &g.save_dir {
-        if dir.as_os_str().is_empty() {
-            out.error(
-                "general.save_dir",
-                "is empty; remove the key to use the default Pictures/ssx folder",
-            );
-        }
+    if let Some(dir) = &g.save_dir
+        && dir.as_os_str().is_empty()
+    {
+        out.error(
+            "general.save_dir",
+            "is empty; remove the key to use the default Pictures/ssx folder",
+        );
     }
     if g.use_type_subfolders {
         check_folder_name(out, "general.subfolders.image", &g.subfolders.image);
@@ -414,21 +414,21 @@ fn validate_workflow_steps(s: &Settings, w: &Workflow, base: &str, out: &mut Sin
             }
         }
     }
-    if let (Some(edit), Some(save)) = (pos(C::OpenEditor), pos(C::SaveToFile)) {
-        if edit > save {
-            out.warn(
+    if let (Some(edit), Some(save)) = (pos(C::OpenEditor), pos(C::SaveToFile))
+        && edit > save
+    {
+        out.warn(
                 format!("{base}.after_capture[{edit}]"),
                 "open_editor runs after save_to_file, so the saved file will not contain your edits; put open_editor first",
             );
-        }
     }
-    if let (Some(edit), Some(up)) = (pos(C::OpenEditor), pos(C::Upload)) {
-        if edit > up {
-            out.warn(
+    if let (Some(edit), Some(up)) = (pos(C::OpenEditor), pos(C::Upload))
+        && edit > up
+    {
+        out.warn(
                 format!("{base}.after_capture[{edit}]"),
                 "open_editor runs after upload, so the upload will not contain your edits; put open_editor first",
             );
-        }
     }
     if let Some(del) = pos(C::DeleteLocalFile) {
         match pos(C::Upload) {
@@ -465,26 +465,23 @@ fn validate_workflow_steps(s: &Settings, w: &Workflow, base: &str, out: &mut Sin
     let needs_url = |a: &AfterUpload| {
         !matches!(a, AfterUpload::ShowNotification | AfterUpload::RunCommand { .. })
     };
-    if !w.uploads() {
-        if let Some(i) = w.after_upload.iter().position(needs_url) {
-            out.warn(
+    if !w.uploads()
+        && let Some(i) = w.after_upload.iter().position(needs_url)
+    {
+        out.warn(
                 format!("{base}.after_upload[{i}]"),
                 "this step needs a URL but the workflow has no upload step, so it will be skipped; add upload to after_capture",
             );
-        }
     }
     for (i, step) in w.after_upload.iter().enumerate() {
         let p = format!("{base}.after_upload[{i}]");
         if w.after_upload[..i].contains(step) {
             out.warn(&p, format!("{step:?} appears more than once; the later copy is redundant"));
         }
-        if let AfterUpload::RunCommand { program, .. } = step {
-            if program.trim().is_empty() {
-                out.error(
-                    &p,
-                    "run_command needs a program, e.g. program = \"/usr/bin/notify-send\"",
-                );
-            }
+        if let AfterUpload::RunCommand { program, .. } = step
+            && program.trim().is_empty()
+        {
+            out.error(&p, "run_command needs a program, e.g. program = \"/usr/bin/notify-send\"");
         }
     }
     for (ty, name) in w.destination.entries() {
@@ -586,7 +583,7 @@ mod tests {
     fn destination_checks() {
         let mut s = Settings::default();
         s.destinations.image = Some("bad name!".into());
-        s.destinations.file = Some("".into());
+        s.destinations.file = Some(String::new());
         s.destinations.video = Some("known".into());
         s.uploaders.insert("known".into(), toml::Table::new());
         s.destinations.extension_overrides.insert(".ZIP".into(), "known".into());
@@ -649,12 +646,14 @@ mod tests {
 
     #[test]
     fn workflow_identity_errors() {
-        let mut s = Settings::default();
-        s.workflows = vec![
-            Workflow { id: "Bad Id".into(), name: "".into(), ..Workflow::default() },
-            wf("dup"),
-            wf("dup"),
-        ];
+        let mut s = Settings {
+            workflows: vec![
+                Workflow { id: "Bad Id".into(), name: String::new(), ..Workflow::default() },
+                wf("dup"),
+                wf("dup"),
+            ],
+            ..Settings::default()
+        };
         s.workflows[1].trigger.cli_name = Some("go".into());
         s.workflows[2].trigger.cli_name = Some("go".into());
         s.workflows[0].trigger.cli_name = Some("UPPER".into());
@@ -668,8 +667,7 @@ mod tests {
 
     #[test]
     fn hotkey_errors_and_duplicates() {
-        let mut s = Settings::default();
-        s.workflows = vec![wf("a"), wf("b"), wf("c")];
+        let mut s = Settings { workflows: vec![wf("a"), wf("b"), wf("c")], ..Settings::default() };
         s.workflows[0].trigger.hotkey = Some("ctrl+shift+printscreen".into());
         s.workflows[1].trigger.hotkey = Some("Shift+Ctrl+PrtSc".into());
         s.workflows[2].trigger.hotkey = Some("ctrl+".into());

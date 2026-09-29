@@ -1,6 +1,6 @@
 //! Evaluating a parsed [`Pattern`] against a [`PatternContext`].
 
-use std::path::PathBuf;
+use std::{fmt::Write as _, path::PathBuf};
 
 use chrono::{Datelike, Timelike};
 
@@ -98,11 +98,19 @@ impl Pattern {
                 },
                 Node::Token(tok) => match tok {
                     Token::Percent => out.push('%'),
-                    Token::Year => out.push_str(&now.year().to_string()),
-                    Token::Year2 => out.push_str(&format!("{:02}", now.year().rem_euclid(100))),
-                    Token::Month => out.push_str(&format!("{:02}", now.month())),
+                    Token::Year => {
+                        let _ = write!(out, "{}", now.year());
+                    }
+                    Token::Year2 => {
+                        let _ = write!(out, "{:02}", now.year().rem_euclid(100));
+                    }
+                    Token::Month => {
+                        let _ = write!(out, "{:02}", now.month());
+                    }
                     Token::MonthName => out.push_str(MONTHS[now.month0() as usize % 12]),
-                    Token::Day => out.push_str(&format!("{:02}", now.day())),
+                    Token::Day => {
+                        let _ = write!(out, "{:02}", now.day());
+                    }
                     Token::Hour => {
                         let h = now.hour();
                         let h = if self.has_ampm {
@@ -113,17 +121,21 @@ impl Pattern {
                         } else {
                             h
                         };
-                        out.push_str(&format!("{h:02}"));
+                        let _ = write!(out, "{h:02}");
                     }
-                    Token::Minute => out.push_str(&format!("{:02}", now.minute())),
-                    Token::Second => out.push_str(&format!("{:02}", now.second().min(59))),
+                    Token::Minute => {
+                        let _ = write!(out, "{:02}", now.minute());
+                    }
+                    Token::Second => {
+                        let _ = write!(out, "{:02}", now.second().min(59));
+                    }
                     // chrono encodes a leap second as 1000..1999 ms.
                     Token::Millis => {
-                        out.push_str(&format!("{:03}", now.timestamp_subsec_millis().min(999)));
+                        let _ = write!(out, "{:03}", now.timestamp_subsec_millis().min(999));
                     }
                     Token::AmPm => out.push_str(if now.hour() >= 12 { "PM" } else { "AM" }),
                     Token::DayName => {
-                        out.push_str(DAYS[now.weekday().num_days_from_monday() as usize % 7])
+                        out.push_str(DAYS[now.weekday().num_days_from_monday() as usize % 7]);
                     }
                     Token::WeekOfYear => out.push_str(&now.iso_week().week().to_string()),
                     Token::Unix => out.push_str(&now.timestamp().to_string()),
@@ -159,13 +171,12 @@ impl Pattern {
                         }
                     }
                     Token::Counter { chars, base, width } => {
-                        let value = match counter {
-                            Some(v) => v,
-                            None => {
-                                let v = ctx.counter.next().map_err(PatternError::Counter)?;
-                                counter = Some(v);
-                                v
-                            }
+                        let value = if let Some(v) = counter {
+                            v
+                        } else {
+                            let v = ctx.counter.next().map_err(PatternError::Counter)?;
+                            counter = Some(v);
+                            v
                         };
                         out.push_str(&to_base(value, chars, *base, *width));
                     }
@@ -263,7 +274,10 @@ fn guid(a: u64, b: u64) -> String {
     bytes[8..].copy_from_slice(&b.to_be_bytes());
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    let hex = bytes.iter().fold(String::with_capacity(32), |mut acc, b| {
+        let _ = write!(acc, "{b:02x}");
+        acc
+    });
     format!("{}-{}-{}-{}-{}", &hex[..8], &hex[8..12], &hex[12..16], &hex[16..20], &hex[20..])
 }
 

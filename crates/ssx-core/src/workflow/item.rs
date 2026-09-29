@@ -6,7 +6,7 @@ use ssx_types::Frame;
 
 use super::{
     Outcome, RecordedVideo, SkipReason, StepReport, UploadOutcome,
-    report::{ItemReport, Importance, StepStatus},
+    report::{Importance, ItemReport, StepStatus},
 };
 use crate::{history::EntryKind, settings::DestinationType};
 
@@ -173,11 +173,7 @@ impl Item {
 
     /// Destination type used for uploading this item.
     pub fn destination_type(&self) -> DestinationType {
-        let ext = self
-            .local_path
-            .as_deref()
-            .or(self.input_path.as_deref())
-            .and_then(extension_of);
+        let ext = self.local_path.as_deref().or(self.input_path.as_deref()).and_then(extension_of);
         match self.origin {
             Origin::Text => DestinationType::Text,
             Origin::Image => DestinationType::Image,

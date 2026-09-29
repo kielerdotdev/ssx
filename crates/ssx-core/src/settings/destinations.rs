@@ -134,12 +134,10 @@ impl Destinations {
                 | DestinationType::File
                 | DestinationType::Video
         );
-        if is_upload {
-            if let Some(ext) = extension {
-                let key = ext.trim_start_matches('.').to_ascii_lowercase();
-                if let Some(n) = non_empty(self.extension_overrides.get(&key).map(String::as_str)) {
-                    return Some(n);
-                }
+        if is_upload && let Some(ext) = extension {
+            let key = ext.trim_start_matches('.').to_ascii_lowercase();
+            if let Some(n) = non_empty(self.extension_overrides.get(&key).map(String::as_str)) {
+                return Some(n);
             }
         }
         if let Some(n) = non_empty(self.default_for(ty)) {

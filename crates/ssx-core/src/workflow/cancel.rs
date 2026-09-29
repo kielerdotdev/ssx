@@ -66,12 +66,8 @@ impl CancelToken {
                 },
                 None => Duration::from_secs(3600),
             };
-            guard = self
-                .0
-                .cv
-                .wait_timeout(guard, remaining)
-                .unwrap_or_else(PoisonError::into_inner)
-                .0;
+            guard =
+                self.0.cv.wait_timeout(guard, remaining).unwrap_or_else(PoisonError::into_inner).0;
         }
     }
 

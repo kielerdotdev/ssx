@@ -103,8 +103,8 @@ fn missing_keys_default_individually() {
     let s = loaded.settings;
     assert_eq!(s.general.image_quality, 50);
     assert_eq!(s.general.file_name_pattern, General::default().file_name_pattern);
-    assert_eq!(s.capture.hdr.peak, 8.0);
-    assert_eq!(s.capture.hdr.knee, HdrConfig::default().knee);
+    assert!((s.capture.hdr.peak - 8.0).abs() < 1e-6);
+    assert!((s.capture.hdr.knee - HdrConfig::default().knee).abs() < 1e-6);
     assert_eq!(s.history, HistorySettings::default());
     assert!(loaded.warnings.is_empty());
 }

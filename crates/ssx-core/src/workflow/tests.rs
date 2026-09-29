@@ -12,7 +12,9 @@ use ssx_types::EncodeOptions;
 use super::{testing::*, *};
 use crate::{
     history::{EntryKind, Query},
-    settings::{AfterCapture as C, AfterUpload as U, DestinationOverride, InputKind, Settings, Workflow},
+    settings::{
+        AfterCapture as C, AfterUpload as U, DestinationOverride, InputKind, Settings, Workflow,
+    },
 };
 
 // ---- helpers ---------------------------------------------------------------------------
@@ -76,7 +78,11 @@ fn files_with(world: &TestWorld, settings: Settings, w: &Workflow, paths: &[&str
 
 /// Events are well formed and agree with the report.
 fn check_event_invariants(events: &[Event], report: &RunReport) {
-    assert!(matches!(events.first(), Some(Event::RunStarted { .. })), "first event: {:?}", events.first());
+    assert!(
+        matches!(events.first(), Some(Event::RunStarted { .. })),
+        "first event: {:?}",
+        events.first()
+    );
     assert_eq!(events.last(), Some(&Event::RunFinished { outcome: report.outcome }));
     assert_eq!(events.iter().filter(|e| matches!(e, Event::RunStarted { .. })).count(), 1);
     assert_eq!(events.iter().filter(|e| matches!(e, Event::RunFinished { .. })).count(), 1);
@@ -115,15 +121,16 @@ fn kinds(steps: &[StepReport]) -> Vec<StepKind> {
 }
 
 fn step_of(r: &RunReport, item: usize, kind: StepKind) -> &StepReport {
-    r.items[item]
-        .steps
-        .iter()
-        .find(|s| s.kind == kind)
-        .unwrap_or_else(|| panic!("no {kind} step for item {item}: {:?}", kinds(&r.items[item].steps)))
+    r.items[item].steps.iter().find(|s| s.kind == kind).unwrap_or_else(|| {
+        panic!("no {kind} step for item {item}: {:?}", kinds(&r.items[item].steps))
+    })
 }
 
 fn run_step(r: &RunReport, kind: StepKind) -> &StepReport {
-    r.steps.iter().find(|s| s.kind == kind).unwrap_or_else(|| panic!("no run-level {kind} step: {:?}", kinds(&r.steps)))
+    r.steps
+        .iter()
+        .find(|s| s.kind == kind)
+        .unwrap_or_else(|| panic!("no run-level {kind} step: {:?}", kinds(&r.steps)))
 }
 
 fn failure(s: &StepReport) -> &StepFailure {
@@ -184,12 +191,19 @@ fn region_save_copy_upload_copy_url_notify() {
 fn step_reports_are_in_listed_order() {
     let world = TestWorld::new();
     let Ran { report, .. } = shot(&world, &standard());
-    assert_eq!(kinds(&report.steps), vec![StepKind::Capture, StepKind::CopyUrl, StepKind::ShowNotification]);
+    assert_eq!(
+        kinds(&report.steps),
+        vec![StepKind::Capture, StepKind::CopyUrl, StepKind::ShowNotification]
+    );
     assert_eq!(
         kinds(&report.items[0].steps),
         vec![StepKind::SaveToFile, StepKind::CopyImage, StepKind::Upload, StepKind::RecordHistory]
     );
-    assert!(report.all_steps().all(|s| s.status.is_success()), "{:?}", report.all_steps().collect::<Vec<_>>());
+    assert!(
+        report.all_steps().all(|s| s.status.is_success()),
+        "{:?}",
+        report.all_steps().collect::<Vec<_>>()
+    );
     assert!(report.warnings().is_empty() && report.errors().is_empty());
 }
 
@@ -202,17 +216,27 @@ fn event_stream_has_progress_and_order() {
         .map(|e| match e {
             Event::RunStarted { workflow_id, .. } => format!("run:{workflow_id}"),
             Event::StepStarted { step, .. } => format!("start:{step}"),
-            Event::StepProgress { step, done, total, .. } => format!("progress:{step}:{done}/{}", total.unwrap_or(0)),
+            Event::StepProgress { step, done, total, .. } => {
+                format!("progress:{step}:{done}/{}", total.unwrap_or(0))
+            }
             Event::StepFinished { step, .. } => format!("done:{step}"),
             Event::RunFinished { .. } => "end".to_owned(),
         })
         .collect();
-    let pos = |s: &str| names.iter().position(|n| n == s).unwrap_or_else(|| panic!("{s} missing in {names:?}"));
+    let pos = |s: &str| {
+        names.iter().position(|n| n == s).unwrap_or_else(|| panic!("{s} missing in {names:?}"))
+    };
     assert_eq!(names[0], "run:test");
     assert!(pos("start:capture") < pos("done:capture"));
     assert!(pos("done:capture") < pos("start:save_to_file"));
-    let first_progress = names.iter().position(|n| n.starts_with("progress:upload")).expect("upload progress events");
-    assert!(pos("start:upload") < first_progress && first_progress < pos("done:upload"), "{names:?}");
+    let first_progress = names
+        .iter()
+        .position(|n| n.starts_with("progress:upload"))
+        .expect("upload progress events");
+    assert!(
+        pos("start:upload") < first_progress && first_progress < pos("done:upload"),
+        "{names:?}"
+    );
     assert!(pos("done:upload") < pos("start:copy_url"));
     assert_eq!(names.last().map(String::as_str), Some("end"));
 }
@@ -255,7 +279,7 @@ fn capture_request_reflects_settings_and_input_kind() {
         let req = *world.capturer.requests.lock().unwrap().last().unwrap();
         assert_eq!(req.target, target);
         assert!(req.include_cursor);
-        assert_eq!(req.hdr.peak, 9.0);
+        assert!((req.hdr.peak - 9.0).abs() < 1e-6);
     }
 }
 
@@ -265,7 +289,8 @@ fn window_title_reaches_the_file_name_and_history() {
     *world.capturer.window_title.lock().unwrap() = Some("My: App / Window".into());
     let mut s = world.settings();
     s.general.file_name_pattern = "%t_%width".into();
-    let Ran { report, .. } = shot_with(&world, s, &wf(InputKind::CaptureWindow, vec![C::SaveToFile], vec![]));
+    let Ran { report, .. } =
+        shot_with(&world, s, &wf(InputKind::CaptureWindow, vec![C::SaveToFile], vec![]));
     let p = report.items[0].local_path.clone().unwrap();
     assert_eq!(p.file_name().unwrap(), "My_App__Window_64.png");
     let e = world.history.list(&Query::default()).unwrap();
@@ -294,8 +319,12 @@ fn folders_formats_and_names_follow_settings() {
     s.general.folder_pattern = String::new();
     s.general.image_format = crate::settings::ImageFormatKind::Jpg;
     s.general.file_name_pattern = "shot".into();
-    let Ran { report, .. } = shot_with(&world, s, &wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::Upload], vec![]));
-    assert_eq!(report.items[0].local_path.as_deref(), Some(Path::new("/shots").join("shot.jpg").as_path()));
+    let Ran { report, .. } =
+        shot_with(&world, s, &wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::Upload], vec![]));
+    assert_eq!(
+        report.items[0].local_path.as_deref(),
+        Some(Path::new("/shots").join("shot.jpg").as_path())
+    );
     let up = world.uploaders.uploads.lock().unwrap().clone();
     assert_eq!(up[0].mime, "image/jpeg");
     let bytes = world.fs.contents(Path::new("/shots").join("shot.jpg")).unwrap();
@@ -320,7 +349,7 @@ fn save_failure_does_not_lose_the_screenshot() {
     assert!(failure(step_of(&report, 0, StepKind::SaveToFile)).message.contains("disk full"));
     // upload still happened, from memory
     assert!(step_of(&report, 0, StepKind::Upload).status.is_success());
-    assert_eq!(world.uploaders.uploads.lock().unwrap()[0].bytes.is_some(), true);
+    assert!(world.uploaders.uploads.lock().unwrap()[0].bytes.is_some());
     assert_eq!(report.outcome, Outcome::PartialSuccess);
     assert!(report.items[0].local_path.is_none());
     // the clipboard copy happened too
@@ -331,18 +360,30 @@ fn save_failure_does_not_lose_the_screenshot() {
 fn save_as_dialog_writes_where_the_user_chose() {
     let world = TestWorld::new();
     *world.save_dialog.choice.lock().unwrap() = Some(PathBuf::from("/chosen/mine.png"));
-    let Ran { report, .. } = shot(&world, &wf(InputKind::CaptureRegion, vec![C::SaveAsDialog, C::Upload], vec![]));
+    let Ran { report, .. } =
+        shot(&world, &wf(InputKind::CaptureRegion, vec![C::SaveAsDialog, C::Upload], vec![]));
     assert_eq!(report.items[0].local_path.as_deref(), Some(Path::new("/chosen/mine.png")));
     assert!(world.fs.contents("/chosen/mine.png").is_some());
-    assert_eq!(world.uploaders.uploads.lock().unwrap()[0].path.as_deref(), Some(Path::new("/chosen/mine.png")));
-    assert!(world.log.lines().iter().any(|l| l == &format!("dialog.save:{}", shot_path().display())));
+    assert_eq!(
+        world.uploaders.uploads.lock().unwrap()[0].path.as_deref(),
+        Some(Path::new("/chosen/mine.png"))
+    );
+    assert!(
+        world.log.lines().iter().any(|l| l == &format!("dialog.save:{}", shot_path().display()))
+    );
 }
 
 #[test]
 fn save_as_dialog_cancel_skips_only_that_step() {
     let world = TestWorld::new();
-    let Ran { report, .. } =
-        shot(&world, &wf(InputKind::CaptureRegion, vec![C::SaveAsDialog, C::CopyImageToClipboard, C::Upload], vec![]));
+    let Ran { report, .. } = shot(
+        &world,
+        &wf(
+            InputKind::CaptureRegion,
+            vec![C::SaveAsDialog, C::CopyImageToClipboard, C::Upload],
+            vec![],
+        ),
+    );
     assert_eq!(skip_reason(step_of(&report, 0, StepKind::SaveAsDialog)), &SkipReason::UserDeclined);
     assert!(step_of(&report, 0, StepKind::Upload).status.is_success());
     assert_eq!(report.outcome, Outcome::Success);
@@ -354,13 +395,22 @@ fn save_as_dialog_cancel_skips_only_that_step() {
 #[test]
 fn edited_image_is_what_gets_saved_and_uploaded() {
     let world = TestWorld::new();
-    let w = wf(InputKind::CaptureRegion, vec![C::OpenEditor, C::SaveToFile, C::CopyImageToClipboard, C::Upload], vec![]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::OpenEditor, C::SaveToFile, C::CopyImageToClipboard, C::Upload],
+        vec![],
+    );
     let Ran { report, .. } = shot(&world, &w);
     assert_eq!(report.outcome, Outcome::Success);
     let lines = world.log.lines();
     let p = |prefix: &str| lines.iter().position(|l| l.starts_with(prefix)).unwrap();
-    assert!(p("capture") < p("editor.edit") && p("editor.edit") < p("fs.write") && p("fs.write") < p("upload"));
-    let saved = image::load_from_memory(&world.fs.contents(shot_path()).unwrap()).unwrap().to_rgba8();
+    assert!(
+        p("capture") < p("editor.edit")
+            && p("editor.edit") < p("fs.write")
+            && p("fs.write") < p("upload")
+    );
+    let saved =
+        image::load_from_memory(&world.fs.contents(shot_path()).unwrap()).unwrap().to_rgba8();
     assert_eq!(saved.get_pixel(0, 0).0, [255, 255, 255, 255], "edit is in the saved file");
     let clip = world.clipboard.image.lock().unwrap().clone().unwrap();
     assert_eq!(&clip.row(0)[..4], &[255, 255, 255, 255], "and on the clipboard");
@@ -370,7 +420,11 @@ fn edited_image_is_what_gets_saved_and_uploaded() {
 fn editor_cancel_cancels_the_run_and_nothing_else_happens() {
     let world = TestWorld::new();
     *world.editor.mode.lock().unwrap() = EditorMode::Cancel;
-    let w = wf(InputKind::CaptureRegion, vec![C::OpenEditor, C::SaveToFile, C::Upload], vec![U::CopyUrl, U::ShowNotification]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::OpenEditor, C::SaveToFile, C::Upload],
+        vec![U::CopyUrl, U::ShowNotification],
+    );
     let Ran { report, .. } = shot(&world, &w);
     assert_eq!(report.outcome, Outcome::Cancelled);
     assert_eq!(report.items[0].outcome, Outcome::Cancelled);
@@ -387,12 +441,19 @@ fn editor_cancel_cancels_the_run_and_nothing_else_happens() {
 fn editor_failure_aborts_the_item_and_reports() {
     let world = TestWorld::new();
     *world.editor.mode.lock().unwrap() = EditorMode::Fail(Fail::msg("GPU device lost"));
-    let w = wf(InputKind::CaptureRegion, vec![C::OpenEditor, C::SaveToFile, C::Upload], vec![U::ShowNotification]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::OpenEditor, C::SaveToFile, C::Upload],
+        vec![U::ShowNotification],
+    );
     let Ran { report, .. } = shot(&world, &w);
     assert_eq!(report.outcome, Outcome::Failed);
     assert_eq!(failure(step_of(&report, 0, StepKind::OpenEditor)).message, "GPU device lost");
     assert_eq!(skip_reason(step_of(&report, 0, StepKind::SaveToFile)), &SkipReason::ItemFailed);
-    assert!(world.uploaders.uploads.lock().unwrap().is_empty(), "never upload unedited when the editor broke");
+    assert!(
+        world.uploaders.uploads.lock().unwrap().is_empty(),
+        "never upload unedited when the editor broke"
+    );
     let n = world.notifier.shown.lock().unwrap().clone();
     assert_eq!(n.len(), 1);
     assert_eq!(n[0].level, NotificationLevel::Error);
@@ -478,7 +539,8 @@ fn capture_delay_elapses_before_capturing() {
     let mut s = world.settings();
     s.capture.delay_ms = 80;
     let start = std::time::Instant::now();
-    let Ran { report, .. } = shot_with(&world, s, &wf(InputKind::CaptureFullscreen, vec![], vec![]));
+    let Ran { report, .. } =
+        shot_with(&world, s, &wf(InputKind::CaptureFullscreen, vec![], vec![]));
     assert!(start.elapsed() >= Duration::from_millis(70));
     assert_eq!(report.outcome, Outcome::Success);
 }
@@ -507,11 +569,16 @@ fn failed_upload_keeps_the_local_file_and_reports_precisely() {
     assert_eq!(report.items[0].local_path.as_deref(), Some(shot_path().as_path()));
     assert!(report.items[0].url.is_none());
     // delete was skipped for the right reason and never touched the file system
-    assert_eq!(skip_reason(step_of(&report, 0, StepKind::DeleteLocalFile)), &SkipReason::UploadNotConfirmed);
+    assert_eq!(
+        skip_reason(step_of(&report, 0, StepKind::DeleteLocalFile)),
+        &SkipReason::UploadNotConfirmed
+    );
     assert!(world.log.with_prefix("fs.remove").is_empty());
     // url steps are skipped with NoUrl
     assert_eq!(skip_reason(run_step(&report, StepKind::CopyUrl)), &SkipReason::NoUrl);
-    assert!(world.opener.fail.lock().unwrap().is_none() && world.log.with_prefix("open:").is_empty());
+    assert!(
+        world.opener.fail.lock().unwrap().is_none() && world.log.with_prefix("open:").is_empty()
+    );
     // the notification tells the user what happened and where the file is
     let n = world.notifier.shown.lock().unwrap().clone();
     assert_eq!(n.len(), 1);
@@ -531,11 +598,16 @@ fn failed_upload_keeps_the_local_file_and_reports_precisely() {
 fn failed_upload_without_saving_is_a_total_failure() {
     let world = TestWorld::new();
     world.uploaders.fail_all(Fail::msg("401 Unauthorized"));
-    let Ran { report, .. } = shot(&world, &wf(InputKind::CaptureRegion, vec![C::Upload], vec![U::ShowNotification]));
+    let Ran { report, .. } =
+        shot(&world, &wf(InputKind::CaptureRegion, vec![C::Upload], vec![U::ShowNotification]));
     assert_eq!(report.outcome, Outcome::Failed);
     let n = world.notifier.shown.lock().unwrap().clone();
     assert_eq!(n[0].level, NotificationLevel::Error);
-    assert_eq!(world.history.count(&Query::default()).unwrap(), 0, "nothing persisted, nothing to record");
+    assert_eq!(
+        world.history.count(&Query::default()).unwrap(),
+        0,
+        "nothing persisted, nothing to record"
+    );
 }
 
 #[test]
@@ -546,7 +618,11 @@ fn missing_destination_is_a_clear_configuration_error() {
     let Ran { report, .. } = shot_with(&world, s, &standard());
     let f = failure(step_of(&report, 0, StepKind::Upload));
     assert_eq!(f.kind, FailureKind::NotConfigured);
-    assert!(f.message.contains("no image uploader") && f.message.contains("destinations.image"), "{}", f.message);
+    assert!(
+        f.message.contains("no image uploader") && f.message.contains("destinations.image"),
+        "{}",
+        f.message
+    );
     assert!(world.uploaders.uploads.lock().unwrap().is_empty(), "the service is not even called");
     assert_eq!(report.outcome, Outcome::PartialSuccess, "the file was saved");
 }
@@ -555,10 +631,17 @@ fn missing_destination_is_a_clear_configuration_error() {
 fn empty_url_means_the_upload_is_not_confirmed() {
     let world = TestWorld::new();
     world.uploaders.empty_url_for.lock().unwrap().push("Screenshot".into());
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::Upload, C::DeleteLocalFile], vec![U::CopyUrl]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::SaveToFile, C::Upload, C::DeleteLocalFile],
+        vec![U::CopyUrl],
+    );
     let Ran { report, .. } = shot(&world, &w);
     assert!(failure(step_of(&report, 0, StepKind::Upload)).message.contains("no URL"));
-    assert_eq!(skip_reason(step_of(&report, 0, StepKind::DeleteLocalFile)), &SkipReason::UploadNotConfirmed);
+    assert_eq!(
+        skip_reason(step_of(&report, 0, StepKind::DeleteLocalFile)),
+        &SkipReason::UploadNotConfirmed
+    );
     assert!(world.fs.contents(shot_path()).is_some(), "file must survive an unconfirmed upload");
     assert!(world.log.with_prefix("clipboard.text").is_empty());
 }
@@ -592,7 +675,8 @@ fn service_panics_become_failed_steps() {
 #[test]
 fn delete_local_file_runs_only_after_confirmed_upload() {
     let world = TestWorld::new();
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::Upload, C::DeleteLocalFile], vec![]);
+    let w =
+        wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::Upload, C::DeleteLocalFile], vec![]);
     let Ran { report, .. } = shot(&world, &w);
     assert_eq!(report.outcome, Outcome::Success);
     assert!(world.fs.contents(shot_path()).is_none());
@@ -612,9 +696,13 @@ fn delete_local_file_runs_only_after_confirmed_upload() {
 #[test]
 fn delete_listed_before_upload_never_runs() {
     let world = TestWorld::new();
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::DeleteLocalFile, C::Upload], vec![]);
+    let w =
+        wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::DeleteLocalFile, C::Upload], vec![]);
     let Ran { report, .. } = shot(&world, &w);
-    assert_eq!(skip_reason(step_of(&report, 0, StepKind::DeleteLocalFile)), &SkipReason::UploadNotConfirmed);
+    assert_eq!(
+        skip_reason(step_of(&report, 0, StepKind::DeleteLocalFile)),
+        &SkipReason::UploadNotConfirmed
+    );
     assert!(world.fs.contents(shot_path()).is_some());
 }
 
@@ -623,7 +711,10 @@ fn delete_without_a_saved_file_is_skipped() {
     let world = TestWorld::new();
     let w = wf(InputKind::CaptureRegion, vec![C::Upload, C::DeleteLocalFile], vec![]);
     let Ran { report, .. } = shot(&world, &w);
-    assert_eq!(skip_reason(step_of(&report, 0, StepKind::DeleteLocalFile)), &SkipReason::NoLocalFile);
+    assert_eq!(
+        skip_reason(step_of(&report, 0, StepKind::DeleteLocalFile)),
+        &SkipReason::NoLocalFile
+    );
     assert_eq!(report.outcome, Outcome::Success);
 }
 
@@ -631,7 +722,12 @@ fn delete_without_a_saved_file_is_skipped() {
 fn delete_is_idempotent_when_the_file_is_already_gone() {
     struct Vanish<'a>(&'a MemFs);
     impl Uploaders for Vanish<'_> {
-        fn upload(&self, r: &UploadRequest<'_>, _: &dyn Fn(UploadProgress), _: &CancelToken) -> Result<UploadOutcome, ServiceError> {
+        fn upload(
+            &self,
+            r: &UploadRequest<'_>,
+            _: &dyn Fn(UploadProgress),
+            _: &CancelToken,
+        ) -> Result<UploadOutcome, ServiceError> {
             // the user (or antivirus, or sync client) removes the file during the upload
             if let UploadSource::LocalFile(p) = r.source {
                 let _ = self.0.remove_file(p);
@@ -642,8 +738,14 @@ fn delete_is_idempotent_when_the_file_is_already_gone() {
     let world = TestWorld::new();
     let v = Vanish(&world.fs);
     let services = Services { uploaders: &v, ..world.services() };
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::Upload, C::DeleteLocalFile], vec![]);
-    let report = world.engine(world.settings()).post_screenshot(&w, &services, &NullSink, &CancelToken::new());
+    let w =
+        wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::Upload, C::DeleteLocalFile], vec![]);
+    let report = world.engine(world.settings()).post_screenshot(
+        &w,
+        &services,
+        &NullSink,
+        &CancelToken::new(),
+    );
     assert_eq!(report.outcome, Outcome::Success);
     assert!(step_of(&report, 0, StepKind::DeleteLocalFile).status.is_success());
 }
@@ -652,7 +754,11 @@ fn delete_is_idempotent_when_the_file_is_already_gone() {
 fn delete_failure_is_reported_and_keeps_the_path() {
     let world = TestWorld::new();
     world.fs.fail_remove(Some(io::ErrorKind::PermissionDenied));
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::Upload, C::DeleteLocalFile], vec![U::CopyUrl]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::SaveToFile, C::Upload, C::DeleteLocalFile],
+        vec![U::CopyUrl],
+    );
     let Ran { report, .. } = shot(&world, &w);
     let f = failure(step_of(&report, 0, StepKind::DeleteLocalFile));
     assert_eq!(f.kind, FailureKind::Io);
@@ -669,7 +775,10 @@ fn user_files_are_never_deleted() {
     world.fs.add_file("/home/u/report.pdf", b"pdf");
     let w = wf(InputKind::Files, vec![C::Upload, C::DeleteLocalFile], vec![]);
     let Ran { report, .. } = files(&world, &w, &["/home/u/report.pdf"]);
-    assert_eq!(skip_reason(step_of(&report, 0, StepKind::DeleteLocalFile)), &SkipReason::NotCreatedByWorkflow);
+    assert_eq!(
+        skip_reason(step_of(&report, 0, StepKind::DeleteLocalFile)),
+        &SkipReason::NotCreatedByWorkflow
+    );
     assert!(world.fs.contents("/home/u/report.pdf").is_some());
     assert!(world.log.with_prefix("fs.remove").is_empty());
     assert_eq!(report.outcome, Outcome::Success);
@@ -681,7 +790,11 @@ fn a_saved_copy_of_an_edited_user_image_may_be_deleted_but_the_original_never() 
     world.fs.add_file("/home/u/photo.png", png_bytes(20, 10));
     let mut s = world.settings();
     s.post_file.images_through_editor = true;
-    let w = wf(InputKind::Files, vec![C::OpenEditor, C::SaveToFile, C::Upload, C::DeleteLocalFile], vec![]);
+    let w = wf(
+        InputKind::Files,
+        vec![C::OpenEditor, C::SaveToFile, C::Upload, C::DeleteLocalFile],
+        vec![],
+    );
     let Ran { report, .. } = files_with(&world, s, &w, &["/home/u/photo.png"]);
     assert_eq!(report.outcome, Outcome::Success, "{}", report.summary());
     assert!(world.fs.contents("/home/u/photo.png").is_some(), "original untouched");
@@ -708,7 +821,14 @@ fn optional_step_failures_are_warnings_and_do_not_stop_anything() {
     assert_eq!(report.outcome, Outcome::Success, "{}", report.summary());
     assert_eq!(report.items[0].outcome, Outcome::Success);
     let warned: Vec<StepKind> = report.warnings().iter().map(|s| s.kind).collect();
-    for k in [StepKind::CopyImage, StepKind::PinToScreen, StepKind::CopyUrl, StepKind::OpenUrl, StepKind::ShowQrCode, StepKind::ShowNotification] {
+    for k in [
+        StepKind::CopyImage,
+        StepKind::PinToScreen,
+        StepKind::CopyUrl,
+        StepKind::OpenUrl,
+        StepKind::ShowQrCode,
+        StepKind::ShowNotification,
+    ] {
         // (ShowQrCode uses the notifier's show_qr which also fails)
         assert!(warned.contains(&k), "{k} missing from {warned:?}");
     }
@@ -733,10 +853,18 @@ fn history_failure_is_only_a_warning() {
     // Lock the file for writing from another connection so inserts time out.
     let raw = rusqlite::Connection::open(&path).unwrap();
     raw.execute_batch("BEGIN IMMEDIATE").unwrap();
-    let cfg = crate::history::HistoryConfig { busy_timeout: Duration::from_millis(30), ..Default::default() };
+    let cfg = crate::history::HistoryConfig {
+        busy_timeout: Duration::from_millis(30),
+        ..Default::default()
+    };
     let h2 = crate::history::History::open_with(&path, &cfg).unwrap();
     let services2 = Services { history: Some(&h2), ..services };
-    let report = world.engine(world.settings()).post_screenshot(&standard(), &services2, &NullSink, &CancelToken::new());
+    let report = world.engine(world.settings()).post_screenshot(
+        &standard(),
+        &services2,
+        &NullSink,
+        &CancelToken::new(),
+    );
     assert_eq!(report.outcome, Outcome::Success);
     let hs = step_of(&report, 0, StepKind::RecordHistory);
     assert!(failure(hs).message.contains("history"), "{:?}", hs.status);
@@ -756,13 +884,22 @@ fn history_entry_has_everything() {
     assert_eq!(e.kind, EntryKind::Image);
     assert_eq!(e.local_path.as_deref(), Some(shot_path().as_path()));
     assert_eq!(e.upload_url.as_deref(), Some(url_of("test", SHOT_NAME).as_str()));
-    assert_eq!(e.thumbnail_url.as_deref(), Some(format!("https://test.test/t/{SHOT_NAME}").as_str()));
-    assert_eq!(e.deletion_url.as_deref(), Some(format!("https://test.test/del/{SHOT_NAME}").as_str()));
+    assert_eq!(
+        e.thumbnail_url.as_deref(),
+        Some(format!("https://test.test/t/{SHOT_NAME}").as_str())
+    );
+    assert_eq!(
+        e.deletion_url.as_deref(),
+        Some(format!("https://test.test/del/{SHOT_NAME}").as_str())
+    );
     assert_eq!(e.uploader.as_deref(), Some("test"));
     assert_eq!((e.width, e.height), (Some(64), Some(48)));
     assert_eq!(e.workflow_id.as_deref(), Some("test"));
     assert_eq!(e.size_bytes, Some(world.fs.contents(shot_path()).unwrap().len() as u64));
-    assert_eq!(e.sha256.as_deref(), Some(crate::history::sha256_hex(&world.fs.contents(shot_path()).unwrap()).as_str()));
+    assert_eq!(
+        e.sha256.as_deref(),
+        Some(crate::history::sha256_hex(&world.fs.contents(shot_path()).unwrap()).as_str())
+    );
     assert_eq!(e.created_at, 1_709_993_106_000, "clock injected into the engine");
     let thumb = e.thumbnail.expect("thumbnail");
     assert_eq!(image::load_from_memory(&thumb).unwrap().width(), 64);
@@ -779,7 +916,12 @@ fn history_can_be_disabled_or_absent() {
     assert!(!kinds(&report.items[0].steps).contains(&StepKind::RecordHistory));
 
     let engine = world.engine(world.settings());
-    let report = engine.post_screenshot(&standard(), &world.services_without_history(), &NullSink, &CancelToken::new());
+    let report = engine.post_screenshot(
+        &standard(),
+        &world.services_without_history(),
+        &NullSink,
+        &CancelToken::new(),
+    );
     assert_eq!(report.outcome, Outcome::Success);
     assert_eq!(world.history.count(&Query::default()).unwrap(), 0);
 }
@@ -811,7 +953,12 @@ fn cancelling_before_the_run_does_nothing() {
     let cancel = CancelToken::new();
     cancel.cancel();
     let sink = CollectingSink::new();
-    let report = world.engine(world.settings()).post_screenshot(&standard(), &world.services(), &sink, &cancel);
+    let report = world.engine(world.settings()).post_screenshot(
+        &standard(),
+        &world.services(),
+        &sink,
+        &cancel,
+    );
     assert_eq!(report.outcome, Outcome::Cancelled);
     assert!(world.log.lines().is_empty());
     check_event_invariants(&sink.events(), &report);
@@ -822,9 +969,14 @@ fn cancel_during_upload_stops_the_rest_but_keeps_and_records_the_file() {
     let world = TestWorld::new();
     let cancel = CancelToken::new();
     *world.uploaders.cancel_on_start.lock().unwrap() = Some((cancel.clone(), false));
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::Upload, C::DeleteLocalFile], vec![U::CopyUrl, U::ShowNotification]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::SaveToFile, C::Upload, C::DeleteLocalFile],
+        vec![U::CopyUrl, U::ShowNotification],
+    );
     let sink = CollectingSink::new();
-    let report = world.engine(world.settings()).post_screenshot(&w, &world.services(), &sink, &cancel);
+    let report =
+        world.engine(world.settings()).post_screenshot(&w, &world.services(), &sink, &cancel);
     assert_eq!(report.outcome, Outcome::Cancelled);
     assert_eq!(step_of(&report, 0, StepKind::Upload).status, StepStatus::Cancelled);
     assert_eq!(skip_reason(step_of(&report, 0, StepKind::DeleteLocalFile)), &SkipReason::Cancelled);
@@ -840,8 +992,13 @@ fn cancel_that_arrives_after_a_finished_upload_keeps_the_url() {
     let world = TestWorld::new();
     let cancel = CancelToken::new();
     *world.uploaders.cancel_on_start.lock().unwrap() = Some((cancel.clone(), true));
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::Upload, C::DeleteLocalFile], vec![U::CopyUrl]);
-    let report = world.engine(world.settings()).post_screenshot(&w, &world.services(), &NullSink, &cancel);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::SaveToFile, C::Upload, C::DeleteLocalFile],
+        vec![U::CopyUrl],
+    );
+    let report =
+        world.engine(world.settings()).post_screenshot(&w, &world.services(), &NullSink, &cancel);
     assert_eq!(report.outcome, Outcome::Cancelled);
     assert!(report.items[0].url.is_some(), "the upload did finish");
     // deletion is a follow-up action and must not happen after a cancel
@@ -870,7 +1027,13 @@ fn cancel_mid_multi_upload_from_another_thread() {
     });
     let paths: Vec<PathBuf> = (0..6).map(|i| PathBuf::from(format!("/in/f{i}.bin"))).collect();
     let start = std::time::Instant::now();
-    let report = engine.post_file(&wf(InputKind::Files, vec![C::Upload], vec![U::CopyUrl]), paths, &world.services(), &NullSink, &cancel);
+    let report = engine.post_file(
+        &wf(InputKind::Files, vec![C::Upload], vec![U::CopyUrl]),
+        paths,
+        &world.services(),
+        &NullSink,
+        &cancel,
+    );
     h.join().unwrap();
     assert!(start.elapsed() < Duration::from_secs(15), "must not wait out the slow uploads");
     assert_eq!(report.outcome, Outcome::Cancelled);
@@ -884,7 +1047,8 @@ fn cancel_mid_multi_upload_from_another_thread() {
 #[test]
 fn shorten_url_replaces_the_current_url() {
     let world = TestWorld::new();
-    let w = wf(InputKind::CaptureRegion, vec![C::Upload], vec![U::ShortenUrl, U::CopyUrl, U::OpenUrl]);
+    let w =
+        wf(InputKind::CaptureRegion, vec![C::Upload], vec![U::ShortenUrl, U::CopyUrl, U::OpenUrl]);
     let Ran { report, .. } = shot(&world, &w);
     let item = &report.items[0];
     assert_eq!(item.short_url.as_deref(), Some("https://sho.rt/1"));
@@ -892,7 +1056,11 @@ fn shorten_url_replaces_the_current_url() {
     assert!(world.log.lines().contains(&"open:https://sho.rt/1".to_owned()));
     assert!(world.log.lines().contains(&format!("shorten:short:{}", url_of("test", SHOT_NAME))));
     assert_eq!(report.urls(), vec!["https://sho.rt/1"]);
-    assert_eq!(item.url.as_deref(), Some(url_of("test", SHOT_NAME).as_str()), "the original URL stays in the report");
+    assert_eq!(
+        item.url.as_deref(),
+        Some(url_of("test", SHOT_NAME).as_str()),
+        "the original URL stays in the report"
+    );
 }
 
 #[test]
@@ -901,18 +1069,35 @@ fn copy_short_url_shortens_on_demand_without_changing_copy_url() {
     let w = wf(InputKind::CaptureRegion, vec![C::Upload], vec![U::CopyShortUrl, U::CopyUrl]);
     shot(&world, &w);
     let copies = world.log.with_prefix("clipboard.text");
-    assert_eq!(copies, vec!["clipboard.text:https://sho.rt/1".to_owned(), format!("clipboard.text:{}", url_of("test", SHOT_NAME))]);
+    assert_eq!(
+        copies,
+        vec![
+            "clipboard.text:https://sho.rt/1".to_owned(),
+            format!("clipboard.text:{}", url_of("test", SHOT_NAME))
+        ]
+    );
 }
 
 #[test]
 fn shortener_failures_fall_back_gracefully() {
     let world = TestWorld::new();
     *world.shortener.fail.lock().unwrap() = Some(Fail::msg("shortener down"));
-    let w = wf(InputKind::CaptureRegion, vec![C::Upload], vec![U::ShortenUrl, U::CopyUrl, U::CopyShortUrl]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::Upload],
+        vec![U::ShortenUrl, U::CopyUrl, U::CopyShortUrl],
+    );
     let Ran { report, .. } = shot(&world, &w);
     assert!(failure(step_of(&report, 0, StepKind::ShortenUrl)).message.contains("shortener down"));
-    assert_eq!(world.log.with_prefix("clipboard.text").len(), 1, "CopyUrl copied the long URL; CopyShortUrl had nothing to copy");
-    assert_eq!(world.clipboard.text.lock().unwrap().as_deref(), Some(url_of("test", SHOT_NAME).as_str()));
+    assert_eq!(
+        world.log.with_prefix("clipboard.text").len(),
+        1,
+        "CopyUrl copied the long URL; CopyShortUrl had nothing to copy"
+    );
+    assert_eq!(
+        world.clipboard.text.lock().unwrap().as_deref(),
+        Some(url_of("test", SHOT_NAME).as_str())
+    );
     assert_eq!(report.outcome, Outcome::PartialSuccess, "shorten is a normal step");
     let short_copy = report.steps.iter().rev().find(|s| s.kind == StepKind::CopyShortUrl).unwrap();
     assert!(matches!(skip_reason(short_copy), SkipReason::NotApplicable(_)));
@@ -923,7 +1108,8 @@ fn missing_shortener_configuration_is_explained() {
     let world = TestWorld::new();
     let mut s = world.settings();
     s.destinations.url_shortener = None;
-    let Ran { report, .. } = shot_with(&world, s, &wf(InputKind::CaptureRegion, vec![C::Upload], vec![U::ShortenUrl]));
+    let Ran { report, .. } =
+        shot_with(&world, s, &wf(InputKind::CaptureRegion, vec![C::Upload], vec![U::ShortenUrl]));
     let f = failure(step_of(&report, 0, StepKind::ShortenUrl));
     assert_eq!(f.kind, FailureKind::NotConfigured);
     assert!(f.message.contains("url_shortener"));
@@ -933,7 +1119,11 @@ fn missing_shortener_configuration_is_explained() {
 fn workflow_override_selects_the_uploader() {
     let world = TestWorld::new();
     let mut w = standard();
-    w.destination = DestinationOverride { image: Some("special".into()), url_shortener: Some("mine".into()), ..Default::default() };
+    w.destination = DestinationOverride {
+        image: Some("special".into()),
+        url_shortener: Some("mine".into()),
+        ..Default::default()
+    };
     shot(&world, &w);
     assert_eq!(world.uploaders.uploads.lock().unwrap()[0].destination, "special");
     let mut w = wf(InputKind::CaptureRegion, vec![C::Upload], vec![U::ShortenUrl]);
@@ -960,7 +1150,10 @@ fn notifications_can_be_turned_off() {
     let mut s = world.settings();
     s.general.show_notifications = false;
     let Ran { report, .. } = shot_with(&world, s, &standard());
-    assert!(matches!(skip_reason(run_step(&report, StepKind::ShowNotification)), SkipReason::NotApplicable(_)));
+    assert!(matches!(
+        skip_reason(run_step(&report, StepKind::ShowNotification)),
+        SkipReason::NotApplicable(_)
+    ));
     assert!(world.notifier.shown.lock().unwrap().is_empty());
 }
 
@@ -992,7 +1185,13 @@ fn run_command_expands_each_argument_separately_without_a_shell() {
         vec![C::Upload],
         vec![U::RunCommand {
             program: "notify {url}".into(),
-            args: vec!["--file={path}".into(), "{file_name}".into(), "{url}".into(), "plain arg".into(), "{{literal}}".into()],
+            args: vec![
+                "--file={path}".into(),
+                "{file_name}".into(),
+                "{url}".into(),
+                "plain arg".into(),
+                "{{literal}}".into(),
+            ],
         }],
     );
     let Ran { report, .. } = files(&world, &w, &[nasty]);
@@ -1018,7 +1217,11 @@ fn run_command_expands_each_argument_separately_without_a_shell() {
 fn run_command_failures_are_reported_with_stderr() {
     let world = TestWorld::new();
     *world.commands.exit_code.lock().unwrap() = 2;
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile], vec![U::RunCommand { program: "post-process".into(), args: vec!["{path}".into()] }]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::SaveToFile],
+        vec![U::RunCommand { program: "post-process".into(), args: vec!["{path}".into()] }],
+    );
     let Ran { report, .. } = shot(&world, &w);
     let f = failure(step_of(&report, 0, StepKind::RunCommand));
     assert!(f.message.contains("post-process exited with code 2: boom"), "{}", f.message);
@@ -1029,12 +1232,20 @@ fn run_command_failures_are_reported_with_stderr() {
 fn run_command_start_failure_and_template_errors() {
     let world = TestWorld::new();
     *world.commands.fail.lock().unwrap() = Some(Fail::msg("cannot start \"nope\""));
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile], vec![U::RunCommand { program: "nope".into(), args: vec![] }]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::SaveToFile],
+        vec![U::RunCommand { program: "nope".into(), args: vec![] }],
+    );
     let Ran { report, .. } = shot(&world, &w);
     assert!(failure(step_of(&report, 0, StepKind::RunCommand)).message.contains("cannot start"));
 
     let world = TestWorld::new();
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile], vec![U::RunCommand { program: "x".into(), args: vec!["{bogus}".into()] }]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::SaveToFile],
+        vec![U::RunCommand { program: "x".into(), args: vec!["{bogus}".into()] }],
+    );
     let Ran { report, .. } = shot(&world, &w);
     let f = failure(step_of(&report, 0, StepKind::RunCommand));
     assert_eq!(f.kind, FailureKind::Invalid);
@@ -1043,7 +1254,11 @@ fn run_command_start_failure_and_template_errors() {
 
     // {url} without an upload
     let world = TestWorld::new();
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile], vec![U::RunCommand { program: "x".into(), args: vec!["{url}".into()] }]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::SaveToFile],
+        vec![U::RunCommand { program: "x".into(), args: vec!["{url}".into()] }],
+    );
     let Ran { report, .. } = shot(&world, &w);
     assert!(failure(step_of(&report, 0, StepKind::RunCommand)).message.contains("not available"));
 }
@@ -1052,9 +1267,18 @@ fn run_command_start_failure_and_template_errors() {
 fn run_command_is_skipped_after_a_failed_upload() {
     let world = TestWorld::new();
     world.uploaders.fail_all(Fail::msg("nope"));
-    let w = wf(InputKind::CaptureRegion, vec![C::SaveToFile, C::Upload], vec![U::RunCommand { program: "x".into(), args: vec![] }]);
+    let w = wf(
+        InputKind::CaptureRegion,
+        vec![C::SaveToFile, C::Upload],
+        vec![U::RunCommand { program: "x".into(), args: vec![] }],
+    );
     let Ran { report, .. } = shot(&world, &w);
-    assert!(run_step(&report, StepKind::RunCommand).status == StepStatus::Skipped(SkipReason::NotApplicable("no item finished successfully".into())));
+    assert!(
+        run_step(&report, StepKind::RunCommand).status
+            == StepStatus::Skipped(SkipReason::NotApplicable(
+                "no item finished successfully".into()
+            ))
+    );
     assert!(world.commands.runs.lock().unwrap().is_empty());
 }
 
@@ -1063,9 +1287,12 @@ fn run_command_is_skipped_after_a_failed_upload() {
 #[test]
 fn ocr_copies_recognised_text() {
     let world = TestWorld::new();
-    let Ran { report, .. } = shot(&world, &wf(InputKind::CaptureRegion, vec![C::Ocr, C::PinToScreen], vec![]));
+    let Ran { report, .. } =
+        shot(&world, &wf(InputKind::CaptureRegion, vec![C::Ocr, C::PinToScreen], vec![]));
     assert_eq!(world.clipboard.text.lock().unwrap().as_deref(), Some("recognised text"));
-    assert!(step_of(&report, 0, StepKind::Ocr).detail.as_deref().unwrap().contains("15 characters"));
+    assert!(
+        step_of(&report, 0, StepKind::Ocr).detail.as_deref().unwrap().contains("15 characters")
+    );
     assert!(world.log.with_prefix("pin:").len() == 1);
 
     let world = TestWorld::new();
@@ -1110,22 +1337,28 @@ fn clipboard_image_follows_the_screenshot_path() {
 fn clipboard_files_follow_the_post_file_path() {
     let world = TestWorld::new();
     world.fs.add_file("/a/x.zip", b"z");
-    *world.clipboard.content.lock().unwrap() = Some(ClipboardContent::Files(vec!["/a/x.zip".into()]));
+    *world.clipboard.content.lock().unwrap() =
+        Some(ClipboardContent::Files(vec!["/a/x.zip".into()]));
     let w = wf(InputKind::Clipboard, vec![C::Upload, C::DeleteLocalFile], vec![]);
     let Ran { report, .. } = shot(&world, &w);
     assert_eq!(report.outcome, Outcome::Success);
-    assert_eq!(world.uploaders.uploads.lock().unwrap()[0].path.as_deref(), Some(Path::new("/a/x.zip")));
+    assert_eq!(
+        world.uploaders.uploads.lock().unwrap()[0].path.as_deref(),
+        Some(Path::new("/a/x.zip"))
+    );
     assert!(world.fs.contents("/a/x.zip").is_some(), "clipboard files are user files");
 }
 
 #[test]
 fn empty_or_blank_clipboard_is_an_actionable_failure() {
-    for content in [None, Some(ClipboardContent::Text("   ".into())), Some(ClipboardContent::Files(vec![]))] {
+    for content in
+        [None, Some(ClipboardContent::Text("   ".into())), Some(ClipboardContent::Files(vec![]))]
+    {
         let world = TestWorld::new();
         *world.clipboard.content.lock().unwrap() = content;
         let Ran { report, .. } = shot(&world, &wf(InputKind::Clipboard, vec![C::Upload], vec![]));
         assert_eq!(report.outcome, Outcome::Failed);
-        assert_eq!(run_step(&report, StepKind::ReadClipboard).status.is_failure(), true);
+        assert!(run_step(&report, StepKind::ReadClipboard).status.is_failure());
     }
 }
 
@@ -1173,7 +1406,11 @@ fn multi_file_urls_are_joined_in_input_order() {
         assert_eq!(report.items[i].index, i);
         assert_eq!(report.items[i].input_path.as_deref(), Some(Path::new(&format!("/in/{n}"))));
     }
-    assert_eq!(world.log.with_prefix("clipboard.text").len(), 1, "one clipboard write for the batch");
+    assert_eq!(
+        world.log.with_prefix("clipboard.text").len(),
+        1,
+        "one clipboard write for the batch"
+    );
     let notes = world.notifier.shown.lock().unwrap().clone();
     assert_eq!(notes.len(), 1, "one summary notification");
     assert_eq!(notes[0].title, "5 uploads complete");
@@ -1188,10 +1425,14 @@ fn one_failure_does_not_stop_the_others() {
     }
     world.uploaders.fail_file("b.bin", Fail::msg("413 Payload Too Large"));
     let w = wf(InputKind::Files, vec![C::Upload], vec![U::CopyUrl, U::ShowNotification]);
-    let Ran { report, .. } = files(&world, &w, &["/in/a.bin", "/in/b.bin", "/in/c.bin", "/in/d.bin"]);
+    let Ran { report, .. } =
+        files(&world, &w, &["/in/a.bin", "/in/b.bin", "/in/c.bin", "/in/d.bin"]);
     assert_eq!(report.outcome, Outcome::PartialSuccess);
     let outcomes: Vec<Outcome> = report.items.iter().map(|i| i.outcome).collect();
-    assert_eq!(outcomes, vec![Outcome::Success, Outcome::Failed, Outcome::Success, Outcome::Success]);
+    assert_eq!(
+        outcomes,
+        vec![Outcome::Success, Outcome::Failed, Outcome::Success, Outcome::Success]
+    );
     assert!(failure(step_of(&report, 1, StepKind::Upload)).message.contains("413"));
     assert_eq!(
         world.clipboard.text.lock().unwrap().clone().unwrap(),
@@ -1249,7 +1490,8 @@ fn no_files_is_an_error() {
 fn duplicate_paths_are_uploaded_twice() {
     let world = TestWorld::new();
     world.fs.add_file("/in/a.txt", b"a");
-    let Ran { report, .. } = files(&world, &wf(InputKind::Files, vec![C::Upload], vec![]), &["/in/a.txt", "/in/a.txt"]);
+    let Ran { report, .. } =
+        files(&world, &wf(InputKind::Files, vec![C::Upload], vec![]), &["/in/a.txt", "/in/a.txt"]);
     assert_eq!(report.outcome, Outcome::Success);
     assert_eq!(world.uploaders.uploads.lock().unwrap().len(), 2);
 }
@@ -1266,7 +1508,8 @@ fn parallelism_is_bounded_by_the_setting() {
         s.post_file.max_parallel_uploads = limit;
         let paths: Vec<String> = (0..files_n).map(|i| format!("/in/{i}.bin")).collect();
         let refs: Vec<&str> = paths.iter().map(String::as_str).collect();
-        let Ran { report, .. } = files_with(&world, s, &wf(InputKind::Files, vec![C::Upload], vec![]), &refs);
+        let Ran { report, .. } =
+            files_with(&world, s, &wf(InputKind::Files, vec![C::Upload], vec![]), &refs);
         assert_eq!(report.outcome, Outcome::Success);
         let max = world.uploaders.max_concurrent.load(Ordering::SeqCst);
         assert!(max <= limit as usize, "limit {limit}: saw {max} concurrent uploads");
@@ -1282,7 +1525,10 @@ fn folders_are_zipped_uploaded_and_cleaned_up() {
     let w = wf(InputKind::Files, vec![C::Upload], vec![U::CopyUrl]);
     let Ran { report, .. } = files(&world, &w, &["/in/My Folder"]);
     assert_eq!(report.outcome, Outcome::Success, "{}", report.summary());
-    assert_eq!(kinds(&report.items[0].steps)[..3], [StepKind::LoadFile, StepKind::Zip, StepKind::Upload]);
+    assert_eq!(
+        kinds(&report.items[0].steps)[..3],
+        [StepKind::LoadFile, StepKind::Zip, StepKind::Upload]
+    );
     let up = world.uploaders.uploads.lock().unwrap().clone();
     assert_eq!(up[0].file_name, "My Folder.zip");
     assert_eq!(up[0].mime, "application/zip");
@@ -1291,7 +1537,11 @@ fn folders_are_zipped_uploaded_and_cleaned_up() {
     assert!(world.fs.contents("/in/My Folder/a.txt").is_some());
     assert!(report.items[0].local_path.is_none());
     let e = world.history.list(&Query::default()).unwrap();
-    assert_eq!(e[0].local_path.as_deref(), Some(Path::new("/in/My Folder")), "history points at the folder, not the deleted zip");
+    assert_eq!(
+        e[0].local_path.as_deref(),
+        Some(Path::new("/in/My Folder")),
+        "history points at the folder, not the deleted zip"
+    );
 }
 
 #[test]
@@ -1299,7 +1549,8 @@ fn zip_archive_is_removed_even_when_the_upload_fails() {
     let world = TestWorld::new();
     world.fs.add_dir("/in/d");
     world.uploaders.fail_all(Fail::msg("offline"));
-    let Ran { report, .. } = files(&world, &wf(InputKind::Files, vec![C::Upload], vec![]), &["/in/d"]);
+    let Ran { report, .. } =
+        files(&world, &wf(InputKind::Files, vec![C::Upload], vec![]), &["/in/d"]);
     assert_eq!(report.outcome, Outcome::Failed);
     assert!(world.fs.files().is_empty(), "no litter: {:?}", world.fs.files());
 }
@@ -1310,7 +1561,8 @@ fn folder_policy_error_and_zipper_failure() {
     world.fs.add_dir("/in/d");
     let mut s = world.settings();
     s.post_file.folders = crate::settings::FolderPolicy::Error;
-    let Ran { report, .. } = files_with(&world, s, &wf(InputKind::Files, vec![C::Upload], vec![]), &["/in/d"]);
+    let Ran { report, .. } =
+        files_with(&world, s, &wf(InputKind::Files, vec![C::Upload], vec![]), &["/in/d"]);
     let f = failure(step_of(&report, 0, StepKind::LoadFile));
     assert!(f.message.contains("is a folder") && f.message.contains("\"zip\""), "{}", f.message);
     assert!(world.uploaders.uploads.lock().unwrap().is_empty());
@@ -1318,7 +1570,8 @@ fn folder_policy_error_and_zipper_failure() {
     let world = TestWorld::new();
     world.fs.add_dir("/in/d");
     *world.zipper.fail.lock().unwrap() = Some(Fail::msg("zip: permission denied"));
-    let Ran { report, .. } = files(&world, &wf(InputKind::Files, vec![C::Upload], vec![]), &["/in/d"]);
+    let Ran { report, .. } =
+        files(&world, &wf(InputKind::Files, vec![C::Upload], vec![]), &["/in/d"]);
     assert!(failure(step_of(&report, 0, StepKind::Zip)).message.contains("permission denied"));
     assert_eq!(report.outcome, Outcome::Failed);
 }
@@ -1341,7 +1594,9 @@ fn image_files_go_through_the_editor_only_when_enabled() {
     let w = wf(InputKind::Files, vec![C::OpenEditor, C::Upload], vec![]);
     // default: off
     let Ran { report, .. } = files(&world, &w, &["/in/photo.png"]);
-    assert!(matches!(skip_reason(step_of(&report, 0, StepKind::OpenEditor)), SkipReason::NotApplicable(m) if m.contains("images_through_editor")));
+    assert!(
+        matches!(skip_reason(step_of(&report, 0, StepKind::OpenEditor)), SkipReason::NotApplicable(m) if m.contains("images_through_editor"))
+    );
     let up = world.uploaders.uploads.lock().unwrap().clone();
     assert_eq!(up[0].kind, DestinationType::File);
     assert_eq!(up[0].path.as_deref(), Some(Path::new("/in/photo.png")));
@@ -1357,7 +1612,11 @@ fn image_files_go_through_the_editor_only_when_enabled() {
     assert_eq!(up[0].kind, DestinationType::Image, "edited images use the image destination");
     assert_eq!(up[0].file_name, "photo.png");
     assert!(up[0].bytes.is_some() && up[0].path.is_none(), "edited bytes, not the original file");
-    assert_eq!(world.fs.contents("/in/photo.png").unwrap(), png_bytes(30, 20), "original untouched");
+    assert_eq!(
+        world.fs.contents("/in/photo.png").unwrap(),
+        png_bytes(30, 20),
+        "original untouched"
+    );
 }
 
 #[test]
@@ -1373,7 +1632,10 @@ fn editor_cancel_on_one_file_skips_only_that_file() {
     assert_eq!(report.items[0].outcome, Outcome::Cancelled);
     assert_eq!(report.items[1].outcome, Outcome::Success);
     assert_eq!(report.outcome, Outcome::PartialSuccess);
-    assert_eq!(world.clipboard.text.lock().unwrap().as_deref(), Some(url_of("test", "b.txt").as_str()));
+    assert_eq!(
+        world.clipboard.text.lock().unwrap().as_deref(),
+        Some(url_of("test", "b.txt").as_str())
+    );
 }
 
 #[test]
@@ -1382,13 +1644,26 @@ fn non_image_files_skip_image_steps() {
     world.fs.add_file("/in/doc.txt", b"t");
     let mut s = world.settings();
     s.post_file.images_through_editor = true;
-    let w = wf(InputKind::Files, vec![C::OpenEditor, C::CopyImageToClipboard, C::PinToScreen, C::Ocr, C::SaveToFile, C::Upload], vec![]);
+    let w = wf(
+        InputKind::Files,
+        vec![
+            C::OpenEditor,
+            C::CopyImageToClipboard,
+            C::PinToScreen,
+            C::Ocr,
+            C::SaveToFile,
+            C::Upload,
+        ],
+        vec![],
+    );
     let Ran { report, .. } = files_with(&world, s, &w, &["/in/doc.txt"]);
     for k in [StepKind::OpenEditor, StepKind::PinToScreen, StepKind::Ocr] {
         assert!(matches!(step_of(&report, 0, k).status, StepStatus::Skipped(_)), "{k}");
     }
     assert_eq!(skip_reason(step_of(&report, 0, StepKind::CopyImage)), &SkipReason::NoImage);
-    assert!(matches!(skip_reason(step_of(&report, 0, StepKind::SaveToFile)), SkipReason::NotApplicable(m) if m.contains("already on disk")));
+    assert!(
+        matches!(skip_reason(step_of(&report, 0, StepKind::SaveToFile)), SkipReason::NotApplicable(m) if m.contains("already on disk"))
+    );
     assert_eq!(report.outcome, Outcome::Success);
 }
 
@@ -1396,7 +1671,11 @@ fn non_image_files_skip_image_steps() {
 fn single_image_file_can_be_copied_pinned_and_recognised() {
     let world = TestWorld::new();
     world.fs.add_file("/in/p.png", png_bytes(12, 9));
-    let w = wf(InputKind::Files, vec![C::CopyImageToClipboard, C::PinToScreen, C::Ocr, C::Upload], vec![]);
+    let w = wf(
+        InputKind::Files,
+        vec![C::CopyImageToClipboard, C::PinToScreen, C::Ocr, C::Upload],
+        vec![],
+    );
     let Ran { report, .. } = files(&world, &w, &["/in/p.png"]);
     assert_eq!(report.outcome, Outcome::Success, "{}", report.summary());
     assert!(world.log.lines().contains(&"clipboard.image:12x9".to_owned()));
@@ -1415,7 +1694,10 @@ fn corrupt_image_files_fail_the_image_step_only() {
     let Ran { report, .. } = files(&world, &w, &["/in/broken.png"]);
     let f = failure(step_of(&report, 0, StepKind::CopyImage));
     assert!(f.message.contains("not a readable image"), "{}", f.message);
-    assert!(step_of(&report, 0, StepKind::Upload).status.is_success(), "optional step failure does not block the upload");
+    assert!(
+        step_of(&report, 0, StepKind::Upload).status.is_success(),
+        "optional step failure does not block the upload"
+    );
     assert_eq!(report.outcome, Outcome::Success);
 }
 
@@ -1427,18 +1709,34 @@ fn batch_skips_ambiguous_image_and_qr_steps_but_runs_per_item_steps() {
     let w = wf(
         InputKind::Files,
         vec![C::CopyImageToClipboard, C::PinToScreen, C::Ocr, C::Upload],
-        vec![U::ShowQrCode, U::OpenUrl, U::RunCommand { program: "hook".into(), args: vec!["{file_name}".into(), "{url}".into()] }],
+        vec![
+            U::ShowQrCode,
+            U::OpenUrl,
+            U::RunCommand {
+                program: "hook".into(),
+                args: vec!["{file_name}".into(), "{url}".into()],
+            },
+        ],
     );
     let Ran { report, .. } = files(&world, &w, &["/in/a.png", "/in/b.png"]);
     for i in 0..2 {
         for k in [StepKind::CopyImage, StepKind::PinToScreen, StepKind::Ocr] {
-            assert!(matches!(skip_reason(step_of(&report, i, k)), SkipReason::NotApplicable(m) if m.contains("multiple")), "{i} {k}");
+            assert!(
+                matches!(skip_reason(step_of(&report, i, k)), SkipReason::NotApplicable(m) if m.contains("multiple")),
+                "{i} {k}"
+            );
         }
     }
-    assert!(matches!(skip_reason(run_step(&report, StepKind::ShowQrCode)), SkipReason::NotApplicable(_)));
+    assert!(matches!(
+        skip_reason(run_step(&report, StepKind::ShowQrCode)),
+        SkipReason::NotApplicable(_)
+    ));
     assert_eq!(world.log.with_prefix("open:").len(), 2);
     assert_eq!(world.commands.runs.lock().unwrap().len(), 2);
-    assert!(world.log.with_prefix("clipboard.image").is_empty() && world.log.with_prefix("pin:").is_empty());
+    assert!(
+        world.log.with_prefix("clipboard.image").is_empty()
+            && world.log.with_prefix("pin:").is_empty()
+    );
 }
 
 #[test]
@@ -1456,7 +1754,8 @@ fn video_files_use_the_video_destination_and_fall_back_to_file() {
     let mut s = world.settings();
     s.destinations.video = None;
     s.destinations.file = Some("files".into());
-    let Ran { report, .. } = files_with(&world, s, &wf(InputKind::Files, vec![C::Upload], vec![]), &["/in/clip.mkv"]);
+    let Ran { report, .. } =
+        files_with(&world, s, &wf(InputKind::Files, vec![C::Upload], vec![]), &["/in/clip.mkv"]);
     let up = world.uploaders.uploads.lock().unwrap().clone();
     assert_eq!(up[0].destination, "files", "video falls back to the file destination");
     assert_eq!(report.items[0].kind, EntryKind::Video);
@@ -1469,7 +1768,12 @@ fn extension_overrides_apply_to_files() {
     world.fs.add_file("/in/b.txt", b"t");
     let mut s = world.settings();
     s.destinations.extension_overrides.insert("zip".into(), "archive-host".into());
-    files_with(&world, s, &wf(InputKind::Files, vec![C::Upload], vec![]), &["/in/a.zip", "/in/b.txt"]);
+    files_with(
+        &world,
+        s,
+        &wf(InputKind::Files, vec![C::Upload], vec![]),
+        &["/in/a.zip", "/in/b.txt"],
+    );
     let mut up = world.uploaders.uploads.lock().unwrap().clone();
     up.sort_by(|a, b| a.file_name.cmp(&b.file_name));
     assert_eq!(up[0].destination, "archive-host");
@@ -1481,7 +1785,8 @@ fn unicode_and_awkward_file_names_survive() {
     let world = TestWorld::new();
     let name = "/in/日本語 ファイル 🎉 (1).png";
     world.fs.add_file(name, png_bytes(4, 4));
-    let Ran { report, .. } = files(&world, &wf(InputKind::Files, vec![C::Upload], vec![U::CopyUrl]), &[name]);
+    let Ran { report, .. } =
+        files(&world, &wf(InputKind::Files, vec![C::Upload], vec![U::CopyUrl]), &[name]);
     assert_eq!(report.outcome, Outcome::Success);
     assert_eq!(world.uploaders.uploads.lock().unwrap()[0].file_name, "日本語 ファイル 🎉 (1).png");
 }
@@ -1507,7 +1812,13 @@ fn video(world: &TestWorld, settings: Settings, w: &Workflow, stop_after: Durati
         s2.cancel();
     });
     let sink = CollectingSink::new();
-    let report = engine.post_video(w, VideoSource::Record { stop }, &world.services(), &sink, &CancelToken::new());
+    let report = engine.post_video(
+        w,
+        VideoSource::Record { stop },
+        &world.services(),
+        &sink,
+        &CancelToken::new(),
+    );
     h.join().unwrap();
     let events = sink.events();
     check_event_invariants(&events, &report);
@@ -1515,7 +1826,10 @@ fn video(world: &TestWorld, settings: Settings, w: &Workflow, stop_after: Durati
 }
 
 fn video_path() -> PathBuf {
-    Path::new("/shots").join("Recordings").join("2024-03").join("Screenshot_2024-03-09_14-05-06.mp4")
+    Path::new("/shots")
+        .join("Recordings")
+        .join("2024-03")
+        .join("Screenshot_2024-03-09_14-05-06.mp4")
 }
 
 #[test]
@@ -1523,7 +1837,11 @@ fn record_stop_upload_via_the_video_destination() {
     let world = TestWorld::new();
     let mut s = world.settings();
     s.destinations.video = Some("vid".into());
-    let w = wf(InputKind::RecordScreen, vec![C::Upload, C::DeleteLocalFile], vec![U::CopyUrl, U::ShowNotification]);
+    let w = wf(
+        InputKind::RecordScreen,
+        vec![C::Upload, C::DeleteLocalFile],
+        vec![U::CopyUrl, U::ShowNotification],
+    );
     let Ran { report, .. } = video(&world, s, &w, Duration::from_millis(50));
     assert_eq!(report.outcome, Outcome::Success, "{}", report.summary());
     let req = world.recorder.requests.lock().unwrap()[0].clone();
@@ -1531,13 +1849,20 @@ fn record_stop_upload_via_the_video_destination() {
     assert_eq!(req.file_stem, "Screenshot_2024-03-09_14-05-06");
     assert_eq!(req.kind, RecordKind::Video);
     let up = world.uploaders.uploads.lock().unwrap().clone();
-    assert_eq!((up[0].destination.as_str(), up[0].kind, up[0].mime.as_str()), ("vid", DestinationType::Video, "video/mp4"));
+    assert_eq!(
+        (up[0].destination.as_str(), up[0].kind, up[0].mime.as_str()),
+        ("vid", DestinationType::Video, "video/mp4")
+    );
     assert_eq!(up[0].path.as_deref(), Some(video_path().as_path()));
     // recorded by this workflow, so deleting after upload is allowed
     assert!(world.fs.contents(video_path()).is_none());
     let lines = world.log.lines();
     let pos = |p: &str| lines.iter().position(|l| l.starts_with(p)).unwrap();
-    assert!(pos("record.start") < pos("record.stop") && pos("record.stop") < pos("upload") && pos("upload") < pos("fs.remove"));
+    assert!(
+        pos("record.start") < pos("record.stop")
+            && pos("record.stop") < pos("upload")
+            && pos("upload") < pos("fs.remove")
+    );
     let e = world.history.list(&Query::default()).unwrap();
     assert_eq!(e[0].kind, EntryKind::Video);
     assert!(e[0].local_path.is_none());
@@ -1555,7 +1880,10 @@ fn video_falls_back_to_the_file_uploader_and_is_kept_when_upload_fails() {
     let w = wf(InputKind::RecordScreen, vec![C::Upload, C::DeleteLocalFile], vec![]);
     let Ran { report, .. } = video(&world, s, &w, Duration::from_millis(20));
     assert_eq!(world.uploaders.uploads.lock().unwrap()[0].destination, "filehost");
-    assert!(world.fs.contents(video_path()).is_some(), "the recording is never lost to a failed upload");
+    assert!(
+        world.fs.contents(video_path()).is_some(),
+        "the recording is never lost to a failed upload"
+    );
     assert_eq!(report.outcome, Outcome::PartialSuccess);
     assert_eq!(report.items[0].local_path.as_deref(), Some(video_path().as_path()));
     assert_eq!(world.history.count(&Query::default()).unwrap(), 1);
@@ -1570,14 +1898,18 @@ fn gif_recordings_use_the_image_destination() {
     let Ran { report, .. } = video(&world, s, &w, Duration::from_millis(20));
     assert_eq!(report.outcome, Outcome::Success);
     let up = world.uploaders.uploads.lock().unwrap().clone();
-    assert_eq!((up[0].destination.as_str(), up[0].kind, up[0].mime.as_str()), ("img", DestinationType::Image, "image/gif"));
+    assert_eq!(
+        (up[0].destination.as_str(), up[0].kind, up[0].mime.as_str()),
+        ("img", DestinationType::Image, "image/gif")
+    );
     assert_eq!(world.recorder.requests.lock().unwrap()[0].kind, RecordKind::Gif);
 }
 
 #[test]
 fn recorder_failures_are_reported() {
     let world = TestWorld::new();
-    *world.recorder.fail_start.lock().unwrap() = Some(Fail::Unsupported("screen recording on Wayland without portal".into()));
+    *world.recorder.fail_start.lock().unwrap() =
+        Some(Fail::Unsupported("screen recording on Wayland without portal".into()));
     let w = wf(InputKind::RecordScreen, vec![C::Upload], vec![U::ShowNotification]);
     let Ran { report, .. } = video(&world, world.settings(), &w, Duration::from_millis(10));
     assert_eq!(report.outcome, Outcome::Failed);
@@ -1609,7 +1941,13 @@ fn cancelling_the_run_aborts_the_recording_and_discards_it() {
         c2.cancel();
     });
     let w = wf(InputKind::RecordScreen, vec![C::Upload], vec![U::CopyUrl]);
-    let report = engine.post_video(&w, VideoSource::Record { stop: stop.clone() }, &world.services(), &NullSink, &cancel);
+    let report = engine.post_video(
+        &w,
+        VideoSource::Record { stop: stop.clone() },
+        &world.services(),
+        &NullSink,
+        &cancel,
+    );
     h.join().unwrap();
     assert_eq!(report.outcome, Outcome::Cancelled);
     assert!(world.log.lines().contains(&"record.abort".to_owned()));
@@ -1624,12 +1962,27 @@ fn an_existing_recording_can_be_posted() {
     world.fs.add_file("/rec/last.mp4", b"video");
     let engine = world.engine(world.settings());
     let w = wf(InputKind::RecordScreen, vec![C::Upload, C::DeleteLocalFile], vec![U::CopyUrl]);
-    let report = engine.post_video(&w, VideoSource::Recorded("/rec/last.mp4".into()), &world.services(), &NullSink, &CancelToken::new());
+    let report = engine.post_video(
+        &w,
+        VideoSource::Recorded("/rec/last.mp4".into()),
+        &world.services(),
+        &NullSink,
+        &CancelToken::new(),
+    );
     assert_eq!(report.outcome, Outcome::Success);
     assert_eq!(world.uploaders.uploads.lock().unwrap()[0].kind, DestinationType::Video);
-    assert!(world.fs.contents("/rec/last.mp4").is_none(), "a just-recorded video is ours to delete");
+    assert!(
+        world.fs.contents("/rec/last.mp4").is_none(),
+        "a just-recorded video is ours to delete"
+    );
 
-    let report = engine.post_video(&w, VideoSource::Recorded("/rec/missing.mp4".into()), &world.services(), &NullSink, &CancelToken::new());
+    let report = engine.post_video(
+        &w,
+        VideoSource::Recorded("/rec/missing.mp4".into()),
+        &world.services(),
+        &NullSink,
+        &CancelToken::new(),
+    );
     assert_eq!(report.outcome, Outcome::Failed);
     assert!(failure(step_of(&report, 0, StepKind::LoadFile)).message.contains("does not exist"));
 }
@@ -1653,7 +2006,8 @@ fn post_image_skips_capture() {
     let engine = world.engine(world.settings());
     let mut c = Captured::new(test_frame(20, 10));
     c.window_title = Some("Given".into());
-    let report = engine.post_image(&standard(), c, &world.services(), &NullSink, &CancelToken::new());
+    let report =
+        engine.post_image(&standard(), c, &world.services(), &NullSink, &CancelToken::new());
     assert_eq!(report.outcome, Outcome::Success);
     assert!(world.log.with_prefix("capture").is_empty());
     assert!(report.steps.iter().all(|s| s.kind != StepKind::Capture));
@@ -1682,7 +2036,12 @@ fn engine_is_shareable_across_threads() {
     std::thread::scope(|s| {
         for _ in 0..4 {
             s.spawn(|| {
-                let r = engine.post_screenshot(&wf(InputKind::CaptureRegion, vec![C::Upload], vec![]), &world.services(), &NullSink, &CancelToken::new());
+                let r = engine.post_screenshot(
+                    &wf(InputKind::CaptureRegion, vec![C::Upload], vec![]),
+                    &world.services(),
+                    &NullSink,
+                    &CancelToken::new(),
+                );
                 assert_eq!(r.outcome, Outcome::Success);
             });
         }

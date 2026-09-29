@@ -121,16 +121,17 @@ fn canonical_key(k: &str) -> Option<String> {
         return Some((*canon).to_owned());
     }
     // F1..F24
-    if let Some(n) = lower.strip_prefix('f').and_then(|n| n.parse::<u8>().ok()) {
-        if (1..=24).contains(&n) {
-            return Some(format!("F{n}"));
-        }
+    if let Some(n) = lower.strip_prefix('f').and_then(|n| n.parse::<u8>().ok())
+        && (1..=24).contains(&n)
+    {
+        return Some(format!("F{n}"));
     }
     // Numpad0..9
-    if let Some(d) = lower.strip_prefix("numpad") {
-        if d.len() == 1 && d.as_bytes()[0].is_ascii_digit() {
-            return Some(format!("Numpad{d}"));
-        }
+    if let Some(d) = lower.strip_prefix("numpad")
+        && d.len() == 1
+        && d.as_bytes()[0].is_ascii_digit()
+    {
+        return Some(format!("Numpad{d}"));
     }
     let mut chars = k.chars();
     match (chars.next(), chars.next()) {

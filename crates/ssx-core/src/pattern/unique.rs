@@ -112,7 +112,7 @@ mod tests {
         for attempt in [1, 9, 10, 999] {
             let c = candidate_name(&long, attempt);
             assert!(c.len() <= 255, "{attempt}: {}", c.len());
-            assert!(c.ends_with(".png"));
+            assert_eq!(c.rsplit('.').next(), Some("png"));
         }
     }
 

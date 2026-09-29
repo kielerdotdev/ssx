@@ -184,15 +184,18 @@ mod tests {
 
     #[test]
     fn multi_step_chain_runs_in_order() {
+        #[allow(clippy::unnecessary_wraps)] // must match `MigrationFn`
         fn a(t: &mut Table) -> Result<(), String> {
             t.insert("trace".into(), Value::String("a".into()));
             Ok(())
         }
+        #[allow(clippy::unnecessary_wraps)] // must match `MigrationFn`
         fn b(t: &mut Table) -> Result<(), String> {
             let cur = t["trace"].as_str().unwrap().to_owned();
             t.insert("trace".into(), Value::String(cur + "b"));
             Ok(())
         }
+        #[allow(clippy::unnecessary_wraps)] // must match `MigrationFn`
         fn c(t: &mut Table) -> Result<(), String> {
             let cur = t["trace"].as_str().unwrap().to_owned();
             t.insert("trace".into(), Value::String(cur + "c"));

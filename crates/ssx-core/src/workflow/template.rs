@@ -31,10 +31,14 @@ pub struct TemplateVars {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum TemplateError {
     /// `{name}` is not a known variable.
-    #[error("unknown variable {{{0}}} in argument {1:?}; available: {{path}} {{dir}} {{file_name}} {{url}} {{short_url}} {{thumbnail_url}} {{deletion_url}}")]
+    #[error(
+        "unknown variable {{{0}}} in argument {1:?}; available: {{path}} {{dir}} {{file_name}} {{url}} {{short_url}} {{thumbnail_url}} {{deletion_url}}"
+    )]
     UnknownVariable(String, String),
     /// The variable is known but has no value for this item.
-    #[error("{{{0}}} is not available for this file (for example {{url}} needs a successful upload)")]
+    #[error(
+        "{{{0}}} is not available for this file (for example {{url}} needs a successful upload)"
+    )]
     Unavailable(String),
     /// A `{` without a matching `}`, or a lone `}`.
     #[error("unbalanced brace in argument {0:?}; write {{{{ and }}}} for literal braces")]
@@ -138,8 +142,12 @@ mod tests {
 
     #[test]
     fn errors() {
-        assert!(matches!(expand("{nope}", &vars()), Err(TemplateError::UnknownVariable(n, _)) if n == "nope"));
-        assert!(matches!(expand("{short_url}", &vars()), Err(TemplateError::Unavailable(n)) if n == "short_url"));
+        assert!(
+            matches!(expand("{nope}", &vars()), Err(TemplateError::UnknownVariable(n, _)) if n == "nope")
+        );
+        assert!(
+            matches!(expand("{short_url}", &vars()), Err(TemplateError::Unavailable(n)) if n == "short_url")
+        );
         for bad in ["{", "a{b", "}", "a}b", "{path"] {
             assert!(matches!(expand(bad, &vars()), Err(TemplateError::Unbalanced(_))), "{bad}");
         }
@@ -156,7 +164,9 @@ mod tests {
 
     #[test]
     fn unicode_is_preserved() {
-        let v = TemplateVars { file_name: Some("日本語 🎉.png".into()), ..TemplateVars::default() };
+        let v = TemplateVars {
+            file_name: Some("日本語 🎉.png".into()), ..TemplateVars::default()
+        };
         assert_eq!(expand("«{file_name}»", &v).unwrap(), "«日本語 🎉.png»");
     }
 }

@@ -162,7 +162,8 @@ impl Run<'_> {
     }
 
     fn can_save_content(item: &Item) -> bool {
-        matches!(item.origin, Origin::Image | Origin::Text) || (item.origin == Origin::UserFile && item.edited)
+        matches!(item.origin, Origin::Image | Origin::Text)
+            || (item.origin == Origin::UserFile && item.edited)
     }
 
     // ---- the per-item pipeline -----------------------------------------------------
@@ -252,7 +253,9 @@ impl Run<'_> {
             match self.svc.fs.remove_file(&zip) {
                 Ok(()) => {}
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => tracing::warn!(path = %zip.display(), error = %e, "could not remove temporary archive"),
+                Err(e) => {
+                    tracing::warn!(path = %zip.display(), error = %e, "could not remove temporary archive");
+                }
             }
             if item.local_path.as_deref() == Some(zip.as_path()) {
                 item.local_path = None;
@@ -521,9 +524,7 @@ impl Run<'_> {
     // ---- after upload --------------------------------------------------------------
 
     fn eligible(&self, item: &Item) -> bool {
-        !item.cancelled
-            && item.halted.is_none()
-            && (!self.wf.uploads() || item.confirmed)
+        !item.cancelled && item.halted.is_none() && (!self.wf.uploads() || item.confirmed)
     }
 
     fn with_url(&self, items: &[Item]) -> Vec<usize> {
@@ -606,7 +607,11 @@ impl Run<'_> {
                             });
                             items[i].push(rep);
                         }
-                        _ => run_steps.push(self.skipped(None, kind, na("multiple files were posted"))),
+                        _ => run_steps.push(self.skipped(
+                            None,
+                            kind,
+                            na("multiple files were posted"),
+                        )),
                     }
                 }
                 AfterUpload::ShowNotification => {
@@ -616,14 +621,17 @@ impl Run<'_> {
                     let targets: Vec<usize> =
                         (0..items.len()).filter(|&i| self.eligible(&items[i])).collect();
                     if targets.is_empty() {
-                        run_steps.push(self.skipped(None, kind, na("no item finished successfully")));
+                        run_steps.push(self.skipped(
+                            None,
+                            kind,
+                            na("no item finished successfully"),
+                        ));
                     }
                     for i in targets {
                         let vars = template_vars(&items[i]);
                         let rep = self.step(Some(i), kind, || {
-                            let args = expand_all(args, &vars).map_err(|e| {
-                                StepEnd::fail(FailureKind::Invalid, e.to_string())
-                            })?;
+                            let args = expand_all(args, &vars)
+                                .map_err(|e| StepEnd::fail(FailureKind::Invalid, e.to_string()))?;
                             let spec = CommandSpec {
                                 program: program.clone(),
                                 args,
@@ -633,8 +641,14 @@ impl Run<'_> {
                             if out.success {
                                 Ok(Some(format!("{program} finished")))
                             } else {
-                                let code = out.exit_code.map_or_else(|| "a signal".to_owned(), |c| format!("code {c}"));
-                                let tail = if out.stderr_tail.is_empty() { String::new() } else { format!(": {}", out.stderr_tail) };
+                                let code = out
+                                    .exit_code
+                                    .map_or_else(|| "a signal".to_owned(), |c| format!("code {c}"));
+                                let tail = if out.stderr_tail.is_empty() {
+                                    String::new()
+                                } else {
+                                    format!(": {}", out.stderr_tail)
+                                };
                                 Err(StepEnd::fail(
                                     FailureKind::Service,
                                     format!("{program} exited with {code}{tail}"),
@@ -703,14 +717,14 @@ impl Run<'_> {
         if !self.settings().general.show_notifications {
             return self.skipped(None, kind, na("notifications are disabled in settings"));
         }
-        let n = self.build_notification(items, run_steps);
+        let n = Self::build_notification(items, run_steps);
         self.step(None, kind, || {
             self.svc.notifier.notify(&n)?;
             Ok(Some(n.title.clone()))
         })
     }
 
-    fn build_notification(&self, items: &[Item], run_steps: &[StepReport]) -> Notification {
+    fn build_notification(items: &[Item], run_steps: &[StepReport]) -> Notification {
         let failures: Vec<String> = run_steps
             .iter()
             .map(|s| (None, s))
@@ -727,8 +741,7 @@ impl Run<'_> {
                 _ => None,
             })
             .collect();
-        let urls: Vec<String> =
-            items.iter().filter_map(|i| i.url.clone()).collect();
+        let urls: Vec<String> = items.iter().filter_map(|i| i.url.clone()).collect();
         let kept: Vec<String> = items
             .iter()
             .filter(|i| i.created && i.local_path.is_some() && !i.confirmed)
@@ -755,9 +768,9 @@ impl Run<'_> {
             };
         }
         let achieved = !urls.is_empty() || !kept.is_empty();
-        let upload_failed = items.iter().any(|i| {
-            i.steps.iter().any(|s| s.kind == StepKind::Upload && s.status.is_failure())
-        });
+        let upload_failed = items
+            .iter()
+            .any(|i| i.steps.iter().any(|s| s.kind == StepKind::Upload && s.status.is_failure()));
         let title = if upload_failed && urls.is_empty() {
             "Upload failed".to_owned()
         } else if upload_failed {
@@ -789,7 +802,9 @@ impl Run<'_> {
             ..ThumbnailOptions::default()
         };
         if let Some(frame) = &item.frame {
-            return thumbnail_from_frame(frame, opts).map_err(|e| tracing::debug!(error = %e, "no history thumbnail")).ok();
+            return thumbnail_from_frame(frame, opts)
+                .map_err(|e| tracing::debug!(error = %e, "no history thumbnail"))
+                .ok();
         }
         let path = item.local_path.as_deref()?;
         let image_file = matches!(item.origin, Origin::UserFile | Origin::Recording)
@@ -798,7 +813,9 @@ impl Run<'_> {
             return None;
         }
         let bytes = self.svc.fs.read(path).ok()?;
-        thumbnail_from_bytes(&bytes, opts).map_err(|e| tracing::debug!(error = %e, "no history thumbnail")).ok()
+        thumbnail_from_bytes(&bytes, opts)
+            .map_err(|e| tracing::debug!(error = %e, "no history thumbnail"))
+            .ok()
     }
 
     /// Writes the item to the history (if enabled) and applies the retention policy.
@@ -844,13 +861,13 @@ impl Run<'_> {
             e.upload_url = item.upload.as_ref().map(|u| u.url.clone());
             e.thumbnail_url = item.upload.as_ref().and_then(|u| u.thumbnail_url.clone());
             e.deletion_url = item.upload.as_ref().and_then(|u| u.deletion_url.clone());
-            e.uploader = item.uploader.clone();
-            e.window_title = item.window_title.clone();
-            e.process_name = item.process_name.clone();
+            e.uploader.clone_from(&item.uploader);
+            e.window_title.clone_from(&item.window_title);
+            e.process_name.clone_from(&item.process_name);
             e.width = width;
             e.height = height;
             e.workflow_id = Some(self.wf.id.clone());
-            e.note = item.text.clone();
+            e.note.clone_from(&item.text);
             let new_id = history.insert(&e).map_err(|err| {
                 StepEnd::fail(FailureKind::Io, format!("could not record the history entry: {err}"))
             })?;
@@ -861,10 +878,10 @@ impl Run<'_> {
                 max_age: (cfg.max_age_days > 0)
                     .then(|| std::time::Duration::from_secs(u64::from(cfg.max_age_days) * 86_400)),
             };
-            if policy != PrunePolicy::default() {
-                if let Err(err) = history.prune(&policy, now) {
-                    tracing::warn!(error = %err, "history retention failed");
-                }
+            if policy != PrunePolicy::default()
+                && let Err(err) = history.prune(&policy, now)
+            {
+                tracing::warn!(error = %err, "history retention failed");
             }
             Ok(Some(format!("history entry {new_id}")))
         });

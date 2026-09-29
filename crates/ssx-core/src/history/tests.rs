@@ -129,7 +129,7 @@ fn paging() {
     let h = mem();
     let all: Vec<i64> =
         (0..25).map(|i| h.insert(&entry(EntryKind::File, T0 + i)).unwrap()).rev().collect();
-    let page = |offset, limit| ids(&h.list(&Query { offset, limit, ..Query::default() }).unwrap());
+    let page = |offset, limit| ids(&h.list(&Query { limit, offset, ..Query::default() }).unwrap());
     assert_eq!(page(0, 10), all[0..10]);
     assert_eq!(page(10, 10), all[10..20]);
     assert_eq!(page(20, 10), all[20..25]);

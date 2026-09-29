@@ -72,7 +72,7 @@ pub trait Rng: Send + Sync + Debug {
 
 const GOLDEN_GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
 
-/// SplitMix64 over an atomic, so `&self` access is thread safe and lock free.
+/// `SplitMix64` over an atomic, so `&self` access is thread safe and lock free.
 fn splitmix64(state: &AtomicU64) -> u64 {
     let s = state.fetch_add(GOLDEN_GAMMA, Ordering::Relaxed).wrapping_add(GOLDEN_GAMMA);
     let mut z = s;

@@ -86,7 +86,8 @@ impl Captured {
 pub trait Capturer: Send + Sync {
     /// Captures according to `req`. Return [`ServiceError::Cancelled`] if the user aborts
     /// (Esc in the region overlay).
-    fn capture(&self, req: &CaptureRequest, cancel: &CancelToken) -> Result<Captured, ServiceError>;
+    fn capture(&self, req: &CaptureRequest, cancel: &CancelToken)
+    -> Result<Captured, ServiceError>;
 }
 
 // ---- recording -----------------------------------------------------------------------
@@ -296,7 +297,12 @@ pub trait Uploaders: Send + Sync {
 /// A URL shortening service.
 pub trait UrlShortener: Send + Sync {
     /// Shortens `url` with the named provider.
-    fn shorten(&self, provider: &str, url: &str, cancel: &CancelToken) -> Result<String, ServiceError>;
+    fn shorten(
+        &self,
+        provider: &str,
+        url: &str,
+        cancel: &CancelToken,
+    ) -> Result<String, ServiceError>;
 }
 
 // ---- clipboard -----------------------------------------------------------------------
@@ -614,9 +620,9 @@ impl CommandRunner for ProcessCommandRunner {
             use std::os::windows::process::CommandExt;
             cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
         }
-        let mut child = cmd.spawn().map_err(|e| {
-            ServiceError::failed(format!("cannot start {:?}: {e}", spec.program))
-        })?;
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| ServiceError::failed(format!("cannot start {:?}: {e}", spec.program)))?;
         let mut stderr = child.stderr.take();
         let reader = std::thread::spawn(move || {
             let mut tail: Vec<u8> = Vec::new();
@@ -776,7 +782,10 @@ mod tests {
         fn runs_without_a_shell() {
             // If a shell were involved, `;` would start a second command.
             let out = ProcessCommandRunner
-                .run(&spec("sh", &["-c", "echo \"$0\" >&2; exit 3", "a; touch /nonexistent/x"]), &CancelToken::new())
+                .run(
+                    &spec("sh", &["-c", "echo \"$0\" >&2; exit 3", "a; touch /nonexistent/x"]),
+                    &CancelToken::new(),
+                )
                 .unwrap();
             assert_eq!(out.exit_code, Some(3));
             assert!(!out.success);
@@ -790,7 +799,10 @@ mod tests {
             let arg = "two words; $(echo injected) `id` *";
             let out = ProcessCommandRunner
                 .run(
-                    &spec("sh", &["-c", "printf %s \"$1\" > \"$2\"", "sh", arg, file.to_str().unwrap()]),
+                    &spec(
+                        "sh",
+                        &["-c", "printf %s \"$1\" > \"$2\"", "sh", arg, file.to_str().unwrap()],
+                    ),
                     &CancelToken::new(),
                 )
                 .unwrap();
@@ -800,7 +812,9 @@ mod tests {
 
         #[test]
         fn success_and_missing_program() {
-            assert!(ProcessCommandRunner.run(&spec("true", &[]), &CancelToken::new()).unwrap().success);
+            assert!(
+                ProcessCommandRunner.run(&spec("true", &[]), &CancelToken::new()).unwrap().success
+            );
             let e = ProcessCommandRunner
                 .run(&spec("definitely-not-a-program-ssx", &[]), &CancelToken::new())
                 .unwrap_err();
@@ -833,13 +847,18 @@ mod tests {
             assert!(started.elapsed() < Duration::from_secs(5));
             h.join().unwrap();
             // already-cancelled tokens never spawn
-            assert!(ProcessCommandRunner.run(&spec("true", &[]), &cancel).unwrap_err().is_cancelled());
+            assert!(
+                ProcessCommandRunner.run(&spec("true", &[]), &cancel).unwrap_err().is_cancelled()
+            );
         }
 
         #[test]
         fn stderr_is_bounded() {
             let out = ProcessCommandRunner
-                .run(&spec("sh", &["-c", "head -c 100000 /dev/zero | tr '\\0' x >&2"]), &CancelToken::new())
+                .run(
+                    &spec("sh", &["-c", "head -c 100000 /dev/zero | tr '\\0' x >&2"]),
+                    &CancelToken::new(),
+                )
                 .unwrap();
             assert!(out.stderr_tail.len() <= STDERR_TAIL_BYTES);
             assert!(out.stderr_tail.len() > 1000);

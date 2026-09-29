@@ -269,7 +269,11 @@ impl MockCapturer {
 }
 
 impl Capturer for MockCapturer {
-    fn capture(&self, req: &CaptureRequest, _cancel: &CancelToken) -> Result<Captured, ServiceError> {
+    fn capture(
+        &self,
+        req: &CaptureRequest,
+        _cancel: &CancelToken,
+    ) -> Result<Captured, ServiceError> {
         self.log.push(format!("capture:{:?}", req.target));
         lock(&self.requests).push(*req);
         if let Some(next) = lock(&self.script).pop_front() {
@@ -285,7 +289,7 @@ impl Capturer for MockCapturer {
         }
         let (w, h) = *lock(&self.size);
         let mut c = Captured::new(test_frame(w, h));
-        c.window_title = lock(&self.window_title).clone();
+        c.window_title.clone_from(&lock(&self.window_title));
         Ok(c)
     }
 }
@@ -320,10 +324,17 @@ impl RecordingSession for MockSession {
             super::RecordKind::Video => "mp4",
             super::RecordKind::Gif => "gif",
         };
-        let path = self
-            .fs
-            .write_unique(&self.req.output_dir, &format!("{}.{ext}", self.req.file_stem), b"fake video bytes")?;
-        Ok(RecordedVideo { path, width: Some(640), height: Some(360), duration: Some(Duration::from_secs(3)) })
+        let path = self.fs.write_unique(
+            &self.req.output_dir,
+            &format!("{}.{ext}", self.req.file_stem),
+            b"fake video bytes",
+        )?;
+        Ok(RecordedVideo {
+            path,
+            width: Some(640),
+            height: Some(360),
+            duration: Some(Duration::from_secs(3)),
+        })
     }
     fn abort(self: Box<Self>) {
         self.log.push("record.abort");
@@ -379,6 +390,15 @@ impl Editor for MockEditor {
             EditorMode::Cancel => Ok(EditResult::Cancelled),
             EditorMode::Fail(f) => Err(f.error()),
         }
+    }
+}
+
+/// Decrements the in-flight counter when an upload ends, however it ends.
+struct Done<'a>(&'a AtomicUsize);
+
+impl Drop for Done<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -443,7 +463,8 @@ impl MockUploaders {
     /// Fails uploads whose file name contains `needle`.
     pub fn fail_file(&self, needle: &str, fail: Fail) {
         let needle = needle.to_owned();
-        *lock(&self.hook) = Some(Box::new(move |r| r.file_name.contains(&needle).then(|| fail.clone())));
+        *lock(&self.hook) =
+            Some(Box::new(move |r| r.file_name.contains(&needle).then(|| fail.clone())));
     }
 
     /// Fails every upload.
@@ -461,12 +482,6 @@ impl Uploaders for MockUploaders {
     ) -> Result<UploadOutcome, ServiceError> {
         let now = self.current.fetch_add(1, Ordering::SeqCst) + 1;
         self.max_concurrent.fetch_max(now, Ordering::SeqCst);
-        struct Done<'a>(&'a AtomicUsize);
-        impl Drop for Done<'_> {
-            fn drop(&mut self) {
-                self.0.fetch_sub(1, Ordering::SeqCst);
-            }
-        }
         let _done = Done(&self.current);
 
         let (path, bytes) = match req.source {
@@ -501,10 +516,10 @@ impl Uploaders for MockUploaders {
         if !delay.is_zero() && !cancel.sleep(delay) {
             return Err(ServiceError::Cancelled);
         }
-        if let Some(hook) = lock(&self.hook).as_ref() {
-            if let Some(f) = hook(req) {
-                return Err(f.error());
-            }
+        if let Some(hook) = lock(&self.hook).as_ref()
+            && let Some(f) = hook(req)
+        {
+            return Err(f.error());
         }
         progress(UploadProgress { sent: total, total: Some(total) });
         if lock(&self.empty_url_for).iter().any(|n| req.file_name.contains(n.as_str())) {
@@ -530,7 +545,12 @@ pub struct MockShortener {
 }
 
 impl UrlShortener for MockShortener {
-    fn shorten(&self, provider: &str, url: &str, _cancel: &CancelToken) -> Result<String, ServiceError> {
+    fn shorten(
+        &self,
+        provider: &str,
+        url: &str,
+        _cancel: &CancelToken,
+    ) -> Result<String, ServiceError> {
         self.log.push(format!("shorten:{provider}:{url}"));
         if let Some(f) = lock(&self.fail).as_ref() {
             return Err(f.error());
@@ -654,7 +674,11 @@ pub struct MockCommands {
 }
 
 impl CommandRunner for MockCommands {
-    fn run(&self, spec: &CommandSpec, _cancel: &CancelToken) -> Result<CommandOutput, ServiceError> {
+    fn run(
+        &self,
+        spec: &CommandSpec,
+        _cancel: &CancelToken,
+    ) -> Result<CommandOutput, ServiceError> {
         self.log.push(format!("run:{} {:?}", spec.program, spec.args));
         lock(&self.runs).push(spec.clone());
         if let Some(f) = lock(&self.fail).as_ref() {
@@ -684,8 +708,14 @@ impl Zipper for MockZipper {
         if let Some(f) = lock(&self.fail).as_ref() {
             return Err(f.error());
         }
-        let name = folder.file_name().map_or_else(|| "folder".to_owned(), |n| n.to_string_lossy().into_owned());
-        Ok(self.fs.write_unique(Path::new("/tmp/ssx-zip"), &format!("{name}.zip"), b"PK fake zip")?)
+        let name = folder
+            .file_name()
+            .map_or_else(|| "folder".to_owned(), |n| n.to_string_lossy().into_owned());
+        Ok(self.fs.write_unique(
+            Path::new("/tmp/ssx-zip"),
+            &format!("{name}.zip"),
+            b"PK fake zip",
+        )?)
     }
 }
 
@@ -799,7 +829,12 @@ impl TestWorld {
             },
             editor: MockEditor { log: log.clone(), mode: Mutex::new(EditorMode::Edit) },
             uploaders: MockUploaders::new(log.clone()),
-            shortener: MockShortener { log: log.clone(), fail: Mutex::default(), empty: Mutex::default(), calls: AtomicUsize::new(0) },
+            shortener: MockShortener {
+                log: log.clone(),
+                fail: Mutex::default(),
+                empty: Mutex::default(),
+                calls: AtomicUsize::new(0),
+            },
             clipboard: MockClipboard {
                 log: log.clone(),
                 image: Mutex::default(),
@@ -808,9 +843,19 @@ impl TestWorld {
                 content: Mutex::default(),
                 fail: Mutex::default(),
             },
-            notifier: MockNotifier { log: log.clone(), shown: Mutex::default(), qr: Mutex::default(), fail: Mutex::default() },
+            notifier: MockNotifier {
+                log: log.clone(),
+                shown: Mutex::default(),
+                qr: Mutex::default(),
+                fail: Mutex::default(),
+            },
             opener: MockOpener { log: log.clone(), fail: Mutex::default() },
-            commands: MockCommands { log: log.clone(), runs: Mutex::default(), exit_code: Mutex::default(), fail: Mutex::default() },
+            commands: MockCommands {
+                log: log.clone(),
+                runs: Mutex::default(),
+                exit_code: Mutex::default(),
+                fail: Mutex::default(),
+            },
             zipper: MockZipper { log: log.clone(), fs: fs.clone(), fail: Mutex::default() },
             save_dialog: MockSaveDialog { log: log.clone(), choice: Mutex::default() },
             pinner: MockPinner { log: log.clone(), fail: Mutex::default() },

@@ -67,7 +67,7 @@ pub enum Importance {
 }
 
 impl StepKind {
-    /// Stable snake_case name (matches the settings names where one exists).
+    /// Stable `snake_case` name (matches the settings names where one exists).
     pub const fn name(self) -> &'static str {
         match self {
             Self::Capture => "capture",
@@ -304,10 +304,7 @@ pub struct RunReport {
 impl RunReport {
     /// URLs of all successful uploads, in input order (the short URL where one exists).
     pub fn urls(&self) -> Vec<&str> {
-        self.items
-            .iter()
-            .filter_map(|i| i.short_url.as_deref().or(i.url.as_deref()))
-            .collect()
+        self.items.iter().filter_map(|i| i.short_url.as_deref().or(i.url.as_deref())).collect()
     }
 
     /// Every step, run-level first, then each item's.

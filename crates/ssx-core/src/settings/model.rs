@@ -176,6 +176,7 @@ impl Default for HdrConfig {
 /// Capture behaviour.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct CaptureSettings {
     /// Include the mouse cursor.
     pub show_cursor: bool,
@@ -183,12 +184,6 @@ pub struct CaptureSettings {
     pub delay_ms: u32,
     /// Default HDR tone mapping.
     pub hdr: HdrConfig,
-}
-
-impl Default for CaptureSettings {
-    fn default() -> Self {
-        Self { show_cursor: false, delay_ms: 0, hdr: HdrConfig::default() }
-    }
 }
 
 /// What `post_file` does with folders.

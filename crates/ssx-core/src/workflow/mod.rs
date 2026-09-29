@@ -69,8 +69,10 @@ pub use services::{
     CaptureRequest, CaptureTarget, Captured, Capturer, Clipboard, ClipboardContent, CommandOutput,
     CommandRunner, CommandSpec, EditResult, Editor, FileSystem, Notification, NotificationLevel,
     Notifier, Ocr, Pinner, ProcessCommandRunner, QrCodeRenderer, QrRenderer, RecordKind,
-    RecordRequest, RecordedVideo, Recorder, RecordingSession, SaveDialog, Services,
-    StdFileSystem, Unsupported, UploadOutcome, UploadProgress, UploadRequest, UploadSource,
-    Uploaders, UrlOpener, UrlShortener, Zipper,
+    RecordRequest, RecordedVideo, Recorder, RecordingSession, SaveDialog, Services, StdFileSystem,
+    Unsupported, UploadOutcome, UploadProgress, UploadRequest, UploadSource, Uploaders, UrlOpener,
+    UrlShortener, Zipper,
 };
-pub use template::{TemplateError, TemplateVars, expand as expand_template, expand_all as expand_templates};
+pub use template::{
+    TemplateError, TemplateVars, expand as expand_template, expand_all as expand_templates,
+};
