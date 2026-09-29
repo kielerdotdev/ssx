@@ -55,7 +55,9 @@ pub enum SxcuError {
         expected: &'static str,
     },
     /// The file predates the format ShareX still reads.
-    #[error("unsupported custom uploader version '{0}' (ShareX 12.3.1 and older files are not readable)")]
+    #[error(
+        "unsupported custom uploader version '{0}' (ShareX 12.3.1 and older files are not readable)"
+    )]
     UnsupportedVersion(String),
 }
 
@@ -253,8 +255,20 @@ pub struct CustomUploader {
 }
 
 const KNOWN_KEYS: [&str; 15] = [
-    "Version", "Name", "DestinationType", "RequestMethod", "RequestURL", "Parameters", "Headers",
-    "Body", "Arguments", "FileFormName", "Data", "URL", "ThumbnailURL", "DeletionURL",
+    "Version",
+    "Name",
+    "DestinationType",
+    "RequestMethod",
+    "RequestURL",
+    "Parameters",
+    "Headers",
+    "Body",
+    "Arguments",
+    "FileFormName",
+    "Data",
+    "URL",
+    "ThumbnailURL",
+    "DeletionURL",
     "ErrorMessage",
 ];
 
@@ -310,8 +324,10 @@ fn parse_enum<T: Copy>(
 }
 
 fn parse_destination(v: &Value) -> Result<DestinationType, SxcuError> {
-    const EXPECTED: &str = "None, ImageUploader, TextUploader, FileUploader, URLShortener, URLSharingService";
-    let err = |value: String| SxcuError::BadEnum { field: "DestinationType", value, expected: EXPECTED };
+    const EXPECTED: &str =
+        "None, ImageUploader, TextUploader, FileUploader, URLShortener, URLSharingService";
+    let err =
+        |value: String| SxcuError::BadEnum { field: "DestinationType", value, expected: EXPECTED };
     match v {
         Value::Null => Ok(DestinationType::NONE),
         Value::Number(n) => {
@@ -322,11 +338,17 @@ fn parse_destination(v: &Value) -> Result<DestinationType, SxcuError> {
             Ok(DestinationType(u8::try_from(bits).map_err(|_| err(n.to_string()))?))
         }
         Value::String(s) => s.split(',').try_fold(DestinationType::NONE, |acc, part| {
-            DestinationType::parse_name(part).map(|f| acc.union(f)).ok_or_else(|| err(part.trim().to_owned()))
+            DestinationType::parse_name(part)
+                .map(|f| acc.union(f))
+                .ok_or_else(|| err(part.trim().to_owned()))
         }),
         Value::Array(items) => items.iter().try_fold(DestinationType::NONE, |acc, item| {
-            let name = item.as_str().ok_or_else(|| bad("DestinationType", "a string, number or array of strings"))?;
-            DestinationType::parse_name(name).map(|f| acc.union(f)).ok_or_else(|| err(name.to_owned()))
+            let name = item
+                .as_str()
+                .ok_or_else(|| bad("DestinationType", "a string, number or array of strings"))?;
+            DestinationType::parse_name(name)
+                .map(|f| acc.union(f))
+                .ok_or_else(|| err(name.to_owned()))
         }),
         _ => Err(bad("DestinationType", "a string, number or array of strings")),
     }
@@ -334,7 +356,9 @@ fn parse_destination(v: &Value) -> Result<DestinationType, SxcuError> {
 
 /// Compare dotted version strings numerically; missing/non-numeric parts count as 0.
 pub fn compare_versions(a: &str, b: &str) -> Ordering {
-    let parts = |s: &str| -> Vec<u64> { s.trim().split('.').map(|p| p.trim().parse().unwrap_or(0)).collect() };
+    let parts = |s: &str| -> Vec<u64> {
+        s.trim().split('.').map(|p| p.trim().parse().unwrap_or(0)).collect()
+    };
     let (pa, pb) = (parts(a), parts(b));
     for i in 0..pa.len().max(pb.len()) {
         let o = pa.get(i).unwrap_or(&0).cmp(pb.get(i).unwrap_or(&0));
@@ -430,7 +454,12 @@ impl CustomUploader {
                 Some("Name") => u.name = scalar_to_string(key, v)?,
                 Some("DestinationType") => u.destination_type = parse_destination(v)?,
                 Some("RequestMethod") => {
-                    if let Some(m) = parse_enum("RequestMethod", v, &HttpMethod::NAMES, "GET, POST, PUT, PATCH, DELETE")? {
+                    if let Some(m) = parse_enum(
+                        "RequestMethod",
+                        v,
+                        &HttpMethod::NAMES,
+                        "GET, POST, PUT, PATCH, DELETE",
+                    )? {
                         u.request_method = m;
                     }
                 }
@@ -464,11 +493,15 @@ impl CustomUploader {
 
     /// ShareX's load-time fix-ups (`CheckBackwardCompatibility`).
     fn normalize(&mut self) -> Result<(), SxcuError> {
-        if !self.version.is_empty() && compare_versions(&self.version, UNSUPPORTED_MAX) != Ordering::Greater {
+        if !self.version.is_empty()
+            && compare_versions(&self.version, UNSUPPORTED_MAX) != Ordering::Greater
+        {
             return Err(SxcuError::UnsupportedVersion(self.version.clone()));
         }
         self.move_request_url_query();
-        if !self.version.is_empty() && compare_versions(&self.version, LEGACY_SYNTAX_MAX) != Ordering::Greater {
+        if !self.version.is_empty()
+            && compare_versions(&self.version, LEGACY_SYNTAX_MAX) != Ordering::Greater
+        {
             self.migrate_legacy_syntax();
         }
         Ok(())
@@ -495,12 +528,13 @@ impl CustomUploader {
                 *v = migrate_old_syntax(v);
             }
         }
-        self.data = replace_ci(&replace_ci(&self.data, "$input$", "{input}"), "$filename$", "{filename}");
+        self.data =
+            replace_ci(&replace_ci(&self.data, "$input$", "{input}"), "$filename$", "{filename}");
         self.url = migrate_old_syntax(&self.url);
         self.thumbnail_url = migrate_old_syntax(&self.thumbnail_url);
         self.deletion_url = migrate_old_syntax(&self.deletion_url);
         self.error_message = migrate_old_syntax(&self.error_message);
-        self.version = CURRENT_VERSION.to_owned();
+        CURRENT_VERSION.clone_into(&mut self.version);
     }
 
     /// Serialise to the JSON value ShareX would write (empty/default fields omitted).
@@ -512,7 +546,8 @@ impl CustomUploader {
         }
         fn put_map(m: &mut Map<String, Value>, k: &str, v: &IndexMap<String, String>) {
             if !v.is_empty() {
-                let o: Map<String, Value> = v.iter().map(|(a, b)| (a.clone(), Value::String(b.clone()))).collect();
+                let o: Map<String, Value> =
+                    v.iter().map(|(a, b)| (a.clone(), Value::String(b.clone()))).collect();
                 m.insert(k.to_owned(), Value::Object(o));
             }
         }
@@ -562,14 +597,16 @@ impl CustomUploader {
             true
         } else {
             match kind {
-                UploadKind::Image => self.destination_type.contains(DestinationType::IMAGE_UPLOADER),
+                UploadKind::Image => {
+                    self.destination_type.contains(DestinationType::IMAGE_UPLOADER)
+                }
                 UploadKind::Text => self.destination_type.contains(DestinationType::TEXT_UPLOADER),
                 UploadKind::File | UploadKind::Video => {
                     self.destination_type.contains(DestinationType::FILE_UPLOADER)
                 }
-                UploadKind::Url => self
-                    .destination_type
-                    .intersects(DestinationType::URL_SHORTENER.union(DestinationType::URL_SHARING_SERVICE)),
+                UploadKind::Url => self.destination_type.intersects(
+                    DestinationType::URL_SHORTENER.union(DestinationType::URL_SHARING_SERVICE),
+                ),
             }
         };
         dest_ok && self.body_can_carry(kind)
@@ -581,8 +618,7 @@ impl CustomUploader {
         match (self.body, kind) {
             (BodyType::MultipartFormData, UploadKind::Text | UploadKind::Url) => true,
             (BodyType::MultipartFormData, _) => !self.file_form_name.is_empty(),
-            (BodyType::Binary, UploadKind::Url) => false,
-            (BodyType::Binary, _) => true,
+            (BodyType::Binary, k) => k != UploadKind::Url,
             (_, UploadKind::Text | UploadKind::Url) => true,
             _ => false,
         }
@@ -638,8 +674,12 @@ impl CustomUploader {
                 )),
             }
         }
-        if self.body == BodyType::None && self.destination_type.contains(DestinationType::TEXT_UPLOADER) {
-            r.warn("Body is None, so uploaded text can only be sent through RequestURL or Parameters");
+        if self.body == BodyType::None
+            && self.destination_type.contains(DestinationType::TEXT_UPLOADER)
+        {
+            r.warn(
+                "Body is None, so uploaded text can only be sent through RequestURL or Parameters",
+            );
         }
         if self.request_method == HttpMethod::Get && self.body != BodyType::None {
             r.warn("RequestMethod is GET but a Body is configured; many servers ignore GET bodies");
@@ -647,7 +687,9 @@ impl CustomUploader {
         if !self.data.is_empty() && !matches!(self.body, BodyType::Json | BodyType::Xml) {
             r.warn("Data is ignored unless Body is JSON or XML");
         }
-        if !self.arguments.is_empty() && !matches!(self.body, BodyType::MultipartFormData | BodyType::FormUrlEncoded) {
+        if !self.arguments.is_empty()
+            && !matches!(self.body, BodyType::MultipartFormData | BodyType::FormUrlEncoded)
+        {
             r.warn("Arguments are ignored unless Body is MultipartFormData or FormURLEncoded");
         }
         if !self.file_form_name.is_empty() && self.body != BodyType::MultipartFormData {
@@ -658,7 +700,9 @@ impl CustomUploader {
         }
         if self.body == BodyType::Json && !self.data.is_empty() {
             let sample = replace_ci(&replace_ci(&self.data, "{input}", "x"), "{filename}", "x");
-            if serde_json::from_str::<Value>(&crate::nameparser::NameParser::text().parse(&sample)).is_err() {
+            if serde_json::from_str::<Value>(&crate::nameparser::NameParser::text().parse(&sample))
+                .is_err()
+            {
                 r.warn("Data is not valid JSON after substituting {input}/{filename}");
             }
         }
@@ -669,10 +713,13 @@ impl CustomUploader {
             r.error("RequestURL must be configured");
         } else {
             check_template(r, "RequestURL", &self.request_url, false);
-            if let Some(scheme) = literal_scheme(&self.request_url) {
-                if !scheme.eq_ignore_ascii_case("http") && !scheme.eq_ignore_ascii_case("https") {
-                    r.error(format!("RequestURL scheme '{scheme}' is not supported (use http or https)"));
-                }
+            if let Some(scheme) = literal_scheme(&self.request_url)
+                && !scheme.eq_ignore_ascii_case("http")
+                && !scheme.eq_ignore_ascii_case("https")
+            {
+                r.error(format!(
+                    "RequestURL scheme '{scheme}' is not supported (use http or https)"
+                ));
             }
         }
         for (name, value) in &self.parameters {
@@ -699,7 +746,9 @@ impl CustomUploader {
 /// `scheme` when the URL literally starts with `something://`.
 fn literal_scheme(url: &str) -> Option<&str> {
     let (scheme, _) = url.split_once("://")?;
-    (!scheme.is_empty() && scheme.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))).then_some(scheme)
+    (!scheme.is_empty()
+        && scheme.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')))
+    .then_some(scheme)
 }
 
 fn host_of(url: &str) -> Option<String> {
@@ -711,7 +760,8 @@ fn host_of(url: &str) -> Option<String> {
 /// Like [`check_template`] for fields ShareX runs through the `%` name parser first, so
 /// that `%rn{8}` is not mistaken for a `{8}` call.
 fn check_named_template(r: &mut ValidationReport, field: &str, text: &str) {
-    let expanded = template::expand_names_keeping_escapes(text, &crate::nameparser::NameParser::text());
+    let expanded =
+        template::expand_names_keeping_escapes(text, &crate::nameparser::NameParser::text());
     check_template(r, field, &expanded, false);
 }
 
@@ -726,16 +776,23 @@ fn check_template(r: &mut ValidationReport, field: &str, text: &str, response_si
     for call in tpl.calls() {
         let Some(name) = call.literal_name() else { continue };
         if name.is_empty() {
-            r.error(format!("{field}: empty function name (a literal '{{' must be written '\\{{')"));
+            r.error(format!(
+                "{field}: empty function name (a literal '{{' must be written '\\{{')"
+            ));
             continue;
         }
         let Some(spec) = template::lookup(&name) else {
-            r.error(format!("{field}: unknown function '{name}' (escape a literal '{{' as '\\{{')"));
+            r.error(format!(
+                "{field}: unknown function '{name}' (escape a literal '{{' as '\\{{')"
+            ));
             continue;
         };
         let n_args = call.args.as_ref().map_or(0, Vec::len);
         if n_args < spec.min_params {
-            r.error(format!("{field}: '{}' needs at least {} parameter(s), found {n_args}", spec.name, spec.min_params));
+            r.error(format!(
+                "{field}: '{}' needs at least {} parameter(s), found {n_args}",
+                spec.name, spec.min_params
+            ));
         }
         if !response_side && (spec.needs_response)(n_args) {
             r.error(format!(
@@ -744,7 +801,10 @@ fn check_template(r: &mut ValidationReport, field: &str, text: &str, response_si
             ));
         }
         if spec.interactive {
-            r.warn(format!("{field}: '{}' is interactive; headless runs use its default", spec.name));
+            r.warn(format!(
+                "{field}: '{}' is interactive; headless runs use its default",
+                spec.name
+            ));
         }
     }
 }
@@ -815,11 +875,15 @@ mod tests {
         assert_eq!(u.arguments["n"], "5");
         assert_eq!(u.arguments["b"], "True");
         assert_eq!(u.arguments["z"], "");
-        let numeric = parse(r#"{"Version":"14.0.0","DestinationType":5,"RequestMethod":2,"Body":5,"RequestURL":"h"}"#);
+        let numeric = parse(
+            r#"{"Version":"14.0.0","DestinationType":5,"RequestMethod":2,"Body":5,"RequestURL":"h"}"#,
+        );
         assert_eq!(numeric.destination_type.names(), vec!["ImageUploader", "FileUploader"]);
         assert_eq!(numeric.request_method, HttpMethod::Put);
         assert_eq!(numeric.body, BodyType::Binary);
-        let arr = parse(r#"{"Version":"14.0.0","DestinationType":["TextUploader","URLShortener"],"RequestURL":"h"}"#);
+        let arr = parse(
+            r#"{"Version":"14.0.0","DestinationType":["TextUploader","URLShortener"],"RequestURL":"h"}"#,
+        );
         assert_eq!(arr.destination_type.names(), vec!["TextUploader", "URLShortener"]);
     }
 
@@ -843,7 +907,8 @@ mod tests {
         assert!(e.to_string().contains("Headers"), "{e}");
         let e = CustomUploader::from_json_str(r#"{"DestinationType":"Nope"}"#).unwrap_err();
         assert!(e.to_string().contains("Nope"), "{e}");
-        let e = CustomUploader::from_json_str(r#"{"Version":"12.0.0","RequestURL":"h"}"#).unwrap_err();
+        let e =
+            CustomUploader::from_json_str(r#"{"Version":"12.0.0","RequestURL":"h"}"#).unwrap_err();
         assert!(matches!(e, SxcuError::UnsupportedVersion(_)));
     }
 
@@ -854,7 +919,9 @@ mod tests {
 
     #[test]
     fn query_string_in_request_url_moves_to_parameters() {
-        let u = parse(r#"{"Version":"14.0.0","RequestURL":"https://h/u?key=abc&x={input}&flag","Parameters":{"key":"keep"}}"#);
+        let u = parse(
+            r#"{"Version":"14.0.0","RequestURL":"https://h/u?key=abc&x={input}&flag","Parameters":{"key":"keep"}}"#,
+        );
         assert_eq!(u.request_url, "https://h/u");
         assert_eq!(u.parameters["key"], "keep", "explicit Parameters win");
         assert_eq!(u.parameters["x"], "{input}");
@@ -905,11 +972,27 @@ mod tests {
                 "RequestURL":"https://h/u","Body":"MultipartFormData","FileFormName":"file","URL":"{response}"}"#,
         );
         let s = u.to_json_string();
-        let keys: Vec<&str> = KNOWN_KEYS.iter().copied().filter(|k| s.contains(&format!("\"{k}\""))).collect();
-        assert_eq!(keys, ["Version", "Name", "DestinationType", "RequestMethod", "RequestURL", "Body", "FileFormName", "URL"]);
-        let positions: Vec<usize> = keys.iter().map(|k| s.find(&format!("\"{k}\"")).unwrap()).collect();
+        let keys: Vec<&str> =
+            KNOWN_KEYS.iter().copied().filter(|k| s.contains(&format!("\"{k}\""))).collect();
+        assert_eq!(
+            keys,
+            [
+                "Version",
+                "Name",
+                "DestinationType",
+                "RequestMethod",
+                "RequestURL",
+                "Body",
+                "FileFormName",
+                "URL"
+            ]
+        );
+        let positions: Vec<usize> =
+            keys.iter().map(|k| s.find(&format!("\"{k}\"")).unwrap()).collect();
         assert!(positions.windows(2).all(|w| w[0] < w[1]), "{s}");
-        assert!(!s.contains("\"Parameters\"") && !s.contains("\"Headers\"") && !s.contains("\"Data\""));
+        assert!(
+            !s.contains("\"Parameters\"") && !s.contains("\"Headers\"") && !s.contains("\"Data\"")
+        );
         assert_eq!(parse(&s), u);
     }
 
@@ -921,13 +1004,20 @@ mod tests {
         assert!(img.supports(UploadKind::Image));
         assert!(!img.supports(UploadKind::File));
         assert!(!img.supports(UploadKind::Url));
-        let text = parse(r#"{"Version":"14.0.0","DestinationType":"TextUploader","RequestURL":"h","Body":"JSON","Data":"{}"}"#);
+        let text = parse(
+            r#"{"Version":"14.0.0","DestinationType":"TextUploader","RequestURL":"h","Body":"JSON","Data":"{}"}"#,
+        );
         assert!(text.supports(UploadKind::Text));
         assert!(!text.supports(UploadKind::Image));
-        let short = parse(r#"{"Version":"14.0.0","DestinationType":"URLShortener","RequestURL":"h"}"#);
+        let short =
+            parse(r#"{"Version":"14.0.0","DestinationType":"URLShortener","RequestURL":"h"}"#);
         assert!(short.supports(UploadKind::Url));
         let none = parse(r#"{"Version":"14.0.0","RequestURL":"h","Body":"Binary"}"#);
-        assert!(none.supports(UploadKind::Video) && none.supports(UploadKind::Text) && !none.supports(UploadKind::Url));
+        assert!(
+            none.supports(UploadKind::Video)
+                && none.supports(UploadKind::Text)
+                && !none.supports(UploadKind::Url)
+        );
     }
 
     fn errors(json: &str) -> Vec<String> {
@@ -937,7 +1027,11 @@ mod tests {
     #[test]
     fn validation_catches_common_mistakes() {
         assert!(errors(r#"{"Version":"14.0.0"}"#).iter().any(|e| e.contains("RequestURL")));
-        assert!(errors(r#"{"Version":"14.0.0","RequestURL":"ftp://h/x"}"#).iter().any(|e| e.contains("scheme")));
+        assert!(
+            errors(r#"{"Version":"14.0.0","RequestURL":"ftp://h/x"}"#)
+                .iter()
+                .any(|e| e.contains("scheme"))
+        );
         assert!(
             errors(r#"{"Version":"14.0.0","RequestURL":"h","DestinationType":"ImageUploader","Body":"MultipartFormData"}"#)
                 .iter()
@@ -948,10 +1042,26 @@ mod tests {
                 .iter()
                 .any(|e| e.contains("cannot upload files"))
         );
-        assert!(errors(r#"{"Version":"14.0.0","RequestURL":"h/{nope}"}"#).iter().any(|e| e.contains("unknown function")));
-        assert!(errors(r#"{"Version":"14.0.0","RequestURL":"h/{random:a}"}"#).iter().any(|e| e.contains("at least 2")));
-        assert!(errors(r#"{"Version":"14.0.0","RequestURL":"h/{json:a}"}"#).iter().any(|e| e.contains("server response")));
-        assert!(errors(r#"{"Version":"14.0.0","RequestURL":"h","Headers":{"bad name":"x"}}"#).iter().any(|e| e.contains("header name")));
+        assert!(
+            errors(r#"{"Version":"14.0.0","RequestURL":"h/{nope}"}"#)
+                .iter()
+                .any(|e| e.contains("unknown function"))
+        );
+        assert!(
+            errors(r#"{"Version":"14.0.0","RequestURL":"h/{random:a}"}"#)
+                .iter()
+                .any(|e| e.contains("at least 2"))
+        );
+        assert!(
+            errors(r#"{"Version":"14.0.0","RequestURL":"h/{json:a}"}"#)
+                .iter()
+                .any(|e| e.contains("server response"))
+        );
+        assert!(
+            errors(r#"{"Version":"14.0.0","RequestURL":"h","Headers":{"bad name":"x"}}"#)
+                .iter()
+                .any(|e| e.contains("header name"))
+        );
     }
 
     #[test]
@@ -966,7 +1076,9 @@ mod tests {
 
     #[test]
     fn validation_warnings() {
-        let u = parse(r#"{"RequestURL":"https://h/u","RequestMethod":"GET","Body":"JSON","Data":"{oops"}"#);
+        let u = parse(
+            r#"{"RequestURL":"https://h/u","RequestMethod":"GET","Body":"JSON","Data":"{oops"}"#,
+        );
         let w = u.check().warnings;
         assert!(w.iter().any(|m| m.contains("Version")));
         assert!(w.iter().any(|m| m.contains("DestinationType")));
@@ -984,7 +1096,9 @@ mod tests {
 
     #[test]
     fn escaped_literal_braces_validate() {
-        let u = parse(r#"{"Version":"14.0.0","RequestURL":"https://h/u","Arguments":{"x":"\\{not a call\\}"},"Body":"FormURLEncoded"}"#);
+        let u = parse(
+            r#"{"Version":"14.0.0","RequestURL":"https://h/u","Arguments":{"x":"\\{not a call\\}"},"Body":"FormURLEncoded"}"#,
+        );
         assert!(u.check().errors.is_empty(), "{:?}", u.check().errors);
     }
 }

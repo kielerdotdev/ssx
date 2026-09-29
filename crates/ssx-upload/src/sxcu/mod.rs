@@ -14,6 +14,7 @@ pub mod template;
 
 pub use engine::SxcuUploader;
 pub use model::{
-    BodyType, CustomUploader, DestinationType, HttpMethod, SxcuError, ValidationError, ValidationReport,
+    BodyType, CustomUploader, DestinationType, HttpMethod, SxcuError, ValidationError,
+    ValidationReport,
 };
 pub use template::{Interaction, NonInteractive, Template, TemplateError, TemplateResponse};

@@ -29,22 +29,31 @@ const HEX_UPPER: &str = "0123456789ABCDEF";
 const HEX_LOWER: &str = "0123456789abcdef";
 
 const MONTHS: [&str; 12] = [
-    "January", "February", "March", "April", "May", "June", "July", "August", "September",
-    "October", "November", "December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
 ];
 const DAYS: [&str; 7] =
     ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 const ADJECTIVES: &[&str] = &[
-    "Brave", "Calm", "Clever", "Cosmic", "Crimson", "Curious", "Daring", "Eager", "Fancy",
-    "Fuzzy", "Gentle", "Golden", "Happy", "Jolly", "Kind", "Lively", "Lucky", "Mellow",
-    "Mighty", "Nimble", "Noble", "Odd", "Peppy", "Proud", "Quick", "Quiet", "Silly", "Sunny",
-    "Swift", "Witty",
+    "Brave", "Calm", "Clever", "Cosmic", "Crimson", "Curious", "Daring", "Eager", "Fancy", "Fuzzy",
+    "Gentle", "Golden", "Happy", "Jolly", "Kind", "Lively", "Lucky", "Mellow", "Mighty", "Nimble",
+    "Noble", "Odd", "Peppy", "Proud", "Quick", "Quiet", "Silly", "Sunny", "Swift", "Witty",
 ];
 const ANIMALS: &[&str] = &[
     "Badger", "Beaver", "Camel", "Cat", "Cobra", "Crane", "Dolphin", "Eagle", "Falcon", "Ferret",
-    "Fox", "Gecko", "Heron", "Horse", "Koala", "Lemur", "Llama", "Lynx", "Otter", "Owl",
-    "Panda", "Penguin", "Rabbit", "Raven", "Seal", "Shark", "Sloth", "Tiger", "Whale", "Wolf",
+    "Fox", "Gecko", "Heron", "Horse", "Koala", "Lemur", "Llama", "Lynx", "Otter", "Owl", "Panda",
+    "Penguin", "Rabbit", "Raven", "Seal", "Shark", "Sloth", "Tiger", "Whale", "Wolf",
 ];
 const EMOJIS: &[&str] = &[
     "😀", "😎", "🤖", "👻", "🐱", "🐶", "🦊", "🐼", "🦄", "🌈", "🔥", "⭐", "🍕", "🍩", "🚀", "🎲",
@@ -114,25 +123,74 @@ impl NameParser {
 
     /// Try to expand the code at the start of `s` (the text after `%`). Returns the
     /// replacement and the number of bytes consumed.
-    fn expand(&self, s: &str, now: &DateTime<FixedOffset>, twelve_hour: bool) -> Option<(String, usize)> {
+    fn expand(
+        &self,
+        s: &str,
+        now: &DateTime<FixedOffset>,
+        twelve_hour: bool,
+    ) -> Option<(String, usize)> {
         // Longest first; see the module docs.
         const CODES: &[&str] = &[
-            "radjective", "ranimal", "remoji", "height", "width", "mon2", "unix", "guid", "GUID",
-            "rna", "iAa", "iaA", "uln", "mon", "yy", "mo", "mi", "ms", "wy", "w2", "pm", "pn",
-            "un", "cn", "ia", "iA", "ib", "iB", "ix", "iX", "rn", "ra", "rx", "rX", "rf", "y",
-            "d", "h", "s", "w", "t", "n", "i",
+            "radjective",
+            "ranimal",
+            "remoji",
+            "height",
+            "width",
+            "mon2",
+            "unix",
+            "guid",
+            "GUID",
+            "rna",
+            "iAa",
+            "iaA",
+            "uln",
+            "mon",
+            "yy",
+            "mo",
+            "mi",
+            "ms",
+            "wy",
+            "w2",
+            "pm",
+            "pn",
+            "un",
+            "cn",
+            "ia",
+            "iA",
+            "ib",
+            "iB",
+            "ix",
+            "iX",
+            "rn",
+            "ra",
+            "rx",
+            "rX",
+            "rf",
+            "y",
+            "d",
+            "h",
+            "s",
+            "w",
+            "t",
+            "n",
+            "i",
         ];
         let code = CODES.iter().find(|c| s.starts_with(**c))?;
         let after = &s[code.len()..];
         // Optional `{args}` directly after the code.
-        let (args, arg_len) = match after.strip_prefix('{').and_then(|a| a.find('}').map(|e| &a[..e])) {
-            Some(a) => (Some(a), a.len() + 2),
-            None => (None, 0),
-        };
+        let (args, arg_len) =
+            match after.strip_prefix('{').and_then(|a| a.find('}').map(|e| &a[..e])) {
+                Some(a) => (Some(a), a.len() + 2),
+                None => (None, 0),
+            };
         let with_args = |text: String| Some((text, code.len() + arg_len));
         let plain = |text: String| Some((text, code.len()));
         let count = || args.map(|a| a.trim().parse::<usize>().unwrap_or(0));
-        let n1 = || args.map_or(0, |a| a.split(',').next().and_then(|p| p.trim().parse::<usize>().ok()).unwrap_or(0));
+        let n1 = || {
+            args.map_or(0, |a| {
+                a.split(',').next().and_then(|p| p.trim().parse::<usize>().ok()).unwrap_or(0)
+            })
+        };
 
         match *code {
             "radjective" => plain(pick(ADJECTIVES).to_owned()),
@@ -150,7 +208,9 @@ impl NameParser {
             "rx" => with_args(repeat(count(), || random_char(HEX_LOWER))),
             "rX" => with_args(repeat(count(), || random_char(HEX_UPPER))),
             "rf" => with_args(random_line_from_file(args.unwrap_or_default())),
-            "uln" => plain(env_first(&["USERDOMAIN", "USERDNSDOMAIN"]).unwrap_or_else(machine_name)),
+            "uln" => {
+                plain(env_first(&["USERDOMAIN", "USERDNSDOMAIN"]).unwrap_or_else(machine_name))
+            }
             "un" => plain(env_first(&["USERNAME", "USER", "LOGNAME"]).unwrap_or_default()),
             "cn" => plain(machine_name()),
             "yy" => plain(format!("{:02}", now.year().rem_euclid(100))),
@@ -170,24 +230,28 @@ impl NameParser {
             "pn" => self.process_name.clone().and_then(plain),
             "t" => self.window_title.as_deref().map(|t| t.trim().replace(' ', "_")).and_then(plain),
             "n" if self.kind == NameParserKind::Text => plain("\n".to_owned()),
-            "n" => None,
             "i" => with_args(pad(self.auto_increment.to_string(), n1())),
             "ix" => with_args(pad(format!("{:x}", self.auto_increment), n1())),
             "iX" => with_args(pad(format!("{:X}", self.auto_increment), n1())),
-            "ia" => with_args(pad(to_base(self.auto_increment, 36, ALPHANUMERIC).to_lowercase(), n1())),
-            "iA" => with_args(pad(to_base(self.auto_increment, 36, ALPHANUMERIC).to_uppercase(), n1())),
+            "ia" => {
+                with_args(pad(to_base(self.auto_increment, 36, ALPHANUMERIC).to_lowercase(), n1()))
+            }
+            "iA" => {
+                with_args(pad(to_base(self.auto_increment, 36, ALPHANUMERIC).to_uppercase(), n1()))
+            }
             "iAa" => with_args(pad(to_base(self.auto_increment, 62, ALPHANUMERIC), n1())),
             "iaA" => with_args(pad(to_base(self.auto_increment, 62, ALPHANUMERIC_INVERSE), n1())),
             "ib" | "iB" => {
                 let alphabet = if *code == "ib" { ALPHANUMERIC_INVERSE } else { ALPHANUMERIC };
-                let (base, width) = args
-                    .map(|a| {
-                        let mut it = a.split(',').map(|p| p.trim().parse::<usize>().ok());
-                        (it.next().flatten(), it.next().flatten())
-                    })
-                    .unwrap_or((None, None));
+                let (base, width) = args.map_or((None, None), |a| {
+                    let mut it = a.split(',').map(|p| p.trim().parse::<usize>().ok());
+                    (it.next().flatten(), it.next().flatten())
+                });
                 let base = base.unwrap_or(10).clamp(2, alphabet.len());
-                with_args(pad(to_base(self.auto_increment, base as u64, alphabet), width.unwrap_or(0)))
+                with_args(pad(
+                    to_base(self.auto_increment, base as u64, alphabet),
+                    width.unwrap_or(0),
+                ))
             }
             _ => None,
         }

@@ -11,7 +11,7 @@ mod common;
 
 use std::sync::atomic::Ordering::Relaxed;
 
-use common::{SinkMode, ctx, spawn_sink, sparse_file};
+use common::{SinkMode, ctx, sparse_file, spawn_sink};
 use ssx_upload::sxcu::SxcuUploader;
 use ssx_upload::{UploadKind, UploadRequest, Uploader};
 
@@ -53,22 +53,39 @@ async fn uploading_a_200_mb_file_streams_in_small_chunks() {
     let s = &sink.stats;
     assert_eq!(s.chunked.load(Relaxed), 0, "must use Content-Length, not chunked encoding");
     assert_eq!(s.received.load(Relaxed), FILE_LEN + 1024, "every byte arrives");
-    assert!(s.reads.load(Relaxed) > 200, "the body arrives in many pieces, got {} reads", s.reads.load(Relaxed));
+    assert!(
+        s.reads.load(Relaxed) > 200,
+        "the body arrives in many pieces, got {} reads",
+        s.reads.load(Relaxed)
+    );
     let events = recorder.events();
     assert_eq!(events.last().copied(), Some((FILE_LEN, Some(FILE_LEN))));
     assert!(events.windows(2).all(|w| w[0].0 <= w[1].0), "progress is monotonic");
-    assert!(events.len() < 20_000, "progress is throttled ({} events in {elapsed:?})", events.len());
+    assert!(
+        events.len() < 20_000,
+        "progress is throttled ({} events in {elapsed:?})",
+        events.len()
+    );
 
     match (before, vm_hwm_kib()) {
         (Some(before), Some(after)) => {
             let grown_mib = after.saturating_sub(before) / 1024;
-            eprintln!("VmHWM grew by {grown_mib} MiB while uploading {} MiB in {elapsed:?}", FILE_LEN / 1024 / 1024);
-            assert!(grown_mib < 40, "peak memory grew by {grown_mib} MiB: the file is being buffered");
+            eprintln!(
+                "VmHWM grew by {grown_mib} MiB while uploading {} MiB in {elapsed:?}",
+                FILE_LEN / 1024 / 1024
+            );
+            assert!(
+                grown_mib < 40,
+                "peak memory grew by {grown_mib} MiB: the file is being buffered"
+            );
             // Control: prove the probe can see a 200 MB buffer, i.e. the assertion above is
             // not vacuous.
             let buffered = std::fs::read(&path).expect("read whole file");
             let after_read = vm_hwm_kib().unwrap_or(0);
-            assert!(after_read.saturating_sub(after) / 1024 > 150, "probe failed to notice a 200 MB buffer");
+            assert!(
+                after_read.saturating_sub(after) / 1024 > 150,
+                "probe failed to notice a 200 MB buffer"
+            );
             drop(buffered);
         }
         _ => eprintln!("skipping the RSS assertion: /proc/self/status is unavailable on this OS"),

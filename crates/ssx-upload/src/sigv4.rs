@@ -217,7 +217,9 @@ pub fn canonical_query(query: &str) -> String {
 fn canonical_headers(headers: &[(String, String)]) -> (String, String) {
     let mut list: Vec<(String, String)> = headers
         .iter()
-        .map(|(k, v)| (k.trim().to_ascii_lowercase(), v.split_whitespace().collect::<Vec<_>>().join(" ")))
+        .map(|(k, v)| {
+            (k.trim().to_ascii_lowercase(), v.split_whitespace().collect::<Vec<_>>().join(" "))
+        })
         .collect();
     list.sort_by(|a, b| a.0.cmp(&b.0));
     // Repeated names are joined with commas in the order given.
@@ -231,7 +233,10 @@ fn canonical_headers(headers: &[(String, String)]) -> (String, String) {
             _ => merged.push((k, v)),
         }
     }
-    let canonical: String = merged.iter().map(|(k, v)| format!("{k}:{v}\n")).collect();
+    let mut canonical = String::new();
+    for (k, v) in &merged {
+        let _ = writeln!(canonical, "{k}:{v}");
+    }
     let signed = merged.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>().join(";");
     (canonical, signed)
 }
@@ -255,7 +260,8 @@ pub fn sign(creds: &Credentials, input: &SigningInput<'_>) -> Signed {
         amz_date(input.time),
         sha256_hex(canonical_request.as_bytes())
     );
-    let k_date = hmac_sha256(format!("AWS4{}", creds.secret_access_key).as_bytes(), date_stamp.as_bytes());
+    let k_date =
+        hmac_sha256(format!("AWS4{}", creds.secret_access_key).as_bytes(), date_stamp.as_bytes());
     let k_region = hmac_sha256(&k_date, input.region.as_bytes());
     let k_service = hmac_sha256(&k_region, input.service.as_bytes());
     let k_signing = hmac_sha256(&k_service, b"aws4_request");
@@ -292,7 +298,10 @@ mod tests {
         );
         // Key longer than the block size is hashed first (RFC 4231 case 6).
         assert_eq!(
-            hex(&hmac_sha256(&[0xaa; 131], b"Test Using Larger Than Block-Size Key - Hash Key First")),
+            hex(&hmac_sha256(
+                &[0xaa; 131],
+                b"Test Using Larger Than Block-Size Key - Hash Key First"
+            )),
             "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54"
         );
     }
@@ -309,7 +318,7 @@ mod tests {
         authz: &'static str,
     }
 
-    /// Vectors from the AWS Signature V4 test suite ("aws4_testsuite"): credentials
+    /// Vectors from the AWS Signature V4 test suite ("`aws4_testsuite")`: credentials
     /// AKIDEXAMPLE / wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY, us-east-1, service "service",
     /// 20150830T123600Z. The suite passes the request line as written, so paths are given
     /// unencoded and are encoded exactly once here.
@@ -438,7 +447,13 @@ mod tests {
         }
     }
 
-    fn s3_sign(method: &str, path: &str, query: &str, headers: &[(&str, &str)], payload_hash: &str) -> Signed {
+    fn s3_sign(
+        method: &str,
+        path: &str,
+        query: &str,
+        headers: &[(&str, &str)],
+        payload_hash: &str,
+    ) -> Signed {
         sign(
             &s3_creds(),
             &SigningInput {
@@ -469,7 +484,10 @@ mod tests {
             &[host, ("range", "bytes=0-9"), ("x-amz-content-sha256", EMPTY_SHA256), date],
             EMPTY_SHA256,
         );
-        assert_eq!(get.signature, "f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41");
+        assert_eq!(
+            get.signature,
+            "f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41"
+        );
         assert_eq!(get.signed_headers, "host;range;x-amz-content-sha256;x-amz-date");
 
         let body_hash = sha256_hex(b"Welcome to Amazon S3.");
@@ -487,11 +505,22 @@ mod tests {
             ],
             &body_hash,
         );
-        assert_eq!(put.signature, "98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd");
+        assert_eq!(
+            put.signature,
+            "98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd"
+        );
 
-        let lifecycle =
-            s3_sign("GET", "/", "lifecycle", &[host, ("x-amz-content-sha256", EMPTY_SHA256), date], EMPTY_SHA256);
-        assert_eq!(lifecycle.signature, "fea454ca298b7da1c68078a5d1bdbfbbe0d65c699e0f91ac7a200a0136783543");
+        let lifecycle = s3_sign(
+            "GET",
+            "/",
+            "lifecycle",
+            &[host, ("x-amz-content-sha256", EMPTY_SHA256), date],
+            EMPTY_SHA256,
+        );
+        assert_eq!(
+            lifecycle.signature,
+            "fea454ca298b7da1c68078a5d1bdbfbbe0d65c699e0f91ac7a200a0136783543"
+        );
 
         let list = s3_sign(
             "GET",
@@ -500,7 +529,10 @@ mod tests {
             &[host, ("x-amz-content-sha256", EMPTY_SHA256), date],
             EMPTY_SHA256,
         );
-        assert_eq!(list.signature, "34b48302e7b5fa45bde8084f4b7868a86f0a534bc59db6670ed5711ef69dc6f7");
+        assert_eq!(
+            list.signature,
+            "34b48302e7b5fa45bde8084f4b7868a86f0a534bc59db6670ed5711ef69dc6f7"
+        );
     }
 
     #[test]
@@ -520,7 +552,11 @@ mod tests {
         assert_eq!(canonical_query("k=a%20b&j=%7E"), "j=~&k=a%20b");
         assert_eq!(canonical_query("x=a+b"), "x=a%2Bb");
         assert_eq!(canonical_query(""), "");
-        assert_eq!(canonical_query("A=1&a=1"), "A=1&a=1", "sorting is by encoded bytes, upper case first");
+        assert_eq!(
+            canonical_query("A=1&a=1"),
+            "A=1&a=1",
+            "sorting is by encoded bytes, upper case first"
+        );
     }
 
     #[test]
@@ -544,7 +580,14 @@ mod tests {
 
     #[test]
     fn credentials_debug_hides_secrets() {
-        let s = format!("{:?}", Credentials { access_key_id: "AK".into(), secret_access_key: "SECRET".into(), session_token: Some("TOK".into()) });
+        let s = format!(
+            "{:?}",
+            Credentials {
+                access_key_id: "AK".into(),
+                secret_access_key: "SECRET".into(),
+                session_token: Some("TOK".into())
+            }
+        );
         assert!(!s.contains("SECRET") && !s.contains("TOK"), "{s}");
     }
 }

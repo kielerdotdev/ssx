@@ -106,7 +106,12 @@ impl OAuthConfig {
     /// Imgur: authorization-code flow without PKCE (Imgur ignores it) but with the client
     /// secret from the registered application.
     pub fn imgur(client_id: &str, client_secret: &str) -> Self {
-        let mut c = Self::new("imgur", client_id, "https://api.imgur.com/oauth2/authorize", "https://api.imgur.com/oauth2/token");
+        let mut c = Self::new(
+            "imgur",
+            client_id,
+            "https://api.imgur.com/oauth2/authorize",
+            "https://api.imgur.com/oauth2/token",
+        );
         c.client_secret = Some(client_secret.to_owned());
         c.use_pkce = false;
         c
@@ -221,7 +226,13 @@ struct Callback {
 impl OAuthClient {
     /// Build a client. `ctx` supplies the HTTP client, secret store and cancellation token.
     pub fn new(cfg: OAuthConfig, ctx: UploadContext, opener: Arc<dyn BrowserOpener>) -> Self {
-        Self { cfg: Arc::new(cfg), ctx, opener, now: Arc::new(unix_now), refresh_lock: Arc::new(tokio::sync::Mutex::new(())) }
+        Self {
+            cfg: Arc::new(cfg),
+            ctx,
+            opener,
+            now: Arc::new(unix_now),
+            refresh_lock: Arc::new(tokio::sync::Mutex::new(())),
+        }
     }
 
     /// Replace the clock (tests).
@@ -235,28 +246,31 @@ impl OAuthClient {
     pub fn stored_tokens(&self) -> Result<Option<TokenSet>, UploadError> {
         let key = self.cfg.tokens_key();
         match self.ctx.secrets.get(&key) {
-            Ok(Some(json)) => serde_json::from_str(&json)
-                .map(Some)
-                .map_err(|e| UploadError::Auth { message: format!("stored OAuth tokens are corrupt ({e}); sign in again") }),
+            Ok(Some(json)) => {
+                serde_json::from_str(&json).map(Some).map_err(|e| UploadError::Auth {
+                    message: format!("stored OAuth tokens are corrupt ({e}); sign in again"),
+                })
+            }
             Ok(None) => Ok(None),
-            Err(e) => Err(UploadError::Auth { message: format!("could not read stored OAuth tokens: {e}") }),
+            Err(e) => Err(UploadError::Auth {
+                message: format!("could not read stored OAuth tokens: {e}"),
+            }),
         }
     }
 
     fn store_tokens(&self, tokens: &TokenSet) -> Result<(), UploadError> {
-        let json = serde_json::to_string(tokens).map_err(|e| UploadError::config(format!("cannot serialise tokens: {e}")))?;
-        self.ctx
-            .secrets
-            .set(&self.cfg.tokens_key(), &json)
-            .map_err(|e| UploadError::Auth { message: format!("could not store OAuth tokens: {e}") })
+        let json = serde_json::to_string(tokens)
+            .map_err(|e| UploadError::config(format!("cannot serialise tokens: {e}")))?;
+        self.ctx.secrets.set(&self.cfg.tokens_key(), &json).map_err(|e| UploadError::Auth {
+            message: format!("could not store OAuth tokens: {e}"),
+        })
     }
 
     /// Forget the stored tokens.
     pub fn sign_out(&self) -> Result<(), UploadError> {
-        self.ctx
-            .secrets
-            .delete(&self.cfg.tokens_key())
-            .map_err(|e| UploadError::Auth { message: format!("could not delete OAuth tokens: {e}") })
+        self.ctx.secrets.delete(&self.cfg.tokens_key()).map_err(|e| UploadError::Auth {
+            message: format!("could not delete OAuth tokens: {e}"),
+        })
     }
 
     fn authorization_url(&self, redirect_uri: &str, state: &str, pkce: Option<&Pkce>) -> String {
@@ -274,7 +288,11 @@ impl OAuthClient {
             params.push(("code_challenge_method".into(), "S256".into()));
         }
         params.extend(self.cfg.extra_auth_params.iter().cloned());
-        let query = params.iter().map(|(k, v)| format!("{}={}", url_encode(k), url_encode(v))).collect::<Vec<_>>().join("&");
+        let query = params
+            .iter()
+            .map(|(k, v)| format!("{}={}", url_encode(k), url_encode(v)))
+            .collect::<Vec<_>>()
+            .join("&");
         let sep = if self.cfg.auth_url.contains('?') { '&' } else { '?' };
         format!("{}{sep}{query}", self.cfg.auth_url)
     }
@@ -282,10 +300,13 @@ impl OAuthClient {
     /// Run the interactive authorization and persist the resulting tokens.
     pub async fn authorize(&self) -> Result<TokenSet, UploadError> {
         self.ctx.check_cancelled()?;
-        let listener = TcpListener::bind(("127.0.0.1", 0))
-            .await
-            .map_err(|e| UploadError::io("binding the loopback listener for the OAuth redirect", e))?;
-        let port = listener.local_addr().map_err(|e| UploadError::io("reading the loopback port", e))?.port();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.map_err(|e| {
+            UploadError::io("binding the loopback listener for the OAuth redirect", e)
+        })?;
+        let port = listener
+            .local_addr()
+            .map_err(|e| UploadError::io("reading the loopback port", e))?
+            .port();
         let redirect_uri = format!("http://127.0.0.1:{port}{}", self.cfg.callback_path);
         let state = random_token(16);
         let pkce = self.cfg.use_pkce.then(Pkce::generate);
@@ -307,7 +328,12 @@ impl OAuthClient {
         Ok(tokens)
     }
 
-    async fn wait_for_callback(&self, listener: &TcpListener, port: u16, state: &str) -> Result<Callback, UploadError> {
+    async fn wait_for_callback(
+        &self,
+        listener: &TcpListener,
+        port: u16,
+        state: &str,
+    ) -> Result<Callback, UploadError> {
         let deadline = tokio::time::Instant::now() + self.cfg.timeout;
         loop {
             let accepted = tokio::select! {
@@ -323,10 +349,9 @@ impl OAuthClient {
                 let _ = respond(&mut sock, 400, "Bad request").await;
                 continue;
             };
-            let host_ok = request
-                .host
-                .as_deref()
-                .is_some_and(|h| h == format!("127.0.0.1:{port}") || h == format!("localhost:{port}"));
+            let host_ok = request.host.as_deref().is_some_and(|h| {
+                h == format!("127.0.0.1:{port}") || h == format!("localhost:{port}")
+            });
             if !host_ok {
                 let _ = respond(&mut sock, 400, "Unexpected Host header").await;
                 continue;
@@ -335,22 +360,37 @@ impl OAuthClient {
                 let _ = respond(&mut sock, 404, "Not found").await;
                 continue;
             }
-            let param = |name: &str| request.query.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone());
+            let param =
+                |name: &str| request.query.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone());
             if !param("state").is_some_and(|s| constant_time_eq(&s, state)) {
-                let _ = respond(&mut sock, 400, "Invalid state parameter; return to the app and start again.").await;
+                let _ = respond(
+                    &mut sock,
+                    400,
+                    "Invalid state parameter; return to the app and start again.",
+                )
+                .await;
                 tracing::warn!("ignored an OAuth callback with a missing or wrong state");
                 continue;
             }
             if let Some(err) = param("error") {
-                let _ = respond(&mut sock, 200, "Sign-in was not completed. You can close this window.").await;
+                let _ = respond(
+                    &mut sock,
+                    200,
+                    "Sign-in was not completed. You can close this window.",
+                )
+                .await;
                 let desc = param("error_description").unwrap_or_default();
-                return Err(UploadError::Auth { message: format!("authorization denied: {err} {desc}").trim().to_owned() });
+                return Err(UploadError::Auth {
+                    message: format!("authorization denied: {err} {desc}").trim().to_owned(),
+                });
             }
             let Some(code) = param("code").filter(|c| !c.is_empty()) else {
                 let _ = respond(&mut sock, 400, "Missing authorization code").await;
                 continue;
             };
-            let _ = respond(&mut sock, 200, "Signed in. You can close this window and return to ssx.").await;
+            let _ =
+                respond(&mut sock, 200, "Signed in. You can close this window and return to ssx.")
+                    .await;
             return Ok(Callback { code });
         }
     }
@@ -358,18 +398,18 @@ impl OAuthClient {
     /// Exchange a refresh token for new tokens and persist them.
     pub async fn refresh(&self) -> Result<TokenSet, UploadError> {
         let _guard = self.refresh_lock.lock().await;
-        let current = self
-            .stored_tokens()?
-            .ok_or_else(|| UploadError::Auth { message: "not signed in; authorize first".into() })?;
+        let current = self.stored_tokens()?.ok_or_else(|| UploadError::Auth {
+            message: "not signed in; authorize first".into(),
+        })?;
         self.refresh_locked(&current).await
     }
 
     async fn refresh_locked(&self, current: &TokenSet) -> Result<TokenSet, UploadError> {
-        let refresh = current
-            .refresh_token
-            .clone()
-            .ok_or_else(|| UploadError::Auth { message: "the access token expired and there is no refresh token; sign in again".into() })?;
-        let form = vec![("grant_type", "refresh_token".to_owned()), ("refresh_token", refresh.clone())];
+        let refresh = current.refresh_token.clone().ok_or_else(|| UploadError::Auth {
+            message: "the access token expired and there is no refresh token; sign in again".into(),
+        })?;
+        let form =
+            vec![("grant_type", "refresh_token".to_owned()), ("refresh_token", refresh.clone())];
         let mut tokens = self.token_request(form).await?;
         if tokens.refresh_token.is_none() {
             // Providers that do not rotate refresh tokens omit it from the response.
@@ -382,9 +422,9 @@ impl OAuthClient {
     /// A currently valid access token, refreshing first if it expires within a minute.
     pub async fn access_token(&self) -> Result<String, UploadError> {
         let now = (self.now)();
-        let tokens = self
-            .stored_tokens()?
-            .ok_or_else(|| UploadError::Auth { message: format!("not signed in to {}; authorize first", self.cfg.name) })?;
+        let tokens = self.stored_tokens()?.ok_or_else(|| UploadError::Auth {
+            message: format!("not signed in to {}; authorize first", self.cfg.name),
+        })?;
         if !tokens.expired(now) {
             return Ok(tokens.access_token);
         }
@@ -397,13 +437,26 @@ impl OAuthClient {
         Ok(self.refresh_locked(&latest).await?.access_token)
     }
 
-    async fn token_request(&self, mut form: Vec<(&'static str, String)>) -> Result<TokenSet, UploadError> {
-        let mut rb = self.ctx.http.post(&self.cfg.token_url).header(ACCEPT, HeaderValue::from_static("application/json"));
+    async fn token_request(
+        &self,
+        mut form: Vec<(&'static str, String)>,
+    ) -> Result<TokenSet, UploadError> {
+        let mut rb = self
+            .ctx
+            .http
+            .post(&self.cfg.token_url)
+            .header(ACCEPT, HeaderValue::from_static("application/json"));
         match (self.cfg.client_auth, &self.cfg.client_secret) {
             (ClientAuth::BasicHeader, secret) => {
-                let raw = format!("{}:{}", url_encode(&self.cfg.client_id), url_encode(secret.as_deref().unwrap_or_default()));
+                let raw = format!(
+                    "{}:{}",
+                    url_encode(&self.cfg.client_id),
+                    url_encode(secret.as_deref().unwrap_or_default())
+                );
                 let mut v = HeaderValue::from_str(&format!("Basic {}", STANDARD.encode(raw)))
-                    .map_err(|_| UploadError::config("client credentials are not valid in a header"))?;
+                    .map_err(|_| {
+                        UploadError::config("client credentials are not valid in a header")
+                    })?;
                 v.set_sensitive(true);
                 rb = rb.header(AUTHORIZATION, v);
             }
@@ -414,14 +467,28 @@ impl OAuthClient {
                 }
             }
         }
-        let body = form.iter().map(|(k, v)| format!("{}={}", url_encode(k), url_encode(v))).collect::<Vec<_>>().join("&");
-        rb = rb.header(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded")).body(body);
+        let body = form
+            .iter()
+            .map(|(k, v)| format!("{}={}", url_encode(k), url_encode(v)))
+            .collect::<Vec<_>>()
+            .join("&");
+        rb = rb
+            .header(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded"))
+            .body(body);
         let resp = http::fetch(&self.ctx, rb, None).await?;
-        let json: serde_json::Value = serde_json::from_str(&resp.text).unwrap_or(serde_json::Value::Null);
+        let json: serde_json::Value =
+            serde_json::from_str(&resp.text).unwrap_or(serde_json::Value::Null);
         if let Some(err) = json.get("error").and_then(|e| e.as_str()) {
             let desc = json.get("error_description").and_then(|d| d.as_str()).unwrap_or_default();
-            let hint = if err == "invalid_grant" { " (the authorization expired or was revoked; sign in again)" } else { "" };
-            return Err(UploadError::Auth { message: format!("token endpoint rejected the request: {err} {desc}{hint}").replace("  ", " ") });
+            let hint = if err == "invalid_grant" {
+                " (the authorization expired or was revoked; sign in again)"
+            } else {
+                ""
+            };
+            return Err(UploadError::Auth {
+                message: format!("token endpoint rejected the request: {err} {desc}{hint}")
+                    .replace("  ", " "),
+            });
         }
         if !resp.is_success() {
             return Err(resp.to_error(None));
@@ -430,13 +497,24 @@ impl OAuthClient {
             .get("access_token")
             .and_then(|t| t.as_str())
             .filter(|t| !t.is_empty())
-            .ok_or_else(|| UploadError::invalid_response(format!("token response has no access_token: {}", http::snippet(&resp.text))))?
+            .ok_or_else(|| {
+                UploadError::invalid_response(format!(
+                    "token response has no access_token: {}",
+                    http::snippet(&resp.text)
+                ))
+            })?
             .to_owned();
-        let expires_in = json.get("expires_in").and_then(|e| e.as_u64().or_else(|| e.as_str().and_then(|s| s.parse().ok())));
+        let expires_in = json
+            .get("expires_in")
+            .and_then(|e| e.as_u64().or_else(|| e.as_str().and_then(|s| s.parse().ok())));
         Ok(TokenSet {
             access_token,
             refresh_token: json.get("refresh_token").and_then(|t| t.as_str()).map(str::to_owned),
-            token_type: json.get("token_type").and_then(|t| t.as_str()).unwrap_or("Bearer").to_owned(),
+            token_type: json
+                .get("token_type")
+                .and_then(|t| t.as_str())
+                .unwrap_or("Bearer")
+                .to_owned(),
             scope: json.get("scope").and_then(|s| s.as_str()).map(str::to_owned),
             expires_at: expires_in.map(|s| (self.now)() + s),
         })
@@ -482,19 +560,27 @@ async fn read_request(sock: &mut tokio::net::TcpStream) -> Option<RequestHead> {
     Some(RequestHead {
         method,
         path: path.to_owned(),
-        query: url::form_urlencoded::parse(query.as_bytes()).map(|(k, v)| (k.into_owned(), v.into_owned())).collect(),
+        query: url::form_urlencoded::parse(query.as_bytes())
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect(),
         host,
     })
 }
 
-async fn respond(sock: &mut tokio::net::TcpStream, status: u16, message: &str) -> std::io::Result<()> {
+async fn respond(
+    sock: &mut tokio::net::TcpStream,
+    status: u16,
+    message: &str,
+) -> std::io::Result<()> {
     let reason = match status {
         200 => "OK",
         404 => "Not Found",
         _ => "Bad Request",
     };
     let escaped = message.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
-    let body = format!("<!doctype html><meta charset=utf-8><title>ssx</title><body style=\"font-family:sans-serif;margin:3em\"><p>{escaped}</p>");
+    let body = format!(
+        "<!doctype html><meta charset=utf-8><title>ssx</title><body style=\"font-family:sans-serif;margin:3em\"><p>{escaped}</p>"
+    );
     let head = format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
         body.len()
@@ -537,7 +623,13 @@ mod tests {
 
     #[test]
     fn token_expiry_uses_a_skew() {
-        let t = TokenSet { access_token: "a".into(), refresh_token: None, token_type: "Bearer".into(), scope: None, expires_at: Some(1000) };
+        let t = TokenSet {
+            access_token: "a".into(),
+            refresh_token: None,
+            token_type: "Bearer".into(),
+            scope: None,
+            expires_at: Some(1000),
+        };
         assert!(!t.expired(900));
         assert!(t.expired(940));
         assert!(t.expired(2000));
@@ -547,7 +639,13 @@ mod tests {
 
     #[test]
     fn token_debug_hides_secrets() {
-        let t = TokenSet { access_token: "SECRETTOKEN".into(), refresh_token: Some("SECRETREFRESH".into()), token_type: "Bearer".into(), scope: None, expires_at: None };
+        let t = TokenSet {
+            access_token: "SECRETTOKEN".into(),
+            refresh_token: Some("SECRETREFRESH".into()),
+            token_type: "Bearer".into(),
+            scope: None,
+            expires_at: None,
+        };
         let s = format!("{t:?}");
         assert!(!s.contains("SECRET"), "{s}");
     }

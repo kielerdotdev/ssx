@@ -64,7 +64,8 @@ impl RetryPolicy {
         if !err.is_retryable() {
             return None;
         }
-        let exp = self.multiplier.max(1.0).powi(i32::try_from(retry.saturating_sub(1)).unwrap_or(30));
+        let exp =
+            self.multiplier.max(1.0).powi(i32::try_from(retry.saturating_sub(1)).unwrap_or(30));
         let base = self.initial_backoff.as_secs_f64() * exp;
         let base = Duration::from_secs_f64(base.min(self.max_backoff.as_secs_f64()).max(0.0));
         let jittered = match self.jitter {
@@ -161,7 +162,7 @@ mod tests {
 
     #[async_trait]
     impl Uploader for Scripted {
-        fn name(&self) -> &str {
+        fn name(&self) -> &'static str {
             "scripted"
         }
         fn supports(&self, _kind: UploadKind) -> bool {
@@ -203,7 +204,10 @@ mod tests {
         let calls = s.calls.lock().unwrap();
         assert_eq!(calls.len(), 4);
         let gaps: Vec<_> = calls.windows(2).map(|w| w[1] - w[0]).collect();
-        assert_eq!(gaps, vec![Duration::from_millis(500), Duration::from_secs(1), Duration::from_secs(2)]);
+        assert_eq!(
+            gaps,
+            vec![Duration::from_millis(500), Duration::from_secs(1), Duration::from_secs(2)]
+        );
     }
 
     #[tokio::test(start_paused = true)]

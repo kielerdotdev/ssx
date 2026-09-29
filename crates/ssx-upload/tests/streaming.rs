@@ -6,7 +6,9 @@ mod common;
 use std::sync::atomic::Ordering::Relaxed;
 use std::time::Duration;
 
-use common::{Recorder, SinkMode, ctx, header, multipart_of, only_request, spawn_sink, sparse_file};
+use common::{
+    Recorder, SinkMode, ctx, header, multipart_of, only_request, sparse_file, spawn_sink,
+};
 use ssx_upload::sxcu::SxcuUploader;
 use ssx_upload::{UploadError, UploadKind, UploadRequest, Uploader};
 use wiremock::matchers::method;
@@ -24,7 +26,8 @@ fn multipart_uploader(url: &str) -> SxcuUploader {
 async fn progress_is_monotonic_and_ends_at_the_bytes_the_server_received() {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("data.bin");
-    std::fs::write(&path, (0..=255u8).cycle().take(3 * 1024 * 1024 + 17).collect::<Vec<_>>()).expect("write");
+    std::fs::write(&path, (0..=255u8).cycle().take(3 * 1024 * 1024 + 17).collect::<Vec<_>>())
+        .expect("write");
     let sink = spawn_sink(SinkMode::Discard).await;
     let rec = Recorder::new();
     let ctx = ctx().with_progress(rec.clone());
@@ -65,7 +68,9 @@ async fn cancelling_mid_upload_returns_promptly_and_stops_sending() {
     });
     let req = UploadRequest::from_path(&path, UploadKind::File);
     let started = std::time::Instant::now();
-    let res = tokio::time::timeout(Duration::from_secs(10), u.upload(&req, &ctx)).await.expect("cancellation must not hang");
+    let res = tokio::time::timeout(Duration::from_secs(10), u.upload(&req, &ctx))
+        .await
+        .expect("cancellation must not hang");
     canceller.await.expect("canceller");
     assert!(matches!(res, Err(UploadError::Cancelled)), "{res:?}");
     assert!(started.elapsed() < Duration::from_secs(5));
@@ -76,7 +81,10 @@ async fn cancelling_mid_upload_returns_promptly_and_stops_sending() {
 #[tokio::test]
 async fn cancelling_before_start_sends_nothing() {
     let server = MockServer::start().await;
-    Mock::given(method("POST")).respond_with(ResponseTemplate::new(200).set_body_string("x")).mount(&server).await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("x"))
+        .mount(&server)
+        .await;
     let ctx = ctx();
     ctx.cancel.cancel();
     let u = multipart_uploader(&format!("{}/up", server.uri()));
@@ -88,7 +96,10 @@ async fn cancelling_before_start_sends_nothing() {
 #[tokio::test]
 async fn multipart_escapes_awkward_file_names_and_keeps_utf8() {
     let server = MockServer::start().await;
-    Mock::given(method("POST")).respond_with(ResponseTemplate::new(200).set_body_string("https://x/1")).mount(&server).await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("https://x/1"))
+        .mount(&server)
+        .await;
     let u = multipart_uploader(&format!("{}/up", server.uri()));
     let name = "we\"ird\r\nname ☃ файл.png";
     let data = vec![b'-'; 100];
@@ -100,13 +111,19 @@ async fn multipart_escapes_awkward_file_names_and_keeps_utf8() {
     assert_eq!(file.filename.as_deref(), Some("we%22ird%0D%0Aname ☃ файл.png"));
     assert_eq!(file.data, data);
     assert_eq!(file.content_type.as_deref(), Some("image/png"));
-    assert_eq!(header(&got, "content-length").map(|v| v.parse::<usize>().unwrap()), Some(got.body.len()));
+    assert_eq!(
+        header(&got, "content-length").map(|v| v.parse::<usize>().unwrap()),
+        Some(got.body.len())
+    );
 }
 
 #[tokio::test]
 async fn text_can_be_uploaded_as_a_file_part_and_from_disk() {
     let server = MockServer::start().await;
-    Mock::given(method("POST")).respond_with(ResponseTemplate::new(200).set_body_string("https://x/t")).mount(&server).await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("https://x/t"))
+        .mount(&server)
+        .await;
     let u = multipart_uploader(&format!("{}/up", server.uri()));
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("note.txt");

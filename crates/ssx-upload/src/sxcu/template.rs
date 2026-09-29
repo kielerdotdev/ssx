@@ -63,7 +63,9 @@ pub enum TemplateError {
         min: usize,
     },
     /// A response-only function used where no response exists (request fields).
-    #[error("function '{0}' can only be used in response templates (URL, ThumbnailURL, DeletionURL, ErrorMessage)")]
+    #[error(
+        "function '{0}' can only be used in response templates (URL, ThumbnailURL, DeletionURL, ErrorMessage)"
+    )]
     NoResponse(String),
     /// Input to `{json:}` is not JSON.
     #[error("expected JSON but the input is not valid JSON: {0}")]
@@ -382,19 +384,97 @@ fn always(_: usize) -> bool {
 
 /// All functions ShareX defines.
 pub const FUNCTIONS: &[FunctionSpec] = &[
-    FunctionSpec { name: "base64", aliases: &[], min_params: 1, needs_response: never, interactive: false },
-    FunctionSpec { name: "filename", aliases: &[], min_params: 0, needs_response: never, interactive: false },
-    FunctionSpec { name: "header", aliases: &[], min_params: 1, needs_response: always, interactive: false },
-    FunctionSpec { name: "input", aliases: &[], min_params: 0, needs_response: never, interactive: false },
-    FunctionSpec { name: "inputbox", aliases: &["prompt"], min_params: 0, needs_response: never, interactive: true },
-    FunctionSpec { name: "json", aliases: &[], min_params: 1, needs_response: |n| n < 2, interactive: false },
-    FunctionSpec { name: "outputbox", aliases: &[], min_params: 1, needs_response: never, interactive: true },
-    FunctionSpec { name: "random", aliases: &[], min_params: 2, needs_response: never, interactive: false },
-    FunctionSpec { name: "regex", aliases: &[], min_params: 1, needs_response: |n| n < 3, interactive: false },
-    FunctionSpec { name: "response", aliases: &[], min_params: 0, needs_response: always, interactive: false },
-    FunctionSpec { name: "responseurl", aliases: &[], min_params: 0, needs_response: always, interactive: false },
-    FunctionSpec { name: "select", aliases: &[], min_params: 1, needs_response: never, interactive: true },
-    FunctionSpec { name: "xml", aliases: &[], min_params: 1, needs_response: |n| n < 2, interactive: false },
+    FunctionSpec {
+        name: "base64",
+        aliases: &[],
+        min_params: 1,
+        needs_response: never,
+        interactive: false,
+    },
+    FunctionSpec {
+        name: "filename",
+        aliases: &[],
+        min_params: 0,
+        needs_response: never,
+        interactive: false,
+    },
+    FunctionSpec {
+        name: "header",
+        aliases: &[],
+        min_params: 1,
+        needs_response: always,
+        interactive: false,
+    },
+    FunctionSpec {
+        name: "input",
+        aliases: &[],
+        min_params: 0,
+        needs_response: never,
+        interactive: false,
+    },
+    FunctionSpec {
+        name: "inputbox",
+        aliases: &["prompt"],
+        min_params: 0,
+        needs_response: never,
+        interactive: true,
+    },
+    FunctionSpec {
+        name: "json",
+        aliases: &[],
+        min_params: 1,
+        needs_response: |n| n < 2,
+        interactive: false,
+    },
+    FunctionSpec {
+        name: "outputbox",
+        aliases: &[],
+        min_params: 1,
+        needs_response: never,
+        interactive: true,
+    },
+    FunctionSpec {
+        name: "random",
+        aliases: &[],
+        min_params: 2,
+        needs_response: never,
+        interactive: false,
+    },
+    FunctionSpec {
+        name: "regex",
+        aliases: &[],
+        min_params: 1,
+        needs_response: |n| n < 3,
+        interactive: false,
+    },
+    FunctionSpec {
+        name: "response",
+        aliases: &[],
+        min_params: 0,
+        needs_response: always,
+        interactive: false,
+    },
+    FunctionSpec {
+        name: "responseurl",
+        aliases: &[],
+        min_params: 0,
+        needs_response: always,
+        interactive: false,
+    },
+    FunctionSpec {
+        name: "select",
+        aliases: &[],
+        min_params: 1,
+        needs_response: never,
+        interactive: true,
+    },
+    FunctionSpec {
+        name: "xml",
+        aliases: &[],
+        min_params: 1,
+        needs_response: |n| n < 2,
+        interactive: false,
+    },
 ];
 
 /// Look a function up by name or alias (case-insensitive).
@@ -416,7 +496,10 @@ fn eval_call(call: &Call, env: &Env<'_>) -> Result<String, TemplateError> {
     };
     let spec = lookup(&name).ok_or_else(|| TemplateError::UnknownFunction(name.clone()))?;
     if args.len() < spec.min_params {
-        return Err(TemplateError::MissingParameters { function: spec.name.to_owned(), min: spec.min_params });
+        return Err(TemplateError::MissingParameters {
+            function: spec.name.to_owned(),
+            min: spec.min_params,
+        });
     }
     if (spec.needs_response)(args.len()) && env.response.is_none() {
         return Err(TemplateError::NoResponse(spec.name.to_owned()));
@@ -424,8 +507,11 @@ fn eval_call(call: &Call, env: &Env<'_>) -> Result<String, TemplateError> {
     let response = env.response;
     let resp_text = || response.map(|r| r.text.as_str()).unwrap_or_default();
     let out: Option<String> = match spec.name {
-        "base64" => Some(base64::engine::general_purpose::STANDARD.encode(args[0].as_bytes())).filter(|_| !args[0].is_empty()),
-        "filename" => Some(if env.url_encode { url_encode(env.file_name) } else { env.file_name.to_owned() }),
+        "base64" => Some(base64::engine::general_purpose::STANDARD.encode(args[0].as_bytes()))
+            .filter(|_| !args[0].is_empty()),
+        "filename" => {
+            Some(if env.url_encode { url_encode(env.file_name) } else { env.file_name.to_owned() })
+        }
         "input" => Some(if env.url_encode { url_encode(env.input) } else { env.input.to_owned() }),
         "header" => response.and_then(|r| r.header(&args[0])),
         "response" => Some(resp_text().to_owned()),
@@ -444,18 +530,30 @@ fn eval_call(call: &Call, env: &Env<'_>) -> Result<String, TemplateError> {
             env.interaction.input_box(title, default)
         }
         "outputbox" => {
-            let (title, text) = if args.len() > 1 { (args[0].as_str(), args[1].as_str()) } else { ("", args[0].as_str()) };
+            let (title, text) = if args.len() > 1 {
+                (args[0].as_str(), args[1].as_str())
+            } else {
+                ("", args[0].as_str())
+            };
             if !text.is_empty() {
                 env.interaction.output_box(if title.is_empty() { "Output" } else { title }, text);
             }
             None
         }
         "json" => {
-            let (input, path) = if args.len() > 1 { (args[0].as_str(), args[1].as_str()) } else { (resp_text(), args[0].as_str()) };
+            let (input, path) = if args.len() > 1 {
+                (args[0].as_str(), args[1].as_str())
+            } else {
+                (resp_text(), args[0].as_str())
+            };
             json_select(input, path)?
         }
         "xml" => {
-            let (input, path) = if args.len() > 1 { (args[0].as_str(), args[1].as_str()) } else { (resp_text(), args[0].as_str()) };
+            let (input, path) = if args.len() > 1 {
+                (args[0].as_str(), args[1].as_str())
+            } else {
+                (resp_text(), args[0].as_str())
+            };
             xml_select(input, path)?
         }
         "regex" => {
@@ -475,7 +573,8 @@ fn json_select(input: &str, path: &str) -> Result<Option<String>, TemplateError>
     if input.is_empty() || path.is_empty() {
         return Ok(None);
     }
-    let doc: serde_json::Value = serde_json::from_str(input).map_err(|e| TemplateError::InvalidJson(e.to_string()))?;
+    let doc: serde_json::Value =
+        serde_json::from_str(input).map_err(|e| TemplateError::InvalidJson(e.to_string()))?;
     Ok(jsonpath::select_first(&doc, path)?.and_then(json_to_string))
 }
 
@@ -495,7 +594,8 @@ fn xml_select(input: &str, xpath: &str) -> Result<Option<String>, TemplateError>
     }
     // sxd-document/sxd-xpath are old and unaudited against hostile input; a panic inside
     // them must not take the upload worker down, so it becomes an ordinary error.
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| xml_select_inner(input, xpath)));
+    let result =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| xml_select_inner(input, xpath)));
     match result {
         Ok(r) => r,
         Err(_) => Err(TemplateError::InvalidXml("the XML engine failed on this document".into())),
@@ -503,9 +603,11 @@ fn xml_select(input: &str, xpath: &str) -> Result<Option<String>, TemplateError>
 }
 
 fn xml_select_inner(input: &str, xpath: &str) -> Result<Option<String>, TemplateError> {
-    let package = sxd_document::parser::parse(input).map_err(|e| TemplateError::InvalidXml(e.to_string()))?;
+    let package =
+        sxd_document::parser::parse(input).map_err(|e| TemplateError::InvalidXml(e.to_string()))?;
     let doc = package.as_document();
-    let value = sxd_xpath::evaluate_xpath(&doc, xpath).map_err(|e| TemplateError::XPath(e.to_string()))?;
+    let value =
+        sxd_xpath::evaluate_xpath(&doc, xpath).map_err(|e| TemplateError::XPath(e.to_string()))?;
     Ok(match value {
         sxd_xpath::Value::Nodeset(ns) => ns.document_order_first().map(|n| n.string_value()),
         other => Some(other.string()),
@@ -538,15 +640,25 @@ fn regex_select(input: &str, pattern: &str, group: &str) -> Result<Option<String
 mod tests {
     use super::*;
 
-    fn env<'a>(resp: Option<&'a TemplateResponse>) -> Env<'a> {
-        Env { file_name: "my file.png", input: "hi there", response: resp, url_encode: false, interaction: &NonInteractive }
+    fn env(resp: Option<&TemplateResponse>) -> Env<'_> {
+        Env {
+            file_name: "my file.png",
+            input: "hi there",
+            response: resp,
+            url_encode: false,
+            interaction: &NonInteractive,
+        }
     }
 
     fn resp(text: &str) -> TemplateResponse {
         TemplateResponse {
             text: text.into(),
             url: "https://final.example/x".into(),
-            headers: vec![("Location".into(), "https://loc/1".into()), ("X-A".into(), "1".into()), ("x-a".into(), "2".into())],
+            headers: vec![
+                ("Location".into(), "https://loc/1".into()),
+                ("X-A".into(), "1".into()),
+                ("x-a".into(), "2".into()),
+            ],
         }
     }
 
@@ -575,7 +687,11 @@ mod tests {
         let mut e = env(None);
         e.url_encode = true;
         assert_eq!(render("{filename}/{input}", &e).unwrap(), "my%20file.png/hi%20there");
-        assert_eq!(render("{FILENAME}", &e).unwrap(), "my%20file.png", "names are case-insensitive");
+        assert_eq!(
+            render("{FILENAME}", &e).unwrap(),
+            "my%20file.png",
+            "names are case-insensitive"
+        );
     }
 
     #[test]
@@ -591,8 +707,14 @@ mod tests {
         assert_eq!(r("{base64:héllo ✓}"), "aMOpbGxvIOKckw==");
         let picked = r("{random:a|b|c}");
         assert!(["a", "b", "c"].contains(&picked.as_str()));
-        assert!(matches!(render("{random:only}", &env(None)), Err(TemplateError::MissingParameters { min: 2, .. })));
-        assert!(matches!(render("{base64}", &env(None)), Err(TemplateError::MissingParameters { .. })));
+        assert!(matches!(
+            render("{random:only}", &env(None)),
+            Err(TemplateError::MissingParameters { min: 2, .. })
+        ));
+        assert!(matches!(
+            render("{base64}", &env(None)),
+            Err(TemplateError::MissingParameters { .. })
+        ));
     }
 
     #[test]
@@ -614,7 +736,9 @@ mod tests {
 
     #[test]
     fn unknown_and_empty_functions() {
-        assert!(matches!(render("{nope}", &env(None)), Err(TemplateError::UnknownFunction(n)) if n == "nope"));
+        assert!(
+            matches!(render("{nope}", &env(None)), Err(TemplateError::UnknownFunction(n)) if n == "nope")
+        );
         assert!(matches!(render("{}", &env(None)), Err(TemplateError::EmptyName)));
         assert!(matches!(render("{:x}", &env(None)), Err(TemplateError::EmptyName)));
     }
@@ -634,7 +758,10 @@ mod tests {
         assert_eq!(rr("[{header:Missing}]", "").unwrap(), "[]");
         assert!(matches!(render("{response}", &env(None)), Err(TemplateError::NoResponse(_))));
         assert!(matches!(render("{json:a}", &env(None)), Err(TemplateError::NoResponse(_))));
-        assert_eq!(render("{json:x|a}", &env(None)).unwrap_err(), TemplateError::InvalidJson("expected value at line 1 column 1".into()));
+        assert_eq!(
+            render("{json:x|a}", &env(None)).unwrap_err(),
+            TemplateError::InvalidJson("expected value at line 1 column 1".into())
+        );
     }
 
     #[test]
@@ -659,7 +786,11 @@ mod tests {
     fn xml_function() {
         let body = "<?xml version=\"1.0\"?><r><files><file><url>http://a/1</url></file><file><url>http://a/2</url></file></files><n>5</n></r>";
         assert_eq!(rr("{xml:/r/files/file[2]/url}", body).unwrap(), "http://a/2");
-        assert_eq!(rr("{xml:/r/files/file/url}", body).unwrap(), "http://a/1", "first node in document order");
+        assert_eq!(
+            rr("{xml:/r/files/file/url}", body).unwrap(),
+            "http://a/1",
+            "first node in document order"
+        );
         assert_eq!(rr("{xml:/r/missing}", body).unwrap(), "");
         assert_eq!(rr("{xml:count(/r/files/file)}", body).unwrap(), "2");
         assert_eq!(rr("{xml:{response}|/r/n}", body).unwrap(), "5");
@@ -670,10 +801,19 @@ mod tests {
     #[test]
     fn regex_function() {
         let html = r#"<a href="https://x.example/f/abc123">dl</a>"#;
-        assert_eq!(rr(r#"{regex:(?<=href=").+?(?=")}"#, html).unwrap(), "https://x.example/f/abc123");
+        assert_eq!(
+            rr(r#"{regex:(?<=href=").+?(?=")}"#, html).unwrap(),
+            "https://x.example/f/abc123"
+        );
         assert_eq!(rr(r#"{regex:href="(.+?)"|1}"#, html).unwrap(), "https://x.example/f/abc123");
-        assert_eq!(rr(r#"{regex:href="(?<url>.+?)"|url}"#, html).unwrap(), "https://x.example/f/abc123");
-        assert_eq!(rr(r#"{regex:{response}|href="(.+?)"|1}"#, html).unwrap(), "https://x.example/f/abc123");
+        assert_eq!(
+            rr(r#"{regex:href="(?<url>.+?)"|url}"#, html).unwrap(),
+            "https://x.example/f/abc123"
+        );
+        assert_eq!(
+            rr(r#"{regex:{response}|href="(.+?)"|1}"#, html).unwrap(),
+            "https://x.example/f/abc123"
+        );
         assert_eq!(rr("{regex:nomatch}", html).unwrap(), "");
         assert_eq!(rr("{regex:href|9}", html).unwrap(), "", "nonexistent group is empty like .NET");
         assert_eq!(rr("{regex:(a)|(b)?|2}", "a").unwrap(), "");
@@ -713,7 +853,13 @@ mod tests {
 
     #[test]
     fn interaction_can_be_injected() {
-        let e = Env { file_name: "", input: "", response: None, url_encode: false, interaction: &Scripted };
+        let e = Env {
+            file_name: "",
+            input: "",
+            response: None,
+            url_encode: false,
+            interaction: &Scripted,
+        };
         assert_eq!(render("{select:a|b|c}{inputbox:T}", &e).unwrap(), "c<T>");
     }
 
@@ -735,7 +881,10 @@ mod tests {
     #[test]
     fn name_parser_runs_before_templates_and_respects_escapes() {
         let names = NameParser { auto_increment: 3, ..NameParser::text() };
-        assert_eq!(render_with_names("n=%i {filename}", &names, &env(None)).unwrap(), "n=3 my file.png");
+        assert_eq!(
+            render_with_names("n=%i {filename}", &names, &env(None)).unwrap(),
+            "n=3 my file.png"
+        );
         assert_eq!(render_with_names(r"\%i %i", &names, &env(None)).unwrap(), "%i 3");
         // A code that expands to template syntax is not re-evaluated as a call.
         assert_eq!(expand_names_keeping_escapes(r"a\{%i\}", &names), r"a\{3\}");

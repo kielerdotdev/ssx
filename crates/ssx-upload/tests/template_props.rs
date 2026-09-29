@@ -6,15 +6,55 @@ use proptest::prelude::*;
 use ssx_upload::nameparser::NameParser;
 use ssx_upload::sxcu::jsonpath;
 use ssx_upload::sxcu::template::{
-    Env, NonInteractive, Template, TemplateResponse, escape_literal, expand_names_keeping_escapes, render, url_encode,
+    Env, NonInteractive, Template, TemplateResponse, escape_literal, expand_names_keeping_escapes,
+    render, url_encode,
 };
 
 /// Strings made of the characters that matter to the template grammar plus function names.
 fn templateish() -> impl Strategy<Value = String> {
     let pieces = prop::sample::select(vec![
-        "{", "}", "|", ":", "\\", "%", "$", "json", "xml", "regex", "base64", "random", "select", "header",
-        "response", "responseurl", "filename", "input", "inputbox", "outputbox", "a", "b", "0", "1", "[", "]",
-        "(", ")", ".", "*", "?", "'", "\"", " ", "日", "é", "\n", "%rn{3}", "%y", "$.a", "{json:a}", "{regex:(a)|1}",
+        "{",
+        "}",
+        "|",
+        ":",
+        "\\",
+        "%",
+        "$",
+        "json",
+        "xml",
+        "regex",
+        "base64",
+        "random",
+        "select",
+        "header",
+        "response",
+        "responseurl",
+        "filename",
+        "input",
+        "inputbox",
+        "outputbox",
+        "a",
+        "b",
+        "0",
+        "1",
+        "[",
+        "]",
+        "(",
+        ")",
+        ".",
+        "*",
+        "?",
+        "'",
+        "\"",
+        " ",
+        "日",
+        "é",
+        "\n",
+        "%rn{3}",
+        "%y",
+        "$.a",
+        "{json:a}",
+        "{regex:(a)|1}",
     ]);
     prop::collection::vec(pieces, 0..40).prop_map(|v| v.concat())
 }
@@ -27,8 +67,14 @@ fn response() -> TemplateResponse {
     }
 }
 
-fn env<'a>(resp: Option<&'a TemplateResponse>, encode: bool) -> Env<'a> {
-    Env { file_name: "f é.png", input: "in put", response: resp, url_encode: encode, interaction: &NonInteractive }
+fn env(resp: Option<&TemplateResponse>, encode: bool) -> Env<'_> {
+    Env {
+        file_name: "f é.png",
+        input: "in put",
+        response: resp,
+        url_encode: encode,
+        interaction: &NonInteractive,
+    }
 }
 
 proptest! {

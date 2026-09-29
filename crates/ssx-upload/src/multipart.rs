@@ -73,8 +73,8 @@ pub fn plan_with_boundary(
         prefix.extend_from_slice(b"\r\n");
     }
     let content_type = format!("multipart/form-data; boundary={boundary}");
-    match file {
-        Some(f) => {
+    if let Some(f) = file {
+        {
             prefix.extend_from_slice(
                 format!(
                     "--{boundary}\r\nContent-Disposition: form-data; name=\"{}\"; filename=\"{}\"\r\nContent-Type: {}\r\n\r\n",
@@ -87,10 +87,9 @@ pub fn plan_with_boundary(
             let suffix = format!("\r\n--{boundary}--\r\n");
             (content_type, BodyPlan::framed(Bytes::from(prefix), f.payload, Bytes::from(suffix)))
         }
-        None => {
-            prefix.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
-            (content_type, BodyPlan::framed(Bytes::from(prefix), Payload::Empty, Bytes::new()))
-        }
+    } else {
+        prefix.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
+        (content_type, BodyPlan::framed(Bytes::from(prefix), Payload::Empty, Bytes::new()))
     }
 }
 

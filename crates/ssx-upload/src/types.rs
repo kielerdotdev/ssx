@@ -96,9 +96,17 @@ impl UploadRequest {
     }
 
     /// Upload in-memory bytes as `kind` under `filename`.
-    pub fn from_bytes(data: impl Into<Bytes>, filename: impl Into<String>, kind: UploadKind) -> Self {
+    pub fn from_bytes(
+        data: impl Into<Bytes>,
+        filename: impl Into<String>,
+        kind: UploadKind,
+    ) -> Self {
         Self {
-            source: UploadSource::Bytes { data: data.into(), filename: filename.into(), mime: None },
+            source: UploadSource::Bytes {
+                data: data.into(),
+                filename: filename.into(),
+                mime: None,
+            },
             kind,
             filename: None,
         }

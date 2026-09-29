@@ -90,8 +90,14 @@ pub fn parse_multipart(content_type: &str, body: &[u8]) -> Vec<Part> {
         let header_end = find(body, b"\r\n\r\n", pos).expect("part headers end");
         let headers = std::str::from_utf8(&body[pos..header_end]).expect("utf8 headers");
         let data_start = header_end + 4;
-        let next = find(body, format!("\r\n{delim}").as_bytes(), data_start).expect("next boundary");
-        let mut part = Part { name: String::new(), filename: None, content_type: None, data: body[data_start..next].to_vec() };
+        let next =
+            find(body, format!("\r\n{delim}").as_bytes(), data_start).expect("next boundary");
+        let mut part = Part {
+            name: String::new(),
+            filename: None,
+            content_type: None,
+            data: body[data_start..next].to_vec(),
+        };
         for line in headers.split("\r\n") {
             let lower = line.to_ascii_lowercase();
             if lower.starts_with("content-disposition:") {
@@ -200,17 +206,19 @@ pub async fn spawn_sink(mode: SinkMode) -> SinkServer {
                 }
                 let len: u64 = head_text
                     .lines()
-                    .find_map(|l| l.strip_prefix("content-length:").map(|v| v.trim().parse().unwrap_or(0)))
+                    .find_map(|l| {
+                        l.strip_prefix("content-length:").map(|v| v.trim().parse().unwrap_or(0))
+                    })
                     .unwrap_or(0);
                 st.lengths.lock().expect("lock").push(len);
                 let mut remaining = len.saturating_sub((head.len() - head_end) as u64);
                 let mut got = (head.len() - head_end) as u64;
                 st.received.fetch_add(got, Relaxed);
                 while remaining > 0 {
-                    if let SinkMode::StallAfter(limit) = mode {
-                        if got >= limit {
-                            std::future::pending::<()>().await;
-                        }
+                    if let SinkMode::StallAfter(limit) = mode
+                        && got >= limit
+                    {
+                        std::future::pending::<()>().await;
                     }
                     let want = usize::try_from(remaining).unwrap_or(usize::MAX).min(buf.len());
                     let n = sock.read(&mut buf[..want]).await.unwrap_or(0);
@@ -224,7 +232,9 @@ pub async fn spawn_sink(mode: SinkMode) -> SinkServer {
                     remaining -= n as u64;
                 }
                 let _ = sock
-                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
+                    )
                     .await;
                 let _ = sock.shutdown().await;
             });

@@ -150,7 +150,9 @@ fn apply<'a>(sel: &Selector, node: &'a Value, out: &mut Vec<&'a Value>) {
             }
         }
         Selector::Index(i) => {
-            if let Some(v) = node.as_array().and_then(|a| resolve_index(a.len(), *i).and_then(|i| a.get(i))) {
+            if let Some(v) =
+                node.as_array().and_then(|a| resolve_index(a.len(), *i).and_then(|i| a.get(i)))
+            {
                 out.push(v);
             }
         }
@@ -262,7 +264,10 @@ impl<'a> Parser<'a> {
     }
 
     fn err<T>(&self, why: impl Into<String>) -> PResult<T> {
-        Err(JsonPathError::Syntax { path: self.src.to_owned(), why: format!("{} (at offset {})", why.into(), self.pos) })
+        Err(JsonPathError::Syntax {
+            path: self.src.to_owned(),
+            why: format!("{} (at offset {})", why.into(), self.pos),
+        })
     }
 
     fn unsupported<T>(&self, what: impl Into<String>) -> PResult<T> {
@@ -441,7 +446,9 @@ impl<'a> Parser<'a> {
             let step = if self.eat(':') { self.parse_int()? } else { None };
             return Ok(Selector::Slice(first, end, step));
         }
-        let Some(first) = first else { return self.err("expected an index, slice, quoted name or '*'") };
+        let Some(first) = first else {
+            return self.err("expected an index, slice, quoted name or '*'");
+        };
         let mut items = vec![Selector::Index(first)];
         loop {
             self.skip_ws();
@@ -532,13 +539,17 @@ impl<'a> Parser<'a> {
                         Some('.') => {
                             self.pos += 1;
                             let start = self.pos;
-                            while self.peek().is_some_and(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+                            while self
+                                .peek()
+                                .is_some_and(|c| c.is_alphanumeric() || c == '_' || c == '-')
+                            {
                                 self.pos += 1;
                             }
                             if start == self.pos {
                                 return self.err("empty property name in filter");
                             }
-                            parts.push(PathPart::Name(self.chars[start..self.pos].iter().collect()));
+                            parts
+                                .push(PathPart::Name(self.chars[start..self.pos].iter().collect()));
                         }
                         Some('[') => {
                             self.pos += 1;
@@ -564,7 +575,10 @@ impl<'a> Parser<'a> {
             Some(c) if c.is_ascii_digit() || c == '-' => {
                 let start = self.pos;
                 self.pos += 1;
-                while self.peek().is_some_and(|c| c.is_ascii_digit() || matches!(c, '.' | 'e' | 'E' | '+' | '-')) {
+                while self
+                    .peek()
+                    .is_some_and(|c| c.is_ascii_digit() || matches!(c, '.' | 'e' | 'E' | '+' | '-'))
+                {
                     self.pos += 1;
                 }
                 let s: String = self.chars[start..self.pos].iter().collect();
@@ -635,9 +649,15 @@ mod tests {
             {"n": "b", "size": 30, "ok": false},
             {"n": "c", "size": 50}
         ]});
-        assert_eq!(select_all(&v, "items[?(@.size > 20)].n").unwrap(), vec![&json!("b"), &json!("c")]);
+        assert_eq!(
+            select_all(&v, "items[?(@.size > 20)].n").unwrap(),
+            vec![&json!("b"), &json!("c")]
+        );
         assert_eq!(select_all(&v, "items[?(@.n == 'a' || @.n == \"c\")].n").unwrap().len(), 2);
-        assert_eq!(select_all(&v, "items[?(@.size >= 10 && @.ok == true)].n").unwrap(), vec![&json!("a")]);
+        assert_eq!(
+            select_all(&v, "items[?(@.size >= 10 && @.ok == true)].n").unwrap(),
+            vec![&json!("a")]
+        );
         assert_eq!(select_all(&v, "items[?(@.ok)].n").unwrap().len(), 2, "existence test");
         assert_eq!(select_all(&v, "items[?(!@.ok)].n").unwrap(), vec![&json!("c")]);
         assert_eq!(select_all(&v, "items[?(@.n != 'a')].n").unwrap().len(), 2);
@@ -646,11 +666,19 @@ mod tests {
     #[test]
     fn errors_are_reported_not_panics() {
         let v = json!({});
-        for bad in ["a[", "a[1", "a['x", "a[?(@.x", "a[?(@.x ==)]", "a..", "a[]", "a[1:2:x]", "a.[0]"] {
+        for bad in
+            ["a[", "a[1", "a['x", "a[?(@.x", "a[?(@.x ==)]", "a..", "a[]", "a[1:2:x]", "a.[0]"]
+        {
             assert!(select_all(&v, bad).is_err(), "{bad} should be an error");
         }
-        assert!(matches!(select_all(&v, "a[(@.length-1)]"), Err(JsonPathError::Unsupported { .. })));
-        assert!(matches!(select_all(&v, "a[?(@.x =~ /a/)]"), Err(JsonPathError::Unsupported { .. })));
+        assert!(matches!(
+            select_all(&v, "a[(@.length-1)]"),
+            Err(JsonPathError::Unsupported { .. })
+        ));
+        assert!(matches!(
+            select_all(&v, "a[?(@.x =~ /a/)]"),
+            Err(JsonPathError::Unsupported { .. })
+        ));
     }
 
     #[test]

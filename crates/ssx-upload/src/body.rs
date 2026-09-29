@@ -111,7 +111,11 @@ impl BodyPlan {
                 let file = tokio::fs::File::open(&path)
                     .await
                     .map_err(|e| UploadError::io(format!("opening {}", path.display()), e))?;
-                Source::File { reader: ReaderStream::with_capacity(file, CHUNK), expected: len, read: 0 }
+                Source::File {
+                    reader: ReaderStream::with_capacity(file, CHUNK),
+                    expected: len,
+                    read: 0,
+                }
             }
         };
         let progress: Arc<dyn ProgressSink> =
@@ -161,32 +165,33 @@ struct Streamer {
 }
 
 impl Streamer {
-    fn emit(&mut self, chunk: Bytes) -> Option<std::io::Result<Bytes>> {
+    fn emit(&mut self, chunk: Bytes) -> Bytes {
         self.sent += chunk.len() as u64;
         self.progress.report(self.sent, Some(self.total));
-        Some(Ok(chunk))
+        chunk
     }
 
-    fn fail(&mut self, e: std::io::Error, record: bool) -> Option<std::io::Result<Bytes>> {
+    fn fail(&mut self, e: std::io::Error, record: bool) -> std::io::Error {
         self.stage = Stage::Done;
         let out = std::io::Error::new(e.kind(), e.to_string());
         if record {
             self.fault.set(e);
         }
-        Some(Err(out))
+        out
     }
 
     async fn next_chunk(&mut self) -> Option<std::io::Result<Bytes>> {
         loop {
             if self.stage != Stage::Done && self.cancel.is_cancelled() {
-                return self.fail(std::io::Error::new(std::io::ErrorKind::Interrupted, "cancelled"), false);
+                let e = std::io::Error::new(std::io::ErrorKind::Interrupted, "cancelled");
+                return Some(Err(self.fail(e, false)));
             }
             match self.stage {
                 Stage::Prefix => {
                     self.stage = Stage::Payload;
                     if !self.prefix.is_empty() {
                         let p = std::mem::take(&mut self.prefix);
-                        return self.emit(p);
+                        return Some(Ok(self.emit(p)));
                     }
                 }
                 Stage::Payload => match &mut self.source {
@@ -196,7 +201,7 @@ impl Streamer {
                         } else {
                             let n = b.len().min(CHUNK);
                             let chunk = b.split_to(n);
-                            return self.emit(chunk);
+                            return Some(Ok(self.emit(chunk)));
                         }
                     }
                     Source::File { reader, expected, read } => match reader.next().await {
@@ -204,18 +209,18 @@ impl Streamer {
                             *read += chunk.len() as u64;
                             if *read > *expected {
                                 let e = std::io::Error::other("file grew while uploading");
-                                return self.fail(e, true);
+                                return Some(Err(self.fail(e, true)));
                             }
-                            return self.emit(chunk);
+                            return Some(Ok(self.emit(chunk)));
                         }
-                        Some(Err(e)) => return self.fail(e, true),
+                        Some(Err(e)) => return Some(Err(self.fail(e, true))),
                         None => {
                             if *read != *expected {
                                 let e = std::io::Error::new(
                                     std::io::ErrorKind::UnexpectedEof,
                                     "file shrank while uploading",
                                 );
-                                return self.fail(e, true);
+                                return Some(Err(self.fail(e, true)));
                             }
                             self.stage = Stage::Suffix;
                         }
@@ -227,7 +232,7 @@ impl Streamer {
                         let s = std::mem::take(&mut self.suffix);
                         let out = self.emit(s);
                         self.progress.report(self.sent, Some(self.total));
-                        return out;
+                        return Some(Ok(out));
                     }
                     self.progress.report(self.sent, Some(self.total));
                 }

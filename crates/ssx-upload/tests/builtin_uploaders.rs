@@ -11,7 +11,8 @@ use ssx_upload::imgur::{ImgurConfig, ImgurUploader};
 use ssx_upload::local::LocalUploader;
 use ssx_upload::shorten::{HttpShortener, HttpShortenerConfig, ShortenMethod, ShortenResponse};
 use ssx_upload::{
-    InMemorySecretStore, SecretStore, ShorteningUploader, UploadError, UploadKind, UploadRequest, Uploader, UrlShortener,
+    InMemorySecretStore, SecretStore, ShorteningUploader, UploadError, UploadKind, UploadRequest,
+    Uploader, UrlShortener,
 };
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -33,7 +34,11 @@ const IMGUR_OK: &str = r#"{"data":{"id":"AbC123x","deletehash":"DELhash","link":
 #[tokio::test]
 async fn imgur_anonymous_image_upload() {
     let server = MockServer::start().await;
-    Mock::given(method("POST")).and(path("/3/image")).respond_with(ResponseTemplate::new(200).set_body_string(IMGUR_OK)).mount(&server).await;
+    Mock::given(method("POST"))
+        .and(path("/3/image"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(IMGUR_OK))
+        .mount(&server)
+        .await;
     let mut cfg = ImgurConfig::anonymous("client123");
     cfg.title = Some("My shot".into());
     cfg.album = Some("albumhash".into());
@@ -65,7 +70,10 @@ async fn imgur_video_uses_the_upload_endpoint_and_bearer_tokens_come_from_the_st
     let video = UploadRequest::from_bytes(vec![0u8; 100], "clip.mp4", UploadKind::Video);
 
     let ctx_no_secret = ctx().with_secrets(store.clone());
-    assert!(matches!(up.upload(&video, &ctx_no_secret).await, Err(UploadError::Auth { .. })), "missing token is an Auth error");
+    assert!(
+        matches!(up.upload(&video, &ctx_no_secret).await, Err(UploadError::Auth { .. })),
+        "missing token is an Auth error"
+    );
     assert!(server.received_requests().await.unwrap().is_empty());
 
     store.set("imgur.token", "tok-1").unwrap();
@@ -82,24 +90,63 @@ async fn imgur_video_uses_the_upload_endpoint_and_bearer_tokens_come_from_the_st
 async fn imgur_errors_are_mapped() {
     let server = MockServer::start().await;
     let up = imgur(&server, ImgurConfig::anonymous("c"));
-    let fail = |status: u16, body: &str| ResponseTemplate::new(status).set_body_string(body.to_owned());
+    let fail =
+        |status: u16, body: &str| ResponseTemplate::new(status).set_body_string(body.to_owned());
 
     Mock::given(method("POST")).respond_with(fail(400, r#"{"data":{"error":{"message":"Invalid URL","code":1003}},"success":false,"status":400}"#)).up_to_n_times(1).mount(&server).await;
     match up.upload(&png(), &ctx()).await.expect_err("400") {
-        UploadError::Http { status: 400, message, .. } => assert_eq!(message.as_deref(), Some("Invalid URL")),
+        UploadError::Http { status: 400, message, .. } => {
+            assert_eq!(message.as_deref(), Some("Invalid URL"));
+        }
         other => panic!("{other:?}"),
     }
-    Mock::given(method("POST")).respond_with(fail(429, "{}").insert_header("Retry-After", "42")).up_to_n_times(1).mount(&server).await;
-    assert!(matches!(up.upload(&png(), &ctx()).await, Err(UploadError::RateLimited { retry_after: Some(d) }) if d == Duration::from_secs(42)));
-    Mock::given(method("POST")).respond_with(fail(429, "{}").insert_header("X-RateLimit-UserReset", "90")).up_to_n_times(1).mount(&server).await;
-    assert!(matches!(up.upload(&png(), &ctx()).await, Err(UploadError::RateLimited { retry_after: Some(d) }) if d == Duration::from_secs(90)));
-    Mock::given(method("POST")).respond_with(fail(403, r#"{"data":{"error":"Invalid client_id"},"success":false,"status":403}"#)).up_to_n_times(1).mount(&server).await;
-    assert!(matches!(up.upload(&png(), &ctx()).await, Err(UploadError::Auth { message }) if message.contains("Invalid client_id")));
-    Mock::given(method("POST")).respond_with(fail(200, r#"{"data":{"error":"soft failure"},"success":false,"status":400}"#)).up_to_n_times(1).mount(&server).await;
+    Mock::given(method("POST"))
+        .respond_with(fail(429, "{}").insert_header("Retry-After", "42"))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    assert!(
+        matches!(up.upload(&png(), &ctx()).await, Err(UploadError::RateLimited { retry_after: Some(d) }) if d == Duration::from_secs(42))
+    );
+    Mock::given(method("POST"))
+        .respond_with(fail(429, "{}").insert_header("X-RateLimit-UserReset", "90"))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    assert!(
+        matches!(up.upload(&png(), &ctx()).await, Err(UploadError::RateLimited { retry_after: Some(d) }) if d == Duration::from_secs(90))
+    );
+    Mock::given(method("POST"))
+        .respond_with(fail(
+            403,
+            r#"{"data":{"error":"Invalid client_id"},"success":false,"status":403}"#,
+        ))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    assert!(
+        matches!(up.upload(&png(), &ctx()).await, Err(UploadError::Auth { message }) if message.contains("Invalid client_id"))
+    );
+    Mock::given(method("POST"))
+        .respond_with(fail(
+            200,
+            r#"{"data":{"error":"soft failure"},"success":false,"status":400}"#,
+        ))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
     assert!(matches!(up.upload(&png(), &ctx()).await, Err(UploadError::Http { status: 400, .. })));
-    Mock::given(method("POST")).respond_with(fail(200, r#"{"data":{},"success":true,"status":200}"#)).up_to_n_times(1).mount(&server).await;
+    Mock::given(method("POST"))
+        .respond_with(fail(200, r#"{"data":{},"success":true,"status":200}"#))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
     assert!(matches!(up.upload(&png(), &ctx()).await, Err(UploadError::InvalidResponse { .. })));
-    Mock::given(method("POST")).respond_with(fail(200, "<html>")).up_to_n_times(1).mount(&server).await;
+    Mock::given(method("POST"))
+        .respond_with(fail(200, "<html>"))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
     assert!(matches!(up.upload(&png(), &ctx()).await, Err(UploadError::InvalidResponse { .. })));
 }
 
@@ -118,19 +165,34 @@ mod s3 {
 
     /// Recompute the signature from the request the server actually received, using only
     /// the SigV4 primitives (which are verified against AWS's vectors), and compare.
-    fn assert_signature_valid(req: &wiremock::Request, secret: &str, access_key: &str, region: &str) {
+    fn assert_signature_valid(
+        req: &wiremock::Request,
+        secret: &str,
+        access_key: &str,
+        region: &str,
+    ) {
         let auth = header(req, "authorization").expect("authorization header");
         let signed_names = auth.split("SignedHeaders=").nth(1).unwrap().split(',').next().unwrap();
         let headers: Vec<(String, String)> = signed_names
             .split(';')
             .map(|n| {
-                let v = header(req, n).unwrap_or_else(|| panic!("signed header {n} missing from request"));
+                let v = header(req, n)
+                    .unwrap_or_else(|| panic!("signed header {n} missing from request"));
                 (n.to_owned(), v)
             })
             .collect();
-        let time = chrono::NaiveDateTime::parse_from_str(&header(req, "x-amz-date").unwrap(), "%Y%m%dT%H%M%SZ").unwrap().and_utc();
+        let time = chrono::NaiveDateTime::parse_from_str(
+            &header(req, "x-amz-date").unwrap(),
+            "%Y%m%dT%H%M%SZ",
+        )
+        .unwrap()
+        .and_utc();
         let expected = sigv4::sign(
-            &Credentials { access_key_id: access_key.into(), secret_access_key: secret.into(), session_token: None },
+            &Credentials {
+                access_key_id: access_key.into(),
+                secret_access_key: secret.into(),
+                session_token: None,
+            },
             &SigningInput {
                 method: req.method.as_str(),
                 path: req.url.path(),
@@ -147,7 +209,8 @@ mod s3 {
     }
 
     fn uploader(server: &MockServer, tweak: impl FnOnce(&mut S3Config)) -> S3Uploader {
-        let mut cfg = S3Config::minio(&server.uri(), "pics").with_static_credentials("AKIATEST", "s3cr3t/KEY");
+        let mut cfg = S3Config::minio(&server.uri(), "pics")
+            .with_static_credentials("AKIATEST", "s3cr3t/KEY");
         tweak(&mut cfg);
         S3Uploader::new(cfg).expect("s3").with_clock(fixed_clock())
     }
@@ -155,7 +218,10 @@ mod s3 {
     #[tokio::test]
     async fn put_object_is_signed_and_carries_the_configured_headers() {
         let server = MockServer::start().await;
-        Mock::given(method("PUT")).respond_with(ResponseTemplate::new(200).insert_header("ETag", "\"abc123\"")).mount(&server).await;
+        Mock::given(method("PUT"))
+            .respond_with(ResponseTemplate::new(200).insert_header("ETag", "\"abc123\""))
+            .mount(&server)
+            .await;
         let up = uploader(&server, |c| {
             c.key_prefix = "shots/".into();
             c.acl = Some("public-read".into());
@@ -180,11 +246,23 @@ mod s3 {
         assert_eq!(header(&got, "x-amz-content-sha256"), Some(sigv4::sha256_hex(&data)));
         let auth = header(&got, "authorization").unwrap();
         assert!(auth.starts_with("AWS4-HMAC-SHA256 Credential=AKIATEST/20240517/us-east-1/s3/aws4_request, SignedHeaders="), "{auth}");
-        for h in ["host", "x-amz-acl", "x-amz-content-sha256", "x-amz-date", "x-amz-storage-class", "cache-control", "content-type", "x-amz-meta-origin"] {
+        for h in [
+            "host",
+            "x-amz-acl",
+            "x-amz-content-sha256",
+            "x-amz-date",
+            "x-amz-storage-class",
+            "cache-control",
+            "content-type",
+            "x-amz-meta-origin",
+        ] {
             assert!(auth.contains(h), "{h} must be signed: {auth}");
         }
         assert_signature_valid(&got, "s3cr3t/KEY", "AKIATEST", "us-east-1");
-        assert_eq!(header(&got, "content-length").map(|v| v.parse::<usize>().unwrap()), Some(data.len()));
+        assert_eq!(
+            header(&got, "content-length").map(|v| v.parse::<usize>().unwrap()),
+            Some(data.len())
+        );
 
         assert!(res.url.ends_with("/pics/shots/my%20shot%20%C3%BC.png"), "{}", res.url);
         assert_eq!(res.extra["etag"], "abc123");
@@ -204,8 +282,18 @@ mod s3 {
         let file = dir.path().join("clip.mp4");
         std::fs::write(&file, vec![9u8; 200_000]).unwrap();
         let rec = Recorder::new();
-        let res = up.upload(&UploadRequest::from_path(&file, UploadKind::Video), &ctx().with_progress(rec.clone())).await.expect("upload");
-        assert!(res.url.starts_with("https://cdn.example.com/20") && res.url.ends_with("/clip.mp4"), "{}", res.url);
+        let res = up
+            .upload(
+                &UploadRequest::from_path(&file, UploadKind::Video),
+                &ctx().with_progress(rec.clone()),
+            )
+            .await
+            .expect("upload");
+        assert!(
+            res.url.starts_with("https://cdn.example.com/20") && res.url.ends_with("/clip.mp4"),
+            "{}",
+            res.url
+        );
         let got = only_request(&server).await;
         assert_eq!(header(&got, "x-amz-content-sha256").as_deref(), Some("UNSIGNED-PAYLOAD"));
         assert_signature_valid(&got, "s3cr3t/KEY", "AKIATEST", "us-east-1");
@@ -218,7 +306,8 @@ mod s3 {
         let server = MockServer::start().await;
         Mock::given(method("PUT")).respond_with(ResponseTemplate::new(200)).mount(&server).await;
         let store = Arc::new(InMemorySecretStore::new());
-        let mut cfg = S3Config::minio(&server.uri(), "pics").with_stored_credentials("s3.id", "s3.secret");
+        let mut cfg =
+            S3Config::minio(&server.uri(), "pics").with_stored_credentials("s3.id", "s3.secret");
         cfg.payload_signing = PayloadSigning::Hashed;
         let up = S3Uploader::new(cfg).unwrap().with_clock(fixed_clock());
         let c = ctx().with_secrets(store.clone());
@@ -228,7 +317,9 @@ mod s3 {
         std::fs::write(&file, &data).unwrap();
         let req = UploadRequest::from_path(&file, UploadKind::File);
 
-        assert!(matches!(up.upload(&req, &c).await, Err(UploadError::Auth { message }) if message.contains("s3.id")));
+        assert!(
+            matches!(up.upload(&req, &c).await, Err(UploadError::Auth { message }) if message.contains("s3.id"))
+        );
         store.set("s3.id", "AKIASTORED").unwrap();
         store.set("s3.secret", "stored/secret").unwrap();
         up.upload(&req, &c).await.expect("upload");
@@ -242,17 +333,55 @@ mod s3 {
         let server = MockServer::start().await;
         let up = uploader(&server, |_| {});
         let req = UploadRequest::from_bytes(vec![1], "a.png", UploadKind::Image);
-        let xml = |code: &str, msg: &str| format!("<?xml version=\"1.0\"?><Error><Code>{code}</Code><Message>{msg}</Message></Error>");
-        Mock::given(method("PUT")).respond_with(ResponseTemplate::new(403).set_body_string(xml("SignatureDoesNotMatch", "bad sig"))).up_to_n_times(1).mount(&server).await;
-        assert!(matches!(up.upload(&req, &ctx()).await, Err(UploadError::Auth { message }) if message.contains("SignatureDoesNotMatch")));
-        Mock::given(method("PUT")).respond_with(ResponseTemplate::new(404).set_body_string(xml("NoSuchBucket", "The specified bucket does not exist"))).up_to_n_times(1).mount(&server).await;
-        assert!(matches!(up.upload(&req, &ctx()).await, Err(UploadError::Config { message }) if message.contains("bucket")));
-        Mock::given(method("PUT")).respond_with(ResponseTemplate::new(503).set_body_string(xml("SlowDown", "Please reduce your request rate.")).insert_header("Retry-After", "2")).up_to_n_times(1).mount(&server).await;
-        assert!(matches!(up.upload(&req, &ctx()).await, Err(UploadError::RateLimited { retry_after: Some(d) }) if d == Duration::from_secs(2)));
-        Mock::given(method("PUT")).respond_with(ResponseTemplate::new(500).set_body_string(xml("InternalError", "oops"))).up_to_n_times(1).mount(&server).await;
+        let xml = |code: &str, msg: &str| {
+            format!(
+                "<?xml version=\"1.0\"?><Error><Code>{code}</Code><Message>{msg}</Message></Error>"
+            )
+        };
+        Mock::given(method("PUT"))
+            .respond_with(
+                ResponseTemplate::new(403).set_body_string(xml("SignatureDoesNotMatch", "bad sig")),
+            )
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        assert!(
+            matches!(up.upload(&req, &ctx()).await, Err(UploadError::Auth { message }) if message.contains("SignatureDoesNotMatch"))
+        );
+        Mock::given(method("PUT"))
+            .respond_with(
+                ResponseTemplate::new(404)
+                    .set_body_string(xml("NoSuchBucket", "The specified bucket does not exist")),
+            )
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        assert!(
+            matches!(up.upload(&req, &ctx()).await, Err(UploadError::Config { message }) if message.contains("bucket"))
+        );
+        Mock::given(method("PUT"))
+            .respond_with(
+                ResponseTemplate::new(503)
+                    .set_body_string(xml("SlowDown", "Please reduce your request rate."))
+                    .insert_header("Retry-After", "2"),
+            )
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        assert!(
+            matches!(up.upload(&req, &ctx()).await, Err(UploadError::RateLimited { retry_after: Some(d) }) if d == Duration::from_secs(2))
+        );
+        Mock::given(method("PUT"))
+            .respond_with(ResponseTemplate::new(500).set_body_string(xml("InternalError", "oops")))
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
         let e = up.upload(&req, &ctx()).await.unwrap_err();
         assert!(e.is_retryable() && e.to_string().contains("InternalError"), "{e}");
-        assert!(matches!(up.upload(&UploadRequest::url("http://x"), &ctx()).await, Err(UploadError::Unsupported { .. })));
+        assert!(matches!(
+            up.upload(&UploadRequest::url("http://x"), &ctx()).await,
+            Err(UploadError::Unsupported { .. })
+        ));
     }
 }
 
@@ -262,7 +391,8 @@ mod s3 {
 async fn http_put_with_basic_auth_from_the_secret_store() {
     let server = MockServer::start().await;
     Mock::given(method("PUT")).respond_with(ResponseTemplate::new(201)).mount(&server).await;
-    let mut cfg = HttpUploaderConfig::put("WebDAV", &format!("{}/dav/{{stem}}-x.{{ext}}", server.uri()));
+    let mut cfg =
+        HttpUploaderConfig::put("WebDAV", &format!("{}/dav/{{stem}}-x.{{ext}}", server.uri()));
     cfg.auth = HttpAuth::Basic { username: "alice".into(), secret_key: "dav.pw".into() };
     cfg.headers.push(("X-Custom".into(), "v".into()));
     let up = HttpUploader::new(cfg).expect("uploader");
@@ -285,23 +415,65 @@ async fn http_put_with_basic_auth_from_the_secret_store() {
 #[tokio::test]
 async fn http_post_multipart_with_result_extraction_variants() {
     let server = MockServer::start().await;
-    Mock::given(method("POST")).and(path("/json")).respond_with(ResponseTemplate::new(200).set_body_string(r#"{"data":{"link":"https://h/1"}}"#)).mount(&server).await;
-    Mock::given(method("POST")).and(path("/hdr")).respond_with(ResponseTemplate::new(201).insert_header("Location", "https://h/2")).mount(&server).await;
-    Mock::given(method("POST")).and(path("/body")).respond_with(ResponseTemplate::new(200).set_body_string("  https://h/3\n")).mount(&server).await;
-    Mock::given(method("POST")).and(path("/empty")).respond_with(ResponseTemplate::new(200).set_body_string("{}")).mount(&server).await;
+    Mock::given(method("POST"))
+        .and(path("/json"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(r#"{"data":{"link":"https://h/1"}}"#),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/hdr"))
+        .respond_with(ResponseTemplate::new(201).insert_header("Location", "https://h/2"))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/body"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("  https://h/3\n"))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/empty"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{}"))
+        .mount(&server)
+        .await;
 
     let mk = |p: &str, result: ResultUrl| {
-        let mut cfg = HttpUploaderConfig::post_multipart("m", &format!("{}{p}", server.uri()), "upload");
-        cfg.body = HttpBody::Multipart { field: "upload".into(), fields: vec![("name".into(), "{filename}".into())] };
+        let mut cfg =
+            HttpUploaderConfig::post_multipart("m", &format!("{}{p}", server.uri()), "upload");
+        cfg.body = HttpBody::Multipart {
+            field: "upload".into(),
+            fields: vec![("name".into(), "{filename}".into())],
+        };
         cfg.result = result;
         HttpUploader::new(cfg).unwrap()
     };
     let req = UploadRequest::from_bytes(b"x".to_vec(), "a.txt", UploadKind::File);
-    assert_eq!(mk("/json", ResultUrl::JsonPointer("/data/link".into())).upload(&req, &ctx()).await.unwrap().url, "https://h/1");
-    assert_eq!(mk("/hdr", ResultUrl::Header("location".into())).upload(&req, &ctx()).await.unwrap().url, "https://h/2");
+    assert_eq!(
+        mk("/json", ResultUrl::JsonPointer("/data/link".into()))
+            .upload(&req, &ctx())
+            .await
+            .unwrap()
+            .url,
+        "https://h/1"
+    );
+    assert_eq!(
+        mk("/hdr", ResultUrl::Header("location".into())).upload(&req, &ctx()).await.unwrap().url,
+        "https://h/2"
+    );
     assert_eq!(mk("/body", ResultUrl::Body).upload(&req, &ctx()).await.unwrap().url, "https://h/3");
-    assert_eq!(mk("/json", ResultUrl::Template("https://cdn/{filename}".into())).upload(&req, &ctx()).await.unwrap().url, "https://cdn/a.txt");
-    assert!(matches!(mk("/empty", ResultUrl::JsonPointer("/data/link".into())).upload(&req, &ctx()).await, Err(UploadError::InvalidResponse { .. })));
+    assert_eq!(
+        mk("/json", ResultUrl::Template("https://cdn/{filename}".into()))
+            .upload(&req, &ctx())
+            .await
+            .unwrap()
+            .url,
+        "https://cdn/a.txt"
+    );
+    assert!(matches!(
+        mk("/empty", ResultUrl::JsonPointer("/data/link".into())).upload(&req, &ctx()).await,
+        Err(UploadError::InvalidResponse { .. })
+    ));
     let all = server.received_requests().await.unwrap();
     let parts = multipart_of(&all[0]);
     assert_eq!(parts[0].name, "name");
@@ -314,9 +486,23 @@ async fn http_post_multipart_with_result_extraction_variants() {
 #[tokio::test]
 async fn presets_and_configurable_shorteners() {
     let server = MockServer::start().await;
-    Mock::given(method("GET")).and(path("/create.php")).respond_with(ResponseTemplate::new(200).set_body_string("https://is.gd/xyz\n")).mount(&server).await;
-    Mock::given(method("GET")).and(path("/api-create.php")).respond_with(ResponseTemplate::new(200).set_body_string("https://tinyurl.com/abc")).mount(&server).await;
-    Mock::given(method("POST")).and(path("/yourls")).respond_with(ResponseTemplate::new(200).set_body_string(r#"{"shorturl":"https://sho.rt/q"}"#)).mount(&server).await;
+    Mock::given(method("GET"))
+        .and(path("/create.php"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("https://is.gd/xyz\n"))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/api-create.php"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("https://tinyurl.com/abc"))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/yourls"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(r#"{"shorturl":"https://sho.rt/q"}"#),
+        )
+        .mount(&server)
+        .await;
 
     let long = "https://example.com/some path?a=1&b=2";
     let isgd = HttpShortener::is_gd(Some(&format!("{}/create.php", server.uri())));
@@ -336,25 +522,53 @@ async fn presets_and_configurable_shorteners() {
     assert_eq!(yourls.shorten(long, &ctx()).await.unwrap(), "https://sho.rt/q");
 
     let all = server.received_requests().await.unwrap();
-    let q: Vec<(String, String)> = all[0].url.query_pairs().map(|(k, v)| (k.into_owned(), v.into_owned())).collect();
+    let q: Vec<(String, String)> =
+        all[0].url.query_pairs().map(|(k, v)| (k.into_owned(), v.into_owned())).collect();
     assert_eq!(q, vec![("format".into(), "simple".into()), ("url".into(), long.into())]);
-    let form: Vec<(String, String)> = url::form_urlencoded::parse(&all[2].body).map(|(k, v)| (k.into_owned(), v.into_owned())).collect();
-    assert!(form.contains(&("url".into(), long.into())) && form.contains(&("action".into(), "shorturl".into())));
+    let form: Vec<(String, String)> = url::form_urlencoded::parse(&all[2].body)
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    assert!(
+        form.contains(&("url".into(), long.into()))
+            && form.contains(&("action".into(), "shorturl".into()))
+    );
 
     assert!(matches!(isgd.shorten("not a url", &ctx()).await, Err(UploadError::Config { .. })));
-    assert!(HttpShortener::new(HttpShortenerConfig { endpoint: "ftp://x".into(), ..HttpShortenerConfig { name: "n".into(), endpoint: String::new(), method: ShortenMethod::Get, url_param: "url".into(), params: vec![], headers: vec![], response: ShortenResponse::PlainText } }).is_err());
+    assert!(
+        HttpShortener::new(HttpShortenerConfig {
+            endpoint: "ftp://x".into(),
+            ..HttpShortenerConfig {
+                name: "n".into(),
+                endpoint: String::new(),
+                method: ShortenMethod::Get,
+                url_param: "url".into(),
+                params: vec![],
+                headers: vec![],
+                response: ShortenResponse::PlainText
+            }
+        })
+        .is_err()
+    );
 }
 
 #[tokio::test]
 async fn shortener_errors_and_fail_open_chain() {
     let server = MockServer::start().await;
-    Mock::given(method("GET")).respond_with(ResponseTemplate::new(400).set_body_string("Error: Please enter a valid URL to shorten")).mount(&server).await;
+    Mock::given(method("GET"))
+        .respond_with(
+            ResponseTemplate::new(400)
+                .set_body_string("Error: Please enter a valid URL to shorten"),
+        )
+        .mount(&server)
+        .await;
     let bad = Arc::new(HttpShortener::is_gd(Some(&format!("{}/create.php", server.uri()))));
     let e = bad.shorten("https://example.com", &ctx()).await.unwrap_err();
     assert!(e.to_string().contains("Please enter a valid URL"), "{e}");
 
     let dir = tempfile::tempdir().unwrap();
-    let inner: Arc<dyn Uploader> = Arc::new(LocalUploader::to_directory(dir.path()).with_base_url("https://files.example.com/u"));
+    let inner: Arc<dyn Uploader> = Arc::new(
+        LocalUploader::to_directory(dir.path()).with_base_url("https://files.example.com/u"),
+    );
     let open = ShorteningUploader::new(inner.clone(), bad.clone());
     let res = open.upload(&png(), &ctx()).await.expect("fails open");
     assert_eq!(res.url, "https://files.example.com/u/shot.png");
@@ -363,13 +577,21 @@ async fn shortener_errors_and_fail_open_chain() {
     assert!(closed.upload(&png(), &ctx()).await.is_err());
 
     server.reset().await;
-    Mock::given(method("GET")).respond_with(ResponseTemplate::new(200).set_body_string("https://is.gd/ok")).mount(&server).await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("https://is.gd/ok"))
+        .mount(&server)
+        .await;
     let good = Arc::new(HttpShortener::is_gd(Some(&format!("{}/create.php", server.uri()))));
     let res = ShorteningUploader::new(inner, good).upload(&png(), &ctx()).await.unwrap();
     assert_eq!(res.url, "https://is.gd/ok");
-    assert_eq!(res.extra["original_url"], "https://files.example.com/u/shot-2.png", "earlier uploads in this folder took shot.png and shot-1.png");
+    assert_eq!(
+        res.extra["original_url"], "https://files.example.com/u/shot-2.png",
+        "earlier uploads in this folder took shot.png and shot-1.png"
+    );
     let q = only_request(&server).await;
-    assert!(q.url.query().unwrap().contains("url=https%3A%2F%2Ffiles.example.com%2Fu%2Fshot-2.png"));
+    assert!(
+        q.url.query().unwrap().contains("url=https%3A%2F%2Ffiles.example.com%2Fu%2Fshot-2.png")
+    );
 }
 
 // ----------------------------------------------------------------- local

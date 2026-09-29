@@ -147,7 +147,9 @@ impl ImgurUploader {
             ImgurAuth::BearerStored { secret_key } => secret_key.trim().is_empty(),
         };
         if empty {
-            return Err(UploadError::config("Imgur needs a client id (anonymous) or an access token"));
+            return Err(UploadError::config(
+                "Imgur needs a client id (anonymous) or an access token",
+            ));
         }
         let name = match cfg.auth {
             ImgurAuth::Anonymous { .. } => "Imgur (anonymous)",
@@ -160,7 +162,9 @@ impl ImgurUploader {
         Ok(match &self.cfg.auth {
             ImgurAuth::Anonymous { client_id } => format!("Client-ID {}", client_id.trim()),
             ImgurAuth::Bearer { access_token } => format!("Bearer {}", access_token.trim()),
-            ImgurAuth::BearerStored { secret_key } => format!("Bearer {}", ctx.require_secret(secret_key)?.trim()),
+            ImgurAuth::BearerStored { secret_key } => {
+                format!("Bearer {}", ctx.require_secret(secret_key)?.trim())
+            }
         })
     }
 }
@@ -181,7 +185,11 @@ fn header_epoch_delay(headers: &HeaderMap) -> Option<Duration> {
     ["x-ratelimit-userreset", "x-ratelimit-clientreset"].iter().find_map(|h| {
         let reset: u64 = headers.get(*h)?.to_str().ok()?.trim().parse().ok()?;
         // Some deployments send seconds-until-reset, others an epoch; accept both.
-        Some(Duration::from_secs(if reset > 1_000_000_000 { reset.saturating_sub(now) } else { reset }))
+        Some(Duration::from_secs(if reset > 1_000_000_000 {
+            reset.saturating_sub(now)
+        } else {
+            reset
+        }))
     })
 }
 
@@ -195,7 +203,11 @@ impl Uploader for ImgurUploader {
         matches!(kind, UploadKind::Image | UploadKind::Video)
     }
 
-    async fn upload(&self, req: &UploadRequest, ctx: &UploadContext) -> Result<UploadResult, UploadError> {
+    async fn upload(
+        &self,
+        req: &UploadRequest,
+        ctx: &UploadContext,
+    ) -> Result<UploadResult, UploadError> {
         ctx.check_cancelled()?;
         if !self.supports(req.kind) {
             return Err(UploadError::Unsupported { uploader: self.name.clone(), kind: req.kind });
@@ -228,11 +240,14 @@ impl Uploader for ImgurUploader {
         let mut headers = HeaderMap::new();
         headers.insert(
             AUTHORIZATION,
-            HeaderValue::from_str(&self.authorization(ctx)?).map_err(|_| UploadError::config("credentials contain invalid header characters"))?,
+            HeaderValue::from_str(&self.authorization(ctx)?).map_err(|_| {
+                UploadError::config("credentials contain invalid header characters")
+            })?,
         );
         headers.insert(
             reqwest::header::CONTENT_TYPE,
-            HeaderValue::from_str(&content_type).map_err(|_| UploadError::config("bad multipart content type"))?,
+            HeaderValue::from_str(&content_type)
+                .map_err(|_| UploadError::config("bad multipart content type"))?,
         );
         let len = plan.content_length();
         let (body, fault) = plan.into_body(ctx).await?;
@@ -240,40 +255,55 @@ impl Uploader for ImgurUploader {
         let rb = ctx.http.post(url).headers(headers).header(CONTENT_LENGTH, len).body(body);
         let resp = http::fetch(ctx, rb, Some(&fault)).await?;
         if !resp.is_success() {
-            return Err(self.map_error(&resp));
+            return Err(Self::map_error(&resp));
         }
         self.parse_success(&resp)
     }
 }
 
 impl ImgurUploader {
-    fn map_error(&self, resp: &HttpResponse) -> UploadError {
+    fn map_error(resp: &HttpResponse) -> UploadError {
         let message = error_message(&resp.text);
         if resp.status.as_u16() == 429 {
-            let retry_after = http::parse_retry_after(&resp.headers).or_else(|| header_epoch_delay(&resp.headers));
+            let retry_after = http::parse_retry_after(&resp.headers)
+                .or_else(|| header_epoch_delay(&resp.headers));
             return UploadError::RateLimited { retry_after };
         }
         resp.to_error(message)
     }
 
     fn parse_success(&self, resp: &HttpResponse) -> Result<UploadResult, UploadError> {
-        let v: Value = serde_json::from_str(&resp.text)
-            .map_err(|e| UploadError::invalid_response(format!("Imgur did not return JSON ({e}): {}", http::snippet(&resp.text))))?;
+        let v: Value = serde_json::from_str(&resp.text).map_err(|e| {
+            UploadError::invalid_response(format!(
+                "Imgur did not return JSON ({e}): {}",
+                http::snippet(&resp.text)
+            ))
+        })?;
         if v.get("success").and_then(Value::as_bool) == Some(false) {
             return Err(UploadError::Http {
-                status: v.get("status").and_then(Value::as_u64).and_then(|s| u16::try_from(s).ok()).unwrap_or(400),
+                status: v
+                    .get("status")
+                    .and_then(Value::as_u64)
+                    .and_then(|s| u16::try_from(s).ok())
+                    .unwrap_or(400),
                 message: error_message(&resp.text),
                 body_snippet: http::snippet(&resp.text),
                 retry_after: None,
             });
         }
-        let data = v.get("data").ok_or_else(|| UploadError::invalid_response("Imgur response has no 'data' object"))?;
-        let link = data
-            .get("link")
-            .and_then(Value::as_str)
-            .ok_or_else(|| UploadError::invalid_response(format!("Imgur response has no link: {}", http::snippet(&resp.text))))?;
+        let data = v
+            .get("data")
+            .ok_or_else(|| UploadError::invalid_response("Imgur response has no 'data' object"))?;
+        let link = data.get("link").and_then(Value::as_str).ok_or_else(|| {
+            UploadError::invalid_response(format!(
+                "Imgur response has no link: {}",
+                http::snippet(&resp.text)
+            ))
+        })?;
         // Imgur occasionally answers with http:// links; everything is served over https.
-        let url = link.strip_prefix("http://").map_or_else(|| link.to_owned(), |rest| format!("https://{rest}"));
+        let url = link
+            .strip_prefix("http://")
+            .map_or_else(|| link.to_owned(), |rest| format!("https://{rest}"));
         let id = data.get("id").and_then(Value::as_str).unwrap_or_default();
         let deletehash = data.get("deletehash").and_then(Value::as_str).filter(|s| !s.is_empty());
         let mut extra = BTreeMap::new();
@@ -286,9 +316,14 @@ impl ImgurUploader {
         Ok(UploadResult {
             url,
             thumbnail_url: (!id.is_empty()).then(|| {
-                format!("{}/{id}{}.jpg", self.cfg.image_base.trim_end_matches('/'), self.cfg.thumbnail_size.suffix())
+                format!(
+                    "{}/{id}{}.jpg",
+                    self.cfg.image_base.trim_end_matches('/'),
+                    self.cfg.thumbnail_size.suffix()
+                )
             }),
-            deletion_url: deletehash.map(|d| format!("{}/delete/{d}", self.cfg.site_base.trim_end_matches('/'))),
+            deletion_url: deletehash
+                .map(|d| format!("{}/delete/{d}", self.cfg.site_base.trim_end_matches('/'))),
             raw_response: truncate_bytes(&resp.text, RAW_RESPONSE_LIMIT),
             uploader_name: self.name.clone(),
             extra,
@@ -311,7 +346,10 @@ mod tests {
     #[test]
     fn error_message_shapes() {
         assert_eq!(error_message(r#"{"data":{"error":"Bad"}}"#).as_deref(), Some("Bad"));
-        assert_eq!(error_message(r#"{"data":{"error":{"message":"Obj","code":1}}}"#).as_deref(), Some("Obj"));
+        assert_eq!(
+            error_message(r#"{"data":{"error":{"message":"Obj","code":1}}}"#).as_deref(),
+            Some("Obj")
+        );
         assert_eq!(error_message("nope"), None);
     }
 

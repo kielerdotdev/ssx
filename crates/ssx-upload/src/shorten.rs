@@ -67,12 +67,16 @@ pub struct HttpShortener {
 impl HttpShortener {
     /// Validate and build.
     pub fn new(cfg: HttpShortenerConfig) -> Result<Self, UploadError> {
-        let u = url::Url::parse(&cfg.endpoint).map_err(|e| UploadError::config(format!("invalid shortener endpoint '{}': {e}", cfg.endpoint)))?;
+        let u = url::Url::parse(&cfg.endpoint).map_err(|e| {
+            UploadError::config(format!("invalid shortener endpoint '{}': {e}", cfg.endpoint))
+        })?;
         if !matches!(u.scheme(), "http" | "https") {
             return Err(UploadError::config("shortener endpoint must be http(s)"));
         }
         if cfg.url_param.is_empty() {
-            return Err(UploadError::config("shortener needs the name of the parameter that carries the URL"));
+            return Err(UploadError::config(
+                "shortener needs the name of the parameter that carries the URL",
+            ));
         }
         Ok(Self { cfg })
     }
@@ -112,7 +116,8 @@ impl HttpShortener {
 }
 
 fn looks_like_url(s: &str) -> bool {
-    url::Url::parse(s).is_ok_and(|u| matches!(u.scheme(), "http" | "https") && u.host_str().is_some())
+    url::Url::parse(s)
+        .is_ok_and(|u| matches!(u.scheme(), "http" | "https") && u.host_str().is_some())
 }
 
 #[async_trait]
@@ -124,23 +129,33 @@ impl UrlShortener for HttpShortener {
     async fn shorten(&self, long_url: &str, ctx: &UploadContext) -> Result<String, UploadError> {
         ctx.check_cancelled()?;
         if !looks_like_url(long_url) {
-            return Err(UploadError::config(format!("'{long_url}' is not an http(s) URL and cannot be shortened")));
+            return Err(UploadError::config(format!(
+                "'{long_url}' is not an http(s) URL and cannot be shortened"
+            )));
         }
         let mut pairs: Vec<(String, String)> = self.cfg.params.clone();
         pairs.push((self.cfg.url_param.clone(), long_url.to_owned()));
-        let query = pairs.iter().map(|(k, v)| format!("{}={}", url_encode(k), url_encode(v))).collect::<Vec<_>>().join("&");
+        let query = pairs
+            .iter()
+            .map(|(k, v)| format!("{}={}", url_encode(k), url_encode(v)))
+            .collect::<Vec<_>>()
+            .join("&");
         let mut rb = match self.cfg.method {
             ShortenMethod::Get => {
                 let sep = if self.cfg.endpoint.contains('?') { '&' } else { '?' };
                 ctx.http.get(format!("{}{sep}{query}", self.cfg.endpoint))
             }
-            ShortenMethod::Post => {
-                ctx.http.post(&self.cfg.endpoint).header(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded")).body(query)
-            }
+            ShortenMethod::Post => ctx
+                .http
+                .post(&self.cfg.endpoint)
+                .header(CONTENT_TYPE, HeaderValue::from_static("application/x-www-form-urlencoded"))
+                .body(query),
         };
         for (k, v) in &self.cfg.headers {
-            let name = HeaderName::from_bytes(k.as_bytes()).map_err(|_| UploadError::config(format!("invalid header name '{k}'")))?;
-            let value = HeaderValue::from_str(v).map_err(|_| UploadError::config(format!("invalid value for header '{k}'")))?;
+            let name = HeaderName::from_bytes(k.as_bytes())
+                .map_err(|_| UploadError::config(format!("invalid header name '{k}'")))?;
+            let value = HeaderValue::from_str(v)
+                .map_err(|_| UploadError::config(format!("invalid value for header '{k}'")))?;
             rb = rb.header(name, value);
         }
         let resp = http::fetch(ctx, rb, None).await?;
@@ -151,13 +166,22 @@ impl UrlShortener for HttpShortener {
         let short = match &self.cfg.response {
             ShortenResponse::PlainText => resp.text.trim().to_owned(),
             ShortenResponse::JsonPointer(p) => {
-                let v: serde_json::Value = serde_json::from_str(&resp.text)
-                    .map_err(|e| UploadError::invalid_response(format!("expected JSON from {} ({e}): {}", self.cfg.name, http::snippet(&resp.text))))?;
+                let v: serde_json::Value = serde_json::from_str(&resp.text).map_err(|e| {
+                    UploadError::invalid_response(format!(
+                        "expected JSON from {} ({e}): {}",
+                        self.cfg.name,
+                        http::snippet(&resp.text)
+                    ))
+                })?;
                 v.pointer(p).and_then(|v| v.as_str()).unwrap_or_default().trim().to_owned()
             }
         };
         if !looks_like_url(&short) {
-            return Err(UploadError::invalid_response(format!("{} did not return a URL: {}", self.cfg.name, http::snippet(&resp.text))));
+            return Err(UploadError::invalid_response(format!(
+                "{} did not return a URL: {}",
+                self.cfg.name,
+                http::snippet(&resp.text)
+            )));
         }
         Ok(short)
     }
@@ -172,7 +196,10 @@ pub struct ShorteningUploader {
 
 impl std::fmt::Debug for ShorteningUploader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ShorteningUploader").field("inner", &self.inner.name()).field("shortener", &self.shortener.name()).finish()
+        f.debug_struct("ShorteningUploader")
+            .field("inner", &self.inner.name())
+            .field("shortener", &self.shortener.name())
+            .finish()
     }
 }
 
@@ -200,14 +227,20 @@ impl Uploader for ShorteningUploader {
         self.inner.supports(kind)
     }
 
-    async fn upload(&self, req: &UploadRequest, ctx: &UploadContext) -> Result<UploadResult, UploadError> {
+    async fn upload(
+        &self,
+        req: &UploadRequest,
+        ctx: &UploadContext,
+    ) -> Result<UploadResult, UploadError> {
         let mut result = self.inner.upload(req, ctx).await?;
         if result.url.is_empty() {
             return Ok(result);
         }
         match self.shortener.shorten(&result.url, ctx).await {
             Ok(short) => {
-                result.extra.insert("original_url".into(), std::mem::replace(&mut result.url, short));
+                result
+                    .extra
+                    .insert("original_url".into(), std::mem::replace(&mut result.url, short));
                 result.extra.insert("shortener".into(), self.shortener.name().to_owned());
                 Ok(result)
             }

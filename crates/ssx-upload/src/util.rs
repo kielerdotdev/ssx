@@ -4,7 +4,8 @@ use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 
 /// Everything except the RFC 3986 unreserved characters is percent-encoded, like ShareX's
 /// `URLHelpers.URLEncode`.
-const URL_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC.remove(b'-').remove(b'.').remove(b'_').remove(b'~');
+const URL_ENCODE_SET: &AsciiSet =
+    &NON_ALPHANUMERIC.remove(b'-').remove(b'.').remove(b'_').remove(b'~');
 
 /// Percent-encode `s` (UTF-8, uppercase hex, unreserved characters untouched).
 pub fn url_encode(s: &str) -> String {

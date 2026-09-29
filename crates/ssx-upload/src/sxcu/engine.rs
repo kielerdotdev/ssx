@@ -25,7 +25,10 @@ use bytes::Bytes;
 use reqwest::header::{CONTENT_LENGTH, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue};
 
 use super::model::{BodyType, CustomUploader, replace_ci};
-use super::template::{Env, Interaction, NonInteractive, TemplateError, TemplateResponse, render, render_with_names, url_encode};
+use super::template::{
+    Env, Interaction, NonInteractive, TemplateError, TemplateResponse, render, render_with_names,
+    url_encode,
+};
 use crate::body::{BodyPlan, Payload};
 use crate::context::UploadContext;
 use crate::error::UploadError;
@@ -76,7 +79,8 @@ fn xml_escape(s: &str) -> String {
 /// ShareX's `URLHelpers.FixPrefix`: add `https://` when the text has no scheme.
 fn fix_prefix(url: &str) -> String {
     let has_prefix = url.split_once("://").is_some_and(|(s, _)| {
-        !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+        !s.is_empty()
+            && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
     });
     if url.is_empty() || has_prefix { url.to_owned() } else { format!("https://{url}") }
 }
@@ -96,7 +100,8 @@ impl SxcuUploader {
 
     /// Parse `.sxcu` text and wrap it.
     pub fn from_json_str(text: &str) -> Result<Self, UploadError> {
-        let def = CustomUploader::from_json_str(text).map_err(|e| UploadError::config(e.to_string()))?;
+        let def =
+            CustomUploader::from_json_str(text).map_err(|e| UploadError::config(e.to_string()))?;
         Self::new(def)
     }
 
@@ -121,9 +126,15 @@ impl SxcuUploader {
         Env { file_name, input, response: None, url_encode, interaction: self.interaction.as_ref() }
     }
 
-    fn build_url(&self, file_name: &str, input: &str, names: &NameParser) -> Result<String, UploadError> {
+    fn build_url(
+        &self,
+        file_name: &str,
+        input: &str,
+        names: &NameParser,
+    ) -> Result<String, UploadError> {
         let env = self.request_env(file_name, input, true);
-        let rendered = render(&self.def.request_url, &env).map_err(|e| config_err("RequestURL", &e))?;
+        let rendered =
+            render(&self.def.request_url, &env).map_err(|e| config_err("RequestURL", &e))?;
         let mut url = fix_prefix(&rendered);
         if url.is_empty() {
             return Err(UploadError::config("RequestURL must be configured"));
@@ -131,7 +142,8 @@ impl SxcuUploader {
         let env = self.request_env(file_name, input, false);
         let mut sep = if url.contains('?') { '&' } else { '?' };
         for (k, v) in &self.def.parameters {
-            let value = render_with_names(v, names, &env).map_err(|e| config_err(&format!("Parameters.{k}"), &e))?;
+            let value = render_with_names(v, names, &env)
+                .map_err(|e| config_err(&format!("Parameters.{k}"), &e))?;
             url.push(sep);
             sep = '&';
             url.push_str(&url_encode(k));
@@ -141,7 +153,12 @@ impl SxcuUploader {
         Ok(url)
     }
 
-    fn build_arguments(&self, file_name: &str, input: &str, names: &NameParser) -> Result<Vec<(String, String)>, UploadError> {
+    fn build_arguments(
+        &self,
+        file_name: &str,
+        input: &str,
+        names: &NameParser,
+    ) -> Result<Vec<(String, String)>, UploadError> {
         let env = self.request_env(file_name, input, false);
         self.def
             .arguments
@@ -163,16 +180,22 @@ impl SxcuUploader {
     ) -> Result<HeaderMap, UploadError> {
         let mut map = HeaderMap::new();
         if let Some(ct) = content_type {
-            let v = HeaderValue::from_str(ct).map_err(|_| UploadError::config(format!("invalid content type '{ct}'")))?;
+            let v = HeaderValue::from_str(ct)
+                .map_err(|_| UploadError::config(format!("invalid content type '{ct}'")))?;
             map.insert(CONTENT_TYPE, v);
         }
         let env = self.request_env(file_name, input, false);
         for (k, v) in &self.def.headers {
-            let value = render_with_names(v, names, &env).map_err(|e| config_err(&format!("Headers.{k}"), &e))?;
-            let name = HeaderName::from_bytes(k.as_bytes())
-                .map_err(|_| UploadError::config(format!("Headers: '{k}' is not a valid header name")))?;
-            let value = HeaderValue::from_str(&value)
-                .map_err(|_| UploadError::config(format!("Headers.{k}: value contains characters not allowed in a header")))?;
+            let value = render_with_names(v, names, &env)
+                .map_err(|e| config_err(&format!("Headers.{k}"), &e))?;
+            let name = HeaderName::from_bytes(k.as_bytes()).map_err(|_| {
+                UploadError::config(format!("Headers: '{k}' is not a valid header name"))
+            })?;
+            let value = HeaderValue::from_str(&value).map_err(|_| {
+                UploadError::config(format!(
+                    "Headers.{k}: value contains characters not allowed in a header"
+                ))
+            })?;
             map.insert(name, value);
         }
         Ok(map)
@@ -202,13 +225,17 @@ impl SxcuUploader {
         match self.def.body {
             BodyType::None => {
                 if is_file {
-                    return Err(UploadError::config("Body is None, so files cannot be uploaded (use MultipartFormData or Binary)"));
+                    return Err(UploadError::config(
+                        "Body is None, so files cannot be uploaded (use MultipartFormData or Binary)",
+                    ));
                 }
                 Ok((None, None))
             }
             BodyType::MultipartFormData => {
                 let fields = self.build_arguments(file_name, input, names)?;
-                let file = if kind == UploadKind::Url || (kind == UploadKind::Text && self.def.file_form_name.is_empty()) {
+                let file = if kind == UploadKind::Url
+                    || (kind == UploadKind::Text && self.def.file_form_name.is_empty())
+                {
                     None
                 } else {
                     if self.def.file_form_name.is_empty() {
@@ -234,7 +261,10 @@ impl SxcuUploader {
                     .map(|(k, v)| format!("{}={}", url_encode(k), url_encode(v)))
                     .collect::<Vec<_>>()
                     .join("&");
-                Ok((Some(BodyPlan::raw(Payload::Memory(Bytes::from(body)))), Some("application/x-www-form-urlencoded".into())))
+                Ok((
+                    Some(BodyPlan::raw(Payload::Memory(Bytes::from(body)))),
+                    Some("application/x-www-form-urlencoded".into()),
+                ))
             }
             BodyType::Json | BodyType::Xml => {
                 if is_file {
@@ -269,7 +299,11 @@ impl SxcuUploader {
         render(&self.def.error_message, &env).ok().filter(|m| !m.trim().is_empty())
     }
 
-    fn parse_response(&self, resp: &HttpResponse, file_name: &str) -> Result<UploadResult, UploadError> {
+    fn parse_response(
+        &self,
+        resp: &HttpResponse,
+        file_name: &str,
+    ) -> Result<UploadResult, UploadError> {
         let tr = to_template_response(resp);
         let env = Env {
             file_name,
@@ -338,7 +372,11 @@ impl Uploader for SxcuUploader {
         self.def.supports(kind)
     }
 
-    async fn upload(&self, req: &UploadRequest, ctx: &UploadContext) -> Result<UploadResult, UploadError> {
+    async fn upload(
+        &self,
+        req: &UploadRequest,
+        ctx: &UploadContext,
+    ) -> Result<UploadResult, UploadError> {
         ctx.check_cancelled()?;
         if !self.supports(req.kind) {
             return Err(UploadError::Unsupported { uploader: self.name.clone(), kind: req.kind });
@@ -385,7 +423,10 @@ mod tests {
     #[test]
     fn escaping_helpers() {
         assert_eq!(json_escape("a\"b\\c\n\u{1}é"), "a\\\"b\\\\c\\n\\u0001é");
-        assert_eq!(xml_escape("<a href=\"x\">'&'</a>"), "&lt;a href=&quot;x&quot;&gt;&apos;&amp;&apos;&lt;/a&gt;");
+        assert_eq!(
+            xml_escape("<a href=\"x\">'&'</a>"),
+            "&lt;a href=&quot;x&quot;&gt;&apos;&amp;&apos;&lt;/a&gt;"
+        );
     }
 
     #[test]

@@ -20,6 +20,7 @@
 //! (403, `ExpiredToken`, clock skew...) become [`UploadError::Auth`], `SlowDown` becomes
 //! [`UploadError::RateLimited`], a wrong-region redirect becomes a configuration hint.
 
+use std::fmt::Write as _;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -129,7 +130,13 @@ fn default_key_template() -> String {
 }
 
 impl S3Config {
-    fn base(name: &str, bucket: &str, region: &str, endpoint: Option<String>, addressing: Addressing) -> Self {
+    fn base(
+        name: &str,
+        bucket: &str,
+        region: &str,
+        endpoint: Option<String>,
+        addressing: Addressing,
+    ) -> Self {
         Self {
             name: name.to_owned(),
             bucket: bucket.to_owned(),
@@ -178,7 +185,11 @@ impl S3Config {
 
     /// Wasabi.
     pub fn wasabi(bucket: &str, region: &str) -> Self {
-        let host = if region == "us-east-1" { "s3.wasabisys.com".to_owned() } else { format!("s3.{region}.wasabisys.com") };
+        let host = if region == "us-east-1" {
+            "s3.wasabisys.com".to_owned()
+        } else {
+            format!("s3.{region}.wasabisys.com")
+        };
         Self::base("Wasabi", bucket, region, Some(format!("https://{host}")), Addressing::PathStyle)
     }
 
@@ -200,7 +211,11 @@ impl S3Config {
 
     /// Read credentials from the secret store under these entry names.
     #[must_use]
-    pub fn with_stored_credentials(mut self, access_key_id_key: &str, secret_access_key_key: &str) -> Self {
+    pub fn with_stored_credentials(
+        mut self,
+        access_key_id_key: &str,
+        secret_access_key_key: &str,
+    ) -> Self {
         self.credentials = Some(S3Credentials::Stored {
             access_key_id_key: access_key_id_key.to_owned(),
             secret_access_key_key: secret_access_key_key.to_owned(),
@@ -220,7 +235,10 @@ pub struct S3Uploader {
 
 impl std::fmt::Debug for S3Uploader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("S3Uploader").field("bucket", &self.cfg.bucket).field("region", &self.cfg.region).finish_non_exhaustive()
+        f.debug_struct("S3Uploader")
+            .field("bucket", &self.cfg.bucket)
+            .field("region", &self.cfg.region)
+            .finish_non_exhaustive()
     }
 }
 
@@ -239,7 +257,7 @@ fn uri_encode_path(s: &str) -> String {
         if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~' | b'/') {
             out.push(b as char);
         } else {
-            out.push_str(&format!("%{b:02X}"));
+            let _ = write!(out, "%{b:02X}");
         }
     }
     out
@@ -257,9 +275,12 @@ impl S3Uploader {
         let endpoint = match &cfg.endpoint {
             None => None,
             Some(e) => {
-                let u = url::Url::parse(e).map_err(|err| UploadError::config(format!("invalid endpoint '{e}': {err}")))?;
+                let u = url::Url::parse(e)
+                    .map_err(|err| UploadError::config(format!("invalid endpoint '{e}': {err}")))?;
                 if !matches!(u.scheme(), "http" | "https") || u.host_str().is_none() {
-                    return Err(UploadError::config(format!("endpoint '{e}' must be an http(s) URL with a host")));
+                    return Err(UploadError::config(format!(
+                        "endpoint '{e}' must be an http(s) URL with a host"
+                    )));
                 }
                 Some(u)
             }
@@ -291,7 +312,7 @@ impl S3Uploader {
         }
     }
 
-    fn target(&self, key: &str) -> Result<Target, UploadError> {
+    fn target(&self, key: &str) -> Target {
         let (scheme, host, port, base_path) = match &self.endpoint {
             Some(e) => (
                 e.scheme().to_owned(),
@@ -299,7 +320,12 @@ impl S3Uploader {
                 e.port(),
                 e.path().trim_end_matches('/').to_owned(),
             ),
-            None => ("https".to_owned(), format!("s3.{}.amazonaws.com", self.cfg.region), None, String::new()),
+            None => (
+                "https".to_owned(),
+                format!("s3.{}.amazonaws.com", self.cfg.region),
+                None,
+                String::new(),
+            ),
         };
         let virtual_hosted = self.effective_addressing() == Addressing::VirtualHosted;
         let host = if virtual_hosted { format!("{}.{host}", self.cfg.bucket) } else { host };
@@ -315,12 +341,13 @@ impl S3Uploader {
         path.push('/');
         path.push_str(&uri_encode_path(key));
         let origin = format!("{scheme}://{host_header}");
-        Ok(Target { url: format!("{origin}{path}"), host_header, path, origin })
+        Target { url: format!("{origin}{path}"), host_header, path, origin }
     }
 
     fn object_key(&self, req: &UploadRequest, names: &NameParser) -> Result<String, UploadError> {
         let filename = req.resolved_filename();
-        let filename: String = filename.chars().map(|c| if c.is_control() || c == '\\' { '_' } else { c }).collect();
+        let filename: String =
+            filename.chars().map(|c| if c.is_control() || c == '\\' { '_' } else { c }).collect();
         let filename = filename.trim_start_matches('/').to_owned();
         let (stem, ext) = match filename.rsplit_once('.') {
             Some((s, e)) if !s.is_empty() => (s.to_owned(), e.to_owned()),
@@ -338,7 +365,10 @@ impl S3Uploader {
             return Err(UploadError::config("the object key template produced an empty key"));
         }
         if key.len() > 1024 {
-            return Err(UploadError::config(format!("object key is {} bytes; S3 allows at most 1024", key.len())));
+            return Err(UploadError::config(format!(
+                "object key is {} bytes; S3 allows at most 1024",
+                key.len()
+            )));
         }
         Ok(key)
     }
@@ -357,21 +387,27 @@ impl S3Uploader {
     fn credentials(&self, ctx: &UploadContext) -> Result<Credentials, UploadError> {
         match &self.cfg.credentials {
             Some(S3Credentials::Static(c)) => Ok(c.clone()),
-            Some(S3Credentials::Stored { access_key_id_key, secret_access_key_key, session_token_key }) => {
-                Ok(Credentials {
-                    access_key_id: ctx.require_secret(access_key_id_key)?,
-                    secret_access_key: ctx.require_secret(secret_access_key_key)?,
-                    session_token: match session_token_key {
-                        Some(k) => Some(ctx.require_secret(k)?),
-                        None => None,
-                    },
-                })
-            }
+            Some(S3Credentials::Stored {
+                access_key_id_key,
+                secret_access_key_key,
+                session_token_key,
+            }) => Ok(Credentials {
+                access_key_id: ctx.require_secret(access_key_id_key)?,
+                secret_access_key: ctx.require_secret(secret_access_key_key)?,
+                session_token: match session_token_key {
+                    Some(k) => Some(ctx.require_secret(k)?),
+                    None => None,
+                },
+            }),
             None => Err(UploadError::Auth { message: "no S3 credentials configured".into() }),
         }
     }
 
-    async fn payload_hash(&self, req: &UploadRequest, ctx: &UploadContext) -> Result<String, UploadError> {
+    async fn payload_hash(
+        &self,
+        req: &UploadRequest,
+        ctx: &UploadContext,
+    ) -> Result<String, UploadError> {
         let unsigned = match self.cfg.payload_signing {
             PayloadSigning::Unsigned => true,
             PayloadSigning::Hashed => false,
@@ -397,7 +433,10 @@ async fn hash_source(req: &UploadRequest, ctx: &UploadContext) -> Result<String,
             let mut buf = vec![0u8; CHUNK];
             loop {
                 ctx.check_cancelled()?;
-                let n = f.read(&mut buf).await.map_err(|e| UploadError::io(format!("hashing {}", p.display()), e))?;
+                let n = f
+                    .read(&mut buf)
+                    .await
+                    .map_err(|e| UploadError::io(format!("hashing {}", p.display()), e))?;
                 if n == 0 {
                     break;
                 }
@@ -417,7 +456,11 @@ fn xml_tag<'a>(body: &'a str, tag: &str) -> Option<&'a str> {
 }
 
 fn xml_unescape(s: &str) -> String {
-    s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&")
+    s.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
 }
 
 /// Map an S3 error response to an [`UploadError`].
@@ -434,22 +477,38 @@ fn map_error(resp: &HttpResponse) -> UploadError {
         "SlowDown" | "RequestLimitExceeded" | "Throttling" | "ThrottlingException" => {
             UploadError::RateLimited { retry_after: http::parse_retry_after(&resp.headers) }
         }
-        "InvalidAccessKeyId" | "SignatureDoesNotMatch" | "AccessDenied" | "ExpiredToken" | "InvalidToken"
-        | "TokenRefreshRequired" | "AccountProblem" => {
+        "InvalidAccessKeyId"
+        | "SignatureDoesNotMatch"
+        | "AccessDenied"
+        | "ExpiredToken"
+        | "InvalidToken"
+        | "TokenRefreshRequired"
+        | "AccountProblem" => {
             let hint = match code {
                 "SignatureDoesNotMatch" => " (check the secret key, region and endpoint)",
-                "ExpiredToken" | "InvalidToken" => " (the session token expired; refresh the credentials)",
+                "ExpiredToken" | "InvalidToken" => {
+                    " (the session token expired; refresh the credentials)"
+                }
                 _ => "",
             };
             UploadError::Auth { message: format!("{}{hint}", detail.unwrap_or_default()) }
         }
         "RequestTimeTooSkewed" => UploadError::Auth {
-            message: format!("{} (your system clock differs from the server's by more than 15 minutes)", detail.unwrap_or_default()),
+            message: format!(
+                "{} (your system clock differs from the server's by more than 15 minutes)",
+                detail.unwrap_or_default()
+            ),
         },
-        "NoSuchBucket" => UploadError::config(format!("{} (check the bucket name and region)", detail.unwrap_or_default())),
-        "PermanentRedirect" | "AuthorizationHeaderMalformed" | "IllegalLocationConstraintException" => {
-            UploadError::config(format!("{} (the bucket is in a different region or endpoint; fix the region setting)", detail.unwrap_or_default()))
-        }
+        "NoSuchBucket" => UploadError::config(format!(
+            "{} (check the bucket name and region)",
+            detail.unwrap_or_default()
+        )),
+        "PermanentRedirect"
+        | "AuthorizationHeaderMalformed"
+        | "IllegalLocationConstraintException" => UploadError::config(format!(
+            "{} (the bucket is in a different region or endpoint; fix the region setting)",
+            detail.unwrap_or_default()
+        )),
         _ if matches!(resp.status.as_u16(), 301 | 307) => UploadError::config(
             "the bucket lives in a different region or endpoint (S3 answered with a redirect); fix the region/endpoint setting",
         ),
@@ -467,15 +526,22 @@ impl Uploader for S3Uploader {
         kind != UploadKind::Url
     }
 
-    async fn upload(&self, req: &UploadRequest, ctx: &UploadContext) -> Result<UploadResult, UploadError> {
+    async fn upload(
+        &self,
+        req: &UploadRequest,
+        ctx: &UploadContext,
+    ) -> Result<UploadResult, UploadError> {
         ctx.check_cancelled()?;
         if !self.supports(req.kind) {
-            return Err(UploadError::Unsupported { uploader: self.cfg.name.clone(), kind: req.kind });
+            return Err(UploadError::Unsupported {
+                uploader: self.cfg.name.clone(),
+                kind: req.kind,
+            });
         }
         let creds = self.credentials(ctx)?;
         let names = NameParser::default();
         let key = self.object_key(req, &names)?;
-        let target = self.target(&key)?;
+        let target = self.target(&key);
         let payload_hash = self.payload_hash(req, ctx).await?;
         let now = (self.clock)();
         let mime = req.resolved_mime();
@@ -499,7 +565,9 @@ impl Uploader for S3Uploader {
                 headers.push((name.into(), v.clone()));
             }
         }
-        headers.extend(self.cfg.extra_headers.iter().map(|(k, v)| (k.to_ascii_lowercase(), v.clone())));
+        headers.extend(
+            self.cfg.extra_headers.iter().map(|(k, v)| (k.to_ascii_lowercase(), v.clone())),
+        );
 
         let signed = sigv4::sign(
             &creds,
@@ -518,13 +586,16 @@ impl Uploader for S3Uploader {
 
         let mut map = HeaderMap::new();
         for (k, v) in headers.iter().filter(|(k, _)| k != "host") {
-            let name = HeaderName::from_bytes(k.as_bytes()).map_err(|_| UploadError::config(format!("invalid header name '{k}'")))?;
-            let value = HeaderValue::from_str(v).map_err(|_| UploadError::config(format!("invalid value for header '{k}'")))?;
+            let name = HeaderName::from_bytes(k.as_bytes())
+                .map_err(|_| UploadError::config(format!("invalid header name '{k}'")))?;
+            let value = HeaderValue::from_str(v)
+                .map_err(|_| UploadError::config(format!("invalid value for header '{k}'")))?;
             map.insert(name, value);
         }
         map.insert(
             reqwest::header::AUTHORIZATION,
-            HeaderValue::from_str(&signed.authorization).map_err(|_| UploadError::config("authorization header is not valid"))?,
+            HeaderValue::from_str(&signed.authorization)
+                .map_err(|_| UploadError::config("authorization header is not valid"))?,
         );
 
         let plan = BodyPlan::raw(Payload::from_request(req).await?);
@@ -562,30 +633,39 @@ mod tests {
 
     #[test]
     fn addressing_and_urls() {
-        let t = up(S3Config::aws("my-bucket", "eu-west-1")).target("a b/c.png").unwrap();
+        let t = up(S3Config::aws("my-bucket", "eu-west-1")).target("a b/c.png");
         assert_eq!(t.url, "https://my-bucket.s3.eu-west-1.amazonaws.com/a%20b/c.png");
         assert_eq!(t.host_header, "my-bucket.s3.eu-west-1.amazonaws.com");
 
         // Dotted bucket names cannot use virtual hosting over HTTPS.
-        let t = up(S3Config::aws("my.dotted.bucket", "us-east-1")).target("k").unwrap();
+        let t = up(S3Config::aws("my.dotted.bucket", "us-east-1")).target("k");
         assert_eq!(t.url, "https://s3.us-east-1.amazonaws.com/my.dotted.bucket/k");
 
-        let t = up(S3Config::minio("http://localhost:9000", "pics")).target("dir/x.png").unwrap();
+        let t = up(S3Config::minio("http://localhost:9000", "pics")).target("dir/x.png");
         assert_eq!(t.url, "http://localhost:9000/pics/dir/x.png");
         assert_eq!(t.host_header, "localhost:9000");
         assert_eq!(t.path, "/pics/dir/x.png");
 
-        let t = up(S3Config::cloudflare_r2("acc123", "shots")).target("k").unwrap();
+        let t = up(S3Config::cloudflare_r2("acc123", "shots")).target("k");
         assert_eq!(t.url, "https://acc123.r2.cloudflarestorage.com/shots/k");
 
         let mut c = S3Config::minio("https://s3.example.com/base/", "b");
         c.addressing = Addressing::VirtualHosted;
-        let t = up(c).target("k").unwrap();
+        let t = up(c).target("k");
         assert_eq!(t.url, "https://b.s3.example.com/base/k");
 
-        assert_eq!(up(S3Config::backblaze_b2("b", "us-west-004")).target("k").unwrap().url, "https://s3.us-west-004.backblazeb2.com/b/k");
-        assert_eq!(up(S3Config::wasabi("b", "us-east-1")).target("k").unwrap().url, "https://s3.wasabisys.com/b/k");
-        assert_eq!(up(S3Config::wasabi("b", "eu-central-1")).target("k").unwrap().url, "https://s3.eu-central-1.wasabisys.com/b/k");
+        assert_eq!(
+            up(S3Config::backblaze_b2("b", "us-west-004")).target("k").url,
+            "https://s3.us-west-004.backblazeb2.com/b/k"
+        );
+        assert_eq!(
+            up(S3Config::wasabi("b", "us-east-1")).target("k").url,
+            "https://s3.wasabisys.com/b/k"
+        );
+        assert_eq!(
+            up(S3Config::wasabi("b", "eu-central-1")).target("k").url,
+            "https://s3.eu-central-1.wasabisys.com/b/k"
+        );
     }
 
     #[test]
@@ -602,8 +682,16 @@ mod tests {
         let mut cfg = S3Config::aws("b", "us-east-1");
         cfg.key_template = "%rn{5}/{filename}".into();
         let u = up(cfg);
-        let key = u.object_key(&UploadRequest::from_bytes(vec![1], "f%y.png", UploadKind::Image), &NameParser::default()).unwrap();
-        assert!(key.len() == 5 + 1 + 7 && key.ends_with("/f%y.png"), "file names are never re-expanded: {key}");
+        let key = u
+            .object_key(
+                &UploadRequest::from_bytes(vec![1], "f%y.png", UploadKind::Image),
+                &NameParser::default(),
+            )
+            .unwrap();
+        assert!(
+            key.len() == 5 + 1 + 7 && key.ends_with("/f%y.png"),
+            "file names are never re-expanded: {key}"
+        );
 
         let mut cfg = S3Config::aws("b", "us-east-1");
         cfg.key_template = "x".repeat(1100);
@@ -616,7 +704,7 @@ mod tests {
         let mut cfg = S3Config::cloudflare_r2("acc", "shots");
         cfg.public_url_template = Some("https://cdn.example.com/{bucket}/{key}?r={region}".into());
         let u = up(cfg);
-        let t = u.target("a b.png").unwrap();
+        let t = u.target("a b.png");
         assert_eq!(u.public_url(&t, "a b.png"), "https://cdn.example.com/shots/a%20b.png?r=auto");
     }
 
@@ -639,15 +727,38 @@ mod tests {
             text: body.into(),
             truncated: false,
         };
-        let e = map_error(&resp(403, "<Error><Code>SignatureDoesNotMatch</Code><Message>The request signature we calculated does not match</Message></Error>"));
-        assert!(matches!(&e, UploadError::Auth { message } if message.contains("SignatureDoesNotMatch") && message.contains("secret key")), "{e:?}");
-        assert!(matches!(map_error(&resp(503, "<Error><Code>SlowDown</Code></Error>")), UploadError::RateLimited { .. }));
-        assert!(matches!(map_error(&resp(404, "<Error><Code>NoSuchBucket</Code><Message>nope</Message></Error>")), UploadError::Config { .. }));
-        assert!(matches!(map_error(&resp(301, "<Error><Code>PermanentRedirect</Code></Error>")), UploadError::Config { .. }));
+        let e = map_error(&resp(
+            403,
+            "<Error><Code>SignatureDoesNotMatch</Code><Message>The request signature we calculated does not match</Message></Error>",
+        ));
+        assert!(
+            matches!(&e, UploadError::Auth { message } if message.contains("SignatureDoesNotMatch") && message.contains("secret key")),
+            "{e:?}"
+        );
+        assert!(matches!(
+            map_error(&resp(503, "<Error><Code>SlowDown</Code></Error>")),
+            UploadError::RateLimited { .. }
+        ));
+        assert!(matches!(
+            map_error(&resp(
+                404,
+                "<Error><Code>NoSuchBucket</Code><Message>nope</Message></Error>"
+            )),
+            UploadError::Config { .. }
+        ));
+        assert!(matches!(
+            map_error(&resp(301, "<Error><Code>PermanentRedirect</Code></Error>")),
+            UploadError::Config { .. }
+        ));
         assert!(matches!(map_error(&resp(307, "")), UploadError::Config { .. }));
         assert!(matches!(map_error(&resp(403, "")), UploadError::Auth { .. }));
-        match map_error(&resp(500, "<Error><Code>InternalError</Code><Message>a &amp; b</Message></Error>")) {
-            UploadError::Http { status: 500, message: Some(m), .. } => assert_eq!(m, "InternalError: a & b"),
+        match map_error(&resp(
+            500,
+            "<Error><Code>InternalError</Code><Message>a &amp; b</Message></Error>",
+        )) {
+            UploadError::Http { status: 500, message: Some(m), .. } => {
+                assert_eq!(m, "InternalError: a & b");
+            }
             other => panic!("{other:?}"),
         }
         assert!(map_error(&resp(500, "<html>")).is_retryable());
@@ -656,12 +767,17 @@ mod tests {
     #[test]
     fn in_memory_secrets_cannot_be_serialised_but_stored_references_can() {
         let cfg = S3Config::aws("b", "r").with_static_credentials("AKIA", "TOPSECRET");
-        assert!(serde_json::to_string(&cfg).is_err(), "static secrets must never reach a config file");
+        assert!(
+            serde_json::to_string(&cfg).is_err(),
+            "static secrets must never reach a config file"
+        );
         assert!(!format!("{cfg:?}").contains("TOPSECRET"), "Debug output is redacted");
         let cfg = S3Config::aws("b", "r").with_stored_credentials("s3.id", "s3.secret");
         let json = serde_json::to_string(&cfg).unwrap();
         let back: S3Config = serde_json::from_str(&json).unwrap();
-        assert!(matches!(back.credentials, Some(S3Credentials::Stored { ref access_key_id_key, .. }) if access_key_id_key == "s3.id"));
+        assert!(
+            matches!(back.credentials, Some(S3Credentials::Stored { ref access_key_id_key, .. }) if access_key_id_key == "s3.id")
+        );
         assert_eq!(back.key_template, "{filename}");
     }
 }

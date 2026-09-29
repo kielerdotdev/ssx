@@ -10,7 +10,9 @@
 //! Secrets never live in the config: [`HttpAuth`] names secret-store entries.
 
 use async_trait::async_trait;
-use reqwest::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue};
+use reqwest::header::{
+    AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::body::{BodyPlan, Payload};
@@ -163,10 +165,8 @@ impl HttpUploader {
         if !matches!(u.scheme(), "http" | "https") {
             return Err(UploadError::config(format!("URL '{}' must use http or https", cfg.url)));
         }
-        if let HttpBody::Multipart { field, .. } = &cfg.body {
-            if field.is_empty() {
-                return Err(UploadError::config("multipart body needs a file field name"));
-            }
+        if matches!(&cfg.body, HttpBody::Multipart { field, .. } if field.is_empty()) {
+            return Err(UploadError::config("multipart body needs a file field name"));
         }
         Ok(Self { cfg })
     }
@@ -180,7 +180,12 @@ impl HttpUploader {
         (filename, stem, ext)
     }
 
-    fn expand(template: &str, req: &UploadRequest, names: &NameParser, encode_parts: bool) -> String {
+    fn expand(
+        template: &str,
+        req: &UploadRequest,
+        names: &NameParser,
+        encode_parts: bool,
+    ) -> String {
         let (filename, stem, ext) = Self::parts(req);
         let f = |s: String| if encode_parts { encode(&s) } else { s };
         names
@@ -190,11 +195,18 @@ impl HttpUploader {
             .replace("{ext}", &f(ext))
     }
 
-    fn headers(&self, req: &UploadRequest, names: &NameParser, ctx: &UploadContext) -> Result<HeaderMap, UploadError> {
+    fn headers(
+        &self,
+        req: &UploadRequest,
+        names: &NameParser,
+        ctx: &UploadContext,
+    ) -> Result<HeaderMap, UploadError> {
         let mut map = HeaderMap::new();
         let mut put = |name: &str, value: &str| -> Result<(), UploadError> {
-            let n = HeaderName::from_bytes(name.as_bytes()).map_err(|_| UploadError::config(format!("invalid header name '{name}'")))?;
-            let mut v = HeaderValue::from_str(value).map_err(|_| UploadError::config(format!("invalid value for header '{name}'")))?;
+            let n = HeaderName::from_bytes(name.as_bytes())
+                .map_err(|_| UploadError::config(format!("invalid header name '{name}'")))?;
+            let mut v = HeaderValue::from_str(value)
+                .map_err(|_| UploadError::config(format!("invalid value for header '{name}'")))?;
             if n == AUTHORIZATION || n.as_str().contains("key") || n.as_str().contains("token") {
                 v.set_sensitive(true);
             }
@@ -212,7 +224,10 @@ impl HttpUploader {
             HttpAuth::Basic { username, secret_key } => {
                 use base64::Engine as _;
                 let raw = format!("{username}:{}", ctx.require_secret(secret_key)?);
-                put("authorization", &format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(raw)))?;
+                put(
+                    "authorization",
+                    &format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(raw)),
+                )?;
             }
             HttpAuth::Header { name, secret_key } => put(name, &ctx.require_secret(secret_key)?)?,
         }
@@ -230,10 +245,17 @@ impl Uploader for HttpUploader {
         kind != UploadKind::Url
     }
 
-    async fn upload(&self, req: &UploadRequest, ctx: &UploadContext) -> Result<UploadResult, UploadError> {
+    async fn upload(
+        &self,
+        req: &UploadRequest,
+        ctx: &UploadContext,
+    ) -> Result<UploadResult, UploadError> {
         ctx.check_cancelled()?;
         if !self.supports(req.kind) {
-            return Err(UploadError::Unsupported { uploader: self.cfg.name.clone(), kind: req.kind });
+            return Err(UploadError::Unsupported {
+                uploader: self.cfg.name.clone(),
+                kind: req.kind,
+            });
         }
         let names = NameParser::default();
         let url = Self::expand(&self.cfg.url, req, &names, true);
@@ -242,11 +264,18 @@ impl Uploader for HttpUploader {
         let (plan, content_type) = match &self.cfg.body {
             HttpBody::Raw => (BodyPlan::raw(payload), req.resolved_mime()),
             HttpBody::Multipart { field, fields } => {
-                let fields: Vec<(String, String)> =
-                    fields.iter().map(|(k, v)| (k.clone(), Self::expand(v, req, &names, false))).collect();
+                let fields: Vec<(String, String)> = fields
+                    .iter()
+                    .map(|(k, v)| (k.clone(), Self::expand(v, req, &names, false)))
+                    .collect();
                 let (ct, plan) = multipart::plan(
                     &fields,
-                    Some(FilePart { field: field.clone(), filename: req.resolved_filename(), mime: req.resolved_mime(), payload }),
+                    Some(FilePart {
+                        field: field.clone(),
+                        filename: req.resolved_filename(),
+                        mime: req.resolved_mime(),
+                        payload,
+                    }),
                 );
                 (plan, ct)
             }
@@ -254,7 +283,8 @@ impl Uploader for HttpUploader {
         if !headers.contains_key(CONTENT_TYPE) {
             headers.insert(
                 CONTENT_TYPE,
-                HeaderValue::from_str(&content_type).map_err(|_| UploadError::config("invalid content type"))?,
+                HeaderValue::from_str(&content_type)
+                    .map_err(|_| UploadError::config("invalid content type"))?,
             );
         }
         let method = match self.cfg.method {
@@ -264,7 +294,8 @@ impl Uploader for HttpUploader {
         };
         let len = plan.content_length();
         let (body, fault) = plan.into_body(ctx).await?;
-        let rb = ctx.http.request(method, &url).headers(headers).header(CONTENT_LENGTH, len).body(body);
+        let rb =
+            ctx.http.request(method, &url).headers(headers).header(CONTENT_LENGTH, len).body(body);
         let resp = http::fetch(ctx, rb, Some(&fault)).await?;
         if !resp.is_success() {
             return Err(resp.to_error(None));
@@ -275,7 +306,10 @@ impl Uploader for HttpUploader {
             ResultUrl::Header(h) => resp.header(h).unwrap_or_default().trim().to_owned(),
             ResultUrl::JsonPointer(p) => {
                 let v: serde_json::Value = serde_json::from_str(&resp.text).map_err(|e| {
-                    UploadError::invalid_response(format!("expected a JSON response ({e}): {}", http::snippet(&resp.text)))
+                    UploadError::invalid_response(format!(
+                        "expected a JSON response ({e}): {}",
+                        http::snippet(&resp.text)
+                    ))
                 })?;
                 match v.pointer(p) {
                     Some(serde_json::Value::String(s)) => s.clone(),
@@ -283,7 +317,9 @@ impl Uploader for HttpUploader {
                     Some(other) => other.to_string(),
                 }
             }
-            ResultUrl::Template(t) => Self::expand(t, req, &names, true).replace("{request_url}", &url),
+            ResultUrl::Template(t) => {
+                Self::expand(t, req, &names, true).replace("{request_url}", &url)
+            }
         };
         if public.is_empty() {
             return Err(UploadError::invalid_response(format!(
@@ -323,6 +359,8 @@ mod tests {
         assert!(HttpUploader::new(HttpUploaderConfig::put("x", "https://h/{filename}")).is_ok());
         assert!(HttpUploader::new(HttpUploaderConfig::put("x", "ftp://h/x")).is_err());
         assert!(HttpUploader::new(HttpUploaderConfig::put("x", "not a url")).is_err());
-        assert!(HttpUploader::new(HttpUploaderConfig::post_multipart("x", "https://h/u", "")).is_err());
+        assert!(
+            HttpUploader::new(HttpUploaderConfig::post_multipart("x", "https://h/u", "")).is_err()
+        );
     }
 }

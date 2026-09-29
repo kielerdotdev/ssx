@@ -64,7 +64,16 @@ impl LocalUploader {
 /// Keep only the last path component and neutralise anything that could escape the folder.
 fn safe_name(name: &str) -> String {
     let last = name.rsplit(['/', '\\']).next().unwrap_or(name);
-    let cleaned: String = last.chars().map(|c| if c.is_control() || matches!(c, ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c }).collect();
+    let cleaned: String = last
+        .chars()
+        .map(|c| {
+            if c.is_control() || matches!(c, ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
     let cleaned = cleaned.trim_matches(['.', ' ']).to_owned();
     if cleaned.is_empty() { "upload.bin".to_owned() } else { cleaned }
 }
@@ -95,7 +104,11 @@ impl Uploader for LocalUploader {
         true
     }
 
-    async fn upload(&self, req: &UploadRequest, ctx: &UploadContext) -> Result<UploadResult, UploadError> {
+    async fn upload(
+        &self,
+        req: &UploadRequest,
+        ctx: &UploadContext,
+    ) -> Result<UploadResult, UploadError> {
         ctx.check_cancelled()?;
         let file_name = safe_name(&req.resolved_filename());
         let total = req.payload_len().await?;
@@ -109,9 +122,13 @@ impl Uploader for LocalUploader {
                 (self.url_for(&file_name, source_path.as_deref()), None)
             }
             Some(dir) => {
-                tokio::fs::create_dir_all(dir).await.map_err(|e| UploadError::io(format!("creating {}", dir.display()), e))?;
+                tokio::fs::create_dir_all(dir)
+                    .await
+                    .map_err(|e| UploadError::io(format!("creating {}", dir.display()), e))?;
                 let target = unique_path(dir, &file_name);
-                let final_name = target.file_name().map_or_else(|| file_name.clone(), |n| n.to_string_lossy().into_owned());
+                let final_name = target
+                    .file_name()
+                    .map_or_else(|| file_name.clone(), |n| n.to_string_lossy().into_owned());
                 copy_payload(req, &target, total, ctx).await?;
                 let abs = std::fs::canonicalize(&target).unwrap_or_else(|_| target.clone());
                 (self.url_for(&final_name, Some(&abs)), Some(target))
@@ -132,7 +149,12 @@ impl Uploader for LocalUploader {
     }
 }
 
-async fn copy_payload(req: &UploadRequest, target: &Path, total: u64, ctx: &UploadContext) -> Result<(), UploadError> {
+async fn copy_payload(
+    req: &UploadRequest,
+    target: &Path,
+    total: u64,
+    ctx: &UploadContext,
+) -> Result<(), UploadError> {
     let ioerr = |what: &str, e| UploadError::io(format!("{what} {}", target.display()), e);
     let mut out = tokio::fs::File::create(target).await.map_err(|e| ioerr("creating", e))?;
     let mut sent = 0u64;
@@ -147,11 +169,16 @@ async fn copy_payload(req: &UploadRequest, target: &Path, total: u64, ctx: &Uplo
                 }
             }
             UploadSource::Path(p) => {
-                let mut src = tokio::fs::File::open(p).await.map_err(|e| UploadError::io(format!("opening {}", p.display()), e))?;
+                let mut src = tokio::fs::File::open(p)
+                    .await
+                    .map_err(|e| UploadError::io(format!("opening {}", p.display()), e))?;
                 let mut buf = vec![0u8; CHUNK];
                 loop {
                     ctx.check_cancelled()?;
-                    let n = src.read(&mut buf).await.map_err(|e| UploadError::io(format!("reading {}", p.display()), e))?;
+                    let n = src
+                        .read(&mut buf)
+                        .await
+                        .map_err(|e| UploadError::io(format!("reading {}", p.display()), e))?;
                     if n == 0 {
                         break;
                     }

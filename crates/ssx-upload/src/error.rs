@@ -145,12 +145,7 @@ mod tests {
     use super::*;
 
     fn http(status: u16) -> UploadError {
-        UploadError::Http {
-            status,
-            message: None,
-            body_snippet: String::new(),
-            retry_after: None,
-        }
+        UploadError::Http { status, message: None, body_snippet: String::new(), retry_after: None }
     }
 
     #[test]

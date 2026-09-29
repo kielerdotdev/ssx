@@ -89,12 +89,8 @@ pub struct HttpResponse {
 impl HttpResponse {
     /// Response header as text (multiple values joined with `, `).
     pub fn header(&self, name: &str) -> Option<String> {
-        let vals: Vec<&str> = self
-            .headers
-            .get_all(name)
-            .iter()
-            .filter_map(|v| v.to_str().ok())
-            .collect();
+        let vals: Vec<&str> =
+            self.headers.get_all(name).iter().filter_map(|v| v.to_str().ok()).collect();
         if vals.is_empty() { None } else { Some(vals.join(", ")) }
     }
 
@@ -111,9 +107,9 @@ impl HttpResponse {
         let code = self.status.as_u16();
         match code {
             401 | 403 => UploadError::Auth {
-                message: message
-                    .filter(|m| !m.is_empty())
-                    .unwrap_or_else(|| format!("server rejected the credentials (HTTP {code}): {snippet}")),
+                message: message.filter(|m| !m.is_empty()).unwrap_or_else(|| {
+                    format!("server rejected the credentials (HTTP {code}): {snippet}")
+                }),
             },
             429 => UploadError::RateLimited { retry_after },
             _ => UploadError::Http { status: code, message, body_snippet: snippet, retry_after },
@@ -200,7 +196,7 @@ pub fn map_send_error(
         cur = err.source();
     }
     if message.is_empty() {
-        message = "request failed".to_owned();
+        "request failed".clone_into(&mut message);
     }
     UploadError::Network { message, timed_out: e.is_timeout() }
 }
@@ -290,7 +286,9 @@ mod tests {
     #[test]
     fn status_mapping() {
         assert!(matches!(resp(401, "no").to_error(None), UploadError::Auth { .. }));
-        assert!(matches!(resp(403, "no").to_error(Some("bad key".into())), UploadError::Auth { message } if message == "bad key"));
+        assert!(
+            matches!(resp(403, "no").to_error(Some("bad key".into())), UploadError::Auth { message } if message == "bad key")
+        );
         assert!(matches!(resp(429, "").to_error(None), UploadError::RateLimited { .. }));
         assert!(matches!(resp(500, "boom").to_error(None), UploadError::Http { status: 500, .. }));
     }
