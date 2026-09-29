@@ -1,1 +1,1 @@
-//! ssx-ipc (stub — being implemented).
+//! stub
