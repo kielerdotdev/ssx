@@ -101,8 +101,6 @@ struct DocumentRepr {
     #[serde(default = "one")]
     next_id: u64,
     #[serde(default = "one32")]
-    next_group: u32,
-    #[serde(default = "one32")]
     step_start: u32,
 }
 
@@ -127,7 +125,6 @@ impl Serialize for Document {
             canvas: &'a Canvas,
             objects: &'a [Object],
             next_id: u64,
-            next_group: u32,
             step_start: u32,
         }
         let base = BaseRepr { width: self.base.width(), height: self.base.height(), png };
@@ -136,7 +133,6 @@ impl Serialize for Document {
             canvas: &self.canvas,
             objects: &self.objects,
             next_id: self.next_id,
-            next_group: self.next_group,
             step_start: self.step_start,
         }
         .serialize(s)
@@ -167,7 +163,6 @@ impl<'de> Deserialize<'de> for Document {
         doc.canvas = r.canvas;
         doc.objects = r.objects;
         doc.next_id = r.next_id.max(max_id + 1);
-        doc.next_group = r.next_group.max(1);
         doc.step_start = r.step_start;
         Ok(doc)
     }
@@ -326,7 +321,6 @@ mod tests {
         let doc = v["document"].as_object_mut().unwrap();
         doc.remove("canvas");
         doc.remove("step_start");
-        doc.remove("next_group");
         v["document"]["objects"][0]["style"] = serde_json::json!({});
         let back = Document::from_json(&v.to_string()).unwrap();
         assert_eq!(back.step_start(), 1);

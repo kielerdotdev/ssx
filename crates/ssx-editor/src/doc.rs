@@ -103,7 +103,6 @@ pub struct Document {
     pub(crate) canvas: Canvas,
     pub(crate) objects: Vec<Object>,
     pub(crate) next_id: u64,
-    pub(crate) next_group: u32,
     pub(crate) step_start: u32,
 }
 
@@ -113,7 +112,6 @@ impl PartialEq for Document {
             && self.canvas == other.canvas
             && self.objects == other.objects
             && self.next_id == other.next_id
-            && self.next_group == other.next_group
             && self.step_start == other.step_start
     }
 }
@@ -138,7 +136,6 @@ impl Document {
             canvas: Canvas::default(),
             objects: Vec::new(),
             next_id: 1,
-            next_group: 1,
             step_start: 1,
         }
     }
@@ -195,11 +192,10 @@ impl Document {
         id
     }
 
-    /// Reserves and returns a fresh group id.
-    pub fn alloc_group(&mut self) -> u32 {
-        let g = self.next_group;
-        self.next_group += 1;
-        g
+    /// A group id not used by any object (computed, so allocating one changes no state and
+    /// undo restores documents exactly).
+    pub fn fresh_group_id(&self) -> u32 {
+        self.objects.iter().filter_map(|o| o.group).max().unwrap_or(0) + 1
     }
 
     /// Inserts an object at `index` (clamped). Bypasses undo.

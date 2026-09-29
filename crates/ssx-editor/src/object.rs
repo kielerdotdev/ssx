@@ -889,7 +889,8 @@ impl ObjectKind {
             ObjectKind::Blur(e) | ObjectKind::Pixelate(e) => e.rect = RectF::default(),
             ObjectKind::Highlight(h) => {
                 h.rect = RectF::default();
-                h.points.clear();
+                // A non-empty point list is what marks the pen variant; keep one dummy point.
+                h.points = if h.points.is_empty() { Vec::new() } else { vec![PointF::default()] };
             }
             ObjectKind::Image(i) => {
                 i.rect = RectF::default();
@@ -1217,6 +1218,15 @@ impl Object {
                     }
                 }
             }
+        }
+    }
+
+    /// Is `p` inside the object's (rotated) box, regardless of fill? Used for placing a text
+    /// caret by clicking inside an edited text box.
+    pub fn hit_test_box(&self, p: PointF, tol: f32) -> bool {
+        match self.kind.as_box() {
+            Some((r, rot)) => in_rotated_rect(p, r.normalized(), rot, tol),
+            None => false,
         }
     }
 

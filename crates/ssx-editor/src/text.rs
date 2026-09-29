@@ -40,6 +40,13 @@ pub const DEFAULT_FAMILY: &str = "Liberation Sans";
 
 const CACHE_LIMIT: usize = 2048;
 
+/// Top-left of a balloon's text block: padded from the left, vertically centred when it fits.
+pub fn balloon_text_origin(b: &crate::object::BalloonShape, layout_height: f32) -> crate::geom::PointF {
+    let pad = b.content.padding.max(0.0);
+    let y = b.rect.y + ((b.rect.h - layout_height) / 2.0).max(pad.min(b.rect.h / 2.0));
+    crate::geom::PointF::new(b.rect.x + pad, y)
+}
+
 /// One visual line of laid-out text. Byte offsets index the **whole** text.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VisualLine {
