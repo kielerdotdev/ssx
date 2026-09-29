@@ -1,0 +1,30 @@
+[package]
+name = "ssx-capture-portal"
+description = "Wayland capture for GNOME (Mutter) and KDE Plasma (KWin): KWin ScreenShot2 and the xdg-desktop-portal Screenshot portal."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+ssx-types.workspace = true
+ssx-capture.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+tracing.workspace = true
+# The portal client. `default-features = false` avoids ashpd's default `tokio` runtime;
+# `async-io` (also used by zbus below) keeps tokio out of the dependency tree.
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "screenshot"] }
+zbus = { version = "5", default-features = false, features = ["async-io"] }
+image.workspace = true
+async-io = "2"
+futures-lite = "2"
+# Monitor enumeration through wl_output / xdg-output (needs no permission).
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "unstable"] }
+
+[lints]
+workspace = true
