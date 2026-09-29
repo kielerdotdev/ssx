@@ -21,7 +21,7 @@
 
 #![forbid(unsafe_code)]
 
-// pub mod history;
+pub mod history;
 // pub mod ipc;
 pub mod pattern;
 pub mod settings;
