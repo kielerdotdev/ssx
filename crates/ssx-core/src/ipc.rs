@@ -6,12 +6,12 @@
 //! # Wire format
 //!
 //! One JSON object per line, UTF-8, `\n` terminated (`\r\n` accepted). Every object carries
-//! the protocol version `v`. Requests also carry a caller-chosen correlation `id` that the
+//! the protocol version `v`. Requests also carry a caller-chosen correlation number `seq` that the
 //! response echoes:
 //!
 //! ```text
-//! {"v":1,"id":7,"type":"post_files","paths":["/home/u/a.png"],"action":{"kind":"upload"}}
-//! {"v":1,"id":7,"type":"accepted","run_id":3}
+//! {"v":1,"seq":7,"type":"post_files","paths":["/home/u/a.png"],"action":{"kind":"upload"}}
+//! {"v":1,"seq":7,"type":"accepted","run_id":3}
 //! ```
 //!
 //! # Compatibility rules
@@ -257,9 +257,10 @@ impl Response {
 pub struct RequestEnvelope {
     /// Protocol version.
     pub v: u32,
-    /// Correlation id chosen by the caller, echoed in the response.
+    /// Correlation number chosen by the caller, echoed in the response. (Named `seq`, not
+    /// `id`, because [`Request::RunWorkflow`] has its own `id` field in the same object.)
     #[serde(default)]
-    pub id: u64,
+    pub seq: u64,
     /// The request (its `type` and fields are flattened next to `v` and `id`).
     #[serde(flatten)]
     pub request: Request,
@@ -270,9 +271,9 @@ pub struct RequestEnvelope {
 pub struct ResponseEnvelope {
     /// Protocol version.
     pub v: u32,
-    /// The request's correlation id.
+    /// The request's correlation number.
     #[serde(default)]
-    pub id: u64,
+    pub seq: u64,
     /// The response.
     #[serde(flatten)]
     pub response: Response,
@@ -280,15 +281,15 @@ pub struct ResponseEnvelope {
 
 impl RequestEnvelope {
     /// Wraps `request` with the current version.
-    pub fn new(id: u64, request: Request) -> Self {
-        Self { v: PROTOCOL_VERSION, id, request }
+    pub fn new(seq: u64, request: Request) -> Self {
+        Self { v: PROTOCOL_VERSION, seq, request }
     }
 }
 
 impl ResponseEnvelope {
     /// Wraps `response` with the current version.
-    pub fn new(id: u64, response: Response) -> Self {
-        Self { v: PROTOCOL_VERSION, id, response }
+    pub fn new(seq: u64, response: Response) -> Self {
+        Self { v: PROTOCOL_VERSION, seq, response }
     }
 }
 
@@ -534,18 +535,18 @@ mod tests {
     fn wire_format_is_stable() {
         // These literals are the protocol; changing them is a breaking change.
         let cases: Vec<(RequestEnvelope, &str)> = vec![
-            (RequestEnvelope::new(1, Request::Ping), r#"{"v":1,"id":1,"type":"ping"}"#),
+            (RequestEnvelope::new(1, Request::Ping), r#"{"v":1,"seq":1,"type":"ping"}"#),
             (
                 RequestEnvelope::new(7, Request::PostFiles { paths: vec!["/a.png".into()], action: PostAction::Upload, wait: false }),
-                r#"{"v":1,"id":7,"type":"post_files","paths":["/a.png"],"action":{"kind":"upload"},"wait":false}"#,
+                r#"{"v":1,"seq":7,"type":"post_files","paths":["/a.png"],"action":{"kind":"upload"},"wait":false}"#,
             ),
             (
                 RequestEnvelope::new(2, Request::RunWorkflow { id: None, name: Some("region".into()), wait: true }),
-                r#"{"v":1,"id":2,"type":"run_workflow","name":"region","wait":true}"#,
+                r#"{"v":1,"seq":2,"type":"run_workflow","name":"region","wait":true}"#,
             ),
             (
                 RequestEnvelope::new(3, Request::Capture { target: CaptureKind::LastRegion, workflow: None, delay_ms: Some(10), wait: false }),
-                r#"{"v":1,"id":3,"type":"capture","target":"last_region","delay_ms":10,"wait":false}"#,
+                r#"{"v":1,"seq":3,"type":"capture","target":"last_region","delay_ms":10,"wait":false}"#,
             ),
         ];
         for (env, expected) in cases {
@@ -555,30 +556,30 @@ mod tests {
         }
         assert_eq!(
             encode_line(&ResponseEnvelope::new(7, Response::Accepted { run_id: 3 })).unwrap().trim_end(),
-            r#"{"v":1,"id":7,"type":"accepted","run_id":3}"#
+            r#"{"v":1,"seq":7,"type":"accepted","run_id":3}"#
         );
         assert_eq!(
             encode_line(&ResponseEnvelope::new(0, Response::error(ErrorCode::Busy, "b"))).unwrap().trim_end(),
-            r#"{"v":1,"id":0,"type":"error","code":"busy","message":"b"}"#
+            r#"{"v":1,"seq":0,"type":"error","code":"busy","message":"b"}"#
         );
         assert_eq!(
             encode_line(&ResponseEnvelope::new(0, Response::Ok)).unwrap().trim_end(),
-            r#"{"v":1,"id":0,"type":"ok"}"#
+            r#"{"v":1,"seq":0,"type":"ok"}"#
         );
     }
 
     #[test]
     fn optional_fields_default_and_unknown_fields_are_ignored() {
         let r: RequestEnvelope = decode_line(r#"{"v":1,"type":"run_workflow","id":"x","future_field":{"a":[1,2]}}"#).unwrap();
-        assert_eq!(r.id, 0, "missing correlation id defaults to 0");
+        assert_eq!(r.seq, 0, "missing correlation number defaults to 0");
         assert_eq!(r.request, Request::RunWorkflow { id: Some("x".into()), name: None, wait: false });
-        let r: RequestEnvelope = decode_line(r#"{"v":1,"id":5,"type":"capture","target":"window"}"#).unwrap();
+        let r: RequestEnvelope = decode_line(r#"{"v":1,"seq":5,"type":"capture","target":"window"}"#).unwrap();
         assert_eq!(r.request, Request::Capture { target: CaptureKind::Window, workflow: None, delay_ms: None, wait: false });
     }
 
     #[test]
     fn newer_versions_are_refused_before_the_body_is_parsed() {
-        let e = decode_line::<RequestEnvelope>(r#"{"v":2,"id":1,"type":"teleport","x":1}"#).unwrap_err();
+        let e = decode_line::<RequestEnvelope>(r#"{"v":2,"seq":1,"type":"teleport","x":1}"#).unwrap_err();
         assert!(matches!(e, CodecError::UnsupportedVersion { found: 2, supported: 1 }), "{e}");
         assert_eq!(e.error_code(), Some(ErrorCode::VersionMismatch));
         assert!(e.to_string().contains("upgrade ssx"));
@@ -587,7 +588,7 @@ mod tests {
     #[test]
     fn bad_versions_and_bodies() {
         let cases = [
-            (r#"{"id":1,"type":"ping"}"#, "MissingVersion"),
+            (r#"{"seq":1,"type":"ping"}"#, "MissingVersion"),
             (r#"{"v":"1","type":"ping"}"#, "Malformed"),
             (r#"{"v":-1,"type":"ping"}"#, "Malformed"),
             (r#"{"v":1.5,"type":"ping"}"#, "Malformed"),
@@ -621,7 +622,7 @@ mod tests {
 
     #[test]
     fn crlf_and_trailing_whitespace_are_tolerated() {
-        let r: RequestEnvelope = decode_line("{\"v\":1,\"id\":1,\"type\":\"ping\"}\r\n").unwrap();
+        let r: RequestEnvelope = decode_line("{\"v\":1,\"seq\":1,\"type\":\"ping\"}\r\n").unwrap();
         assert_eq!(r.request, Request::Ping);
     }
 
@@ -661,7 +662,7 @@ mod tests {
         let mut rd = LineReader::new(Cursor::new(bytes));
         let mut n = 0;
         while let Some(m) = rd.read_message::<RequestEnvelope>().unwrap() {
-            assert_eq!(m.id, n);
+            assert_eq!(m.seq, n);
             n += 1;
         }
         assert_eq!(n as usize, all_requests().len());
@@ -670,7 +671,7 @@ mod tests {
 
     #[test]
     fn last_line_without_newline_and_blank_lines() {
-        let mut rd = reader(b"\n\r\n  \n{\"v\":1,\"id\":1,\"type\":\"ping\"}\n\n{\"v\":1,\"id\":2,\"type\":\"quit\"}");
+        let mut rd = reader(b"\n\r\n  \n{\"v\":1,\"seq\":1,\"type\":\"ping\"}\n\n{\"v\":1,\"seq\":2,\"type\":\"quit\"}");
         assert_eq!(rd.read_message::<RequestEnvelope>().unwrap().unwrap().request, Request::Ping);
         assert_eq!(rd.read_message::<RequestEnvelope>().unwrap().unwrap().request, Request::Quit);
         assert!(rd.read_message::<RequestEnvelope>().unwrap().is_none());
@@ -684,7 +685,7 @@ mod tests {
 
     #[test]
     fn partial_message_at_eof_is_malformed_not_a_hang() {
-        let mut rd = reader(b"{\"v\":1,\"id\":1,\"ty");
+        let mut rd = reader(b"{\"v\":1,\"seq\":1,\"ty");
         let e = rd.read_message::<RequestEnvelope>().unwrap_err();
         assert!(matches!(e, CodecError::Malformed(_)));
     }
@@ -693,12 +694,12 @@ mod tests {
     fn oversized_line_is_skipped_and_the_stream_resynchronises() {
         let mut data = vec![b'x'; MAX_LINE_BYTES + 5000];
         data.push(b'\n');
-        data.extend_from_slice(b"{\"v\":1,\"id\":9,\"type\":\"ping\"}\n");
+        data.extend_from_slice(b"{\"v\":1,\"seq\":9,\"type\":\"ping\"}\n");
         let mut rd = reader(&data);
         let e = rd.read_message::<RequestEnvelope>().unwrap_err();
         assert!(matches!(e, CodecError::LineTooLong));
         assert_eq!(e.error_code(), Some(ErrorCode::InvalidRequest));
-        assert_eq!(rd.read_message::<RequestEnvelope>().unwrap().unwrap().id, 9);
+        assert_eq!(rd.read_message::<RequestEnvelope>().unwrap().unwrap().seq, 9);
     }
 
     #[test]
@@ -721,7 +722,7 @@ mod tests {
 
     #[test]
     fn invalid_utf8_is_malformed() {
-        let mut rd = reader(b"{\"v\":1,\"type\":\"\xFF\"}\n{\"v\":1,\"id\":1,\"type\":\"ping\"}\n");
+        let mut rd = reader(b"{\"v\":1,\"type\":\"\xFF\"}\n{\"v\":1,\"seq\":1,\"type\":\"ping\"}\n");
         assert!(matches!(rd.read_message::<RequestEnvelope>(), Err(CodecError::Malformed(_))));
         assert!(rd.read_message::<RequestEnvelope>().unwrap().is_some(), "next line still readable");
     }
@@ -739,8 +740,8 @@ mod tests {
                 Ok(1)
             }
         }
-        let mut rd = LineReader::new(io::BufReader::with_capacity(1, Trickle(b"{\"v\":1,\"id\":4,\"type\":\"ping\"}\n".to_vec(), 0)));
-        assert_eq!(rd.read_message::<RequestEnvelope>().unwrap().unwrap().id, 4);
+        let mut rd = LineReader::new(io::BufReader::with_capacity(1, Trickle(b"{\"v\":1,\"seq\":4,\"type\":\"ping\"}\n".to_vec(), 0)));
+        assert_eq!(rd.read_message::<RequestEnvelope>().unwrap().unwrap().seq, 4);
     }
 
     #[test]
