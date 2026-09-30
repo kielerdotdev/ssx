@@ -11,6 +11,8 @@ mod general;
 mod history;
 #[path = "ui/hotkeys.rs"]
 mod hotkeys;
+#[path = "ui/integration.rs"]
+mod integration;
 #[path = "ui/shell.rs"]
 mod shell;
 #[path = "ui/uploaders.rs"]
