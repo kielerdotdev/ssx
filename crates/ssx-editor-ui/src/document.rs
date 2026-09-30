@@ -138,10 +138,10 @@ impl EditorDoc {
         if self.revision == self.saved_revision {
             return false;
         }
-        if let Some((rev, d)) = self.dirty_cache.get() {
-            if rev == self.revision {
-                return d;
-            }
+        if let Some((rev, d)) = self.dirty_cache.get()
+            && rev == self.revision
+        {
+            return d;
         }
         let d = self.saved_revision == u64::MAX || *self.session.document() != self.saved_doc;
         self.dirty_cache.set(Some((self.revision, d)));

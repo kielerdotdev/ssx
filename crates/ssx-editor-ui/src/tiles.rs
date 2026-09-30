@@ -265,6 +265,7 @@ impl TilePlanner {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // exact values are what these tests assert
 mod tests {
     use proptest::prelude::*;
 

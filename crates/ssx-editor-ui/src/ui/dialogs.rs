@@ -16,7 +16,9 @@ use crate::{
     document::EditorDoc,
     effects::EffectKind,
     export::SaveFormat,
-    forms::{CanvasForm, CropForm, CutForm, MAX_SIDE, OpenForm, ResizeForm, SaveForm},
+    forms::{
+        CanvasForm, CropForm, CutForm, MAX_SIDE, MAX_SIDE_I32, OpenForm, ResizeForm, SaveForm,
+    },
     preview::Preview,
     props::ColorField,
     shortcuts::{GESTURES, grouped},
@@ -105,11 +107,8 @@ fn modal(
         ui.set_width(width);
         content(ui)
     });
-    match m.inner {
-        Some(true) => true,
-        Some(false) => true,
-        None => m.should_close(),
-    }
+    // Any button (confirm or cancel) ends the dialog; otherwise only Esc / a click outside does.
+    m.inner.is_some() || m.should_close()
 }
 
 fn save_as(ctx: &Context, state: &mut AppState, f: &mut SaveForm) -> bool {
@@ -156,7 +155,7 @@ fn save_as(ctx: &Context, state: &mut AppState, f: &mut SaveForm) -> bool {
                 });
             }
             SaveFormat::Image(ssx_types::ImageFormat::WebP) => {
-                caption(ui, "WebP is saved lossless.")
+                caption(ui, "WebP is saved lossless.");
             }
             SaveFormat::Project => {
                 caption(
@@ -170,12 +169,10 @@ fn save_as(ctx: &Context, state: &mut AppState, f: &mut SaveForm) -> bool {
         error_line(ui, target.as_ref().err().map(String::as_str));
         buttons(ui, "Save", target.is_ok()).inspect(|ok| confirmed = *ok)
     });
-    if confirmed {
-        if let Ok(path) = f.target() {
-            state.prefs.jpeg_quality = f.jpeg_quality;
-            state.prefs.png_fast = f.png_fast;
-            state.push(Action::SaveTo { path, settings: f.settings() });
-        }
+    if confirmed && let Ok(path) = f.target() {
+        state.prefs.jpeg_quality = f.jpeg_quality;
+        state.prefs.png_fast = f.png_fast;
+        state.push(Action::SaveTo { path, settings: f.settings() });
     }
     closed
 }
@@ -200,10 +197,8 @@ fn open(ctx: &Context, state: &mut AppState, f: &mut OpenForm) -> bool {
         }
         buttons(ui, "Open", t.is_ok()).inspect(|ok| confirmed = *ok)
     });
-    if confirmed {
-        if let Ok(p) = f.target() {
-            state.push(Action::OpenPath(p));
-        }
+    if confirmed && let Ok(p) = f.target() {
+        state.push(Action::OpenPath(p));
     }
     closed
 }
@@ -254,10 +249,8 @@ fn resize(ctx: &Context, state: &mut AppState, f: &mut ResizeForm) -> bool {
         error_line(ui, t.as_ref().err().map(String::as_str));
         buttons(ui, "Resize", t.is_ok()).inspect(|ok| confirmed = *ok)
     });
-    if confirmed {
-        if let Ok((w, h)) = f.target() {
-            state.push(Action::Resize { width: w, height: h, filter: f.filter });
-        }
+    if confirmed && let Ok((w, h)) = f.target() {
+        state.push(Action::Resize { width: w, height: h, filter: f.filter });
     }
     closed
 }
@@ -279,7 +272,7 @@ fn canvas(ctx: &Context, state: &mut AppState, f: &mut CanvasForm) -> bool {
             row(ui, label, |ui| {
                 ui.add(
                     egui::DragValue::new(v)
-                        .range(-(MAX_SIDE as i32)..=MAX_SIDE as i32)
+                        .range(-MAX_SIDE_I32..=MAX_SIDE_I32)
                         .speed(1.0)
                         .suffix(" px"),
                 );
@@ -319,16 +312,12 @@ fn crop(ctx: &Context, state: &mut AppState, f: &mut CropForm) -> bool {
         caption(ui, &format!("Image: {} x {} px", f.image.0, f.image.1));
         row(ui, "Left", |ui| {
             ui.add(
-                egui::DragValue::new(&mut f.x)
-                    .range(-(MAX_SIDE as i32)..=MAX_SIDE as i32)
-                    .suffix(" px"),
+                egui::DragValue::new(&mut f.x).range(-MAX_SIDE_I32..=MAX_SIDE_I32).suffix(" px"),
             );
         });
         row(ui, "Top", |ui| {
             ui.add(
-                egui::DragValue::new(&mut f.y)
-                    .range(-(MAX_SIDE as i32)..=MAX_SIDE as i32)
-                    .suffix(" px"),
+                egui::DragValue::new(&mut f.y).range(-MAX_SIDE_I32..=MAX_SIDE_I32).suffix(" px"),
             );
         });
         row(ui, "Width", |ui| {
@@ -355,10 +344,8 @@ fn crop(ctx: &Context, state: &mut AppState, f: &mut CropForm) -> bool {
         state.push(Action::AutoCrop(f.tolerance));
         return true;
     }
-    if confirmed {
-        if let Ok(r) = f.rect() {
-            state.push(Action::CropTo(r));
-        }
+    if confirmed && let Ok(r) = f.rect() {
+        state.push(Action::CropTo(r));
     }
     closed
 }
@@ -392,10 +379,8 @@ fn cut_out(ctx: &Context, state: &mut AppState, f: &mut CutForm) -> bool {
         error_line(ui, s.as_ref().err().map(String::as_str));
         buttons(ui, "Cut out", s.is_ok()).inspect(|ok| confirmed = *ok)
     });
-    if confirmed {
-        if let Ok((axis, start, end)) = f.strip() {
-            state.push(Action::CutOut { axis, start, end });
-        }
+    if confirmed && let Ok((axis, start, end)) = f.strip() {
+        state.push(Action::CutOut { axis, start, end });
     }
     closed
 }

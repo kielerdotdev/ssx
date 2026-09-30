@@ -198,22 +198,22 @@ fn controls(ui: &mut Ui, state: &mut AppState, doc: &EditorDoc, p: &Props) {
             edits.push(PropEdit::CornerRadius(r));
         }
     }
-    if c.smooth {
-        if let ObjectKind::Freehand(f) = &p.kind {
-            let mut s = f.smooth;
-            if ui.checkbox(&mut s, "Smooth").changed() {
-                edits.push(PropEdit::Smooth(s));
-            }
+    if c.smooth
+        && let ObjectKind::Freehand(f) = &p.kind
+    {
+        let mut s = f.smooth;
+        if ui.checkbox(&mut s, "Smooth").changed() {
+            edits.push(PropEdit::Smooth(s));
         }
     }
 
     if c.text {
         text_controls(ui, state, p, &mut edits);
     }
-    if c.arrow {
-        if let Some(h) = p.arrow_heads() {
-            arrow_controls(ui, h, &mut edits);
-        }
+    if c.arrow
+        && let Some(h) = p.arrow_heads()
+    {
+        arrow_controls(ui, h, &mut edits);
     }
     if c.step {
         if let ObjectKind::Step(s) = &p.kind {
@@ -248,89 +248,89 @@ fn controls(ui: &mut Ui, state: &mut AppState, doc: &EditorDoc, p: &Props) {
             }
         }
     }
-    if c.magnify {
-        if let ObjectKind::Magnify(m) = &p.kind {
-            let mut z = m.zoom;
-            if widgets::slider(ui, "Zoom", &mut z, 1.25..=8.0, "x") {
-                edits.push(PropEdit::MagnifyZoom(z));
-            }
-            if let Some(v) = segmented(ui, m.circular, &[(true, "Round"), (false, "Square")]) {
-                edits.push(PropEdit::MagnifyCircular(v));
-            }
+    if c.magnify
+        && let ObjectKind::Magnify(m) = &p.kind
+    {
+        let mut z = m.zoom;
+        if widgets::slider(ui, "Zoom", &mut z, 1.25..=8.0, "x") {
+            edits.push(PropEdit::MagnifyZoom(z));
+        }
+        if let Some(v) = segmented(ui, m.circular, &[(true, "Round"), (false, "Square")]) {
+            edits.push(PropEdit::MagnifyCircular(v));
         }
     }
-    if c.spotlight {
-        if let ObjectKind::Spotlight(s) = &p.kind {
-            if let Some(v) = segmented(ui, s.ellipse, &[(false, "Rectangle"), (true, "Ellipse")]) {
-                edits.push(PropEdit::SpotlightEllipse(v));
-            }
-            caption(ui, "Dim");
-            if let Some(col) =
-                color_button(ui, "Dim colour", s.dim, ColorField::SpotlightDim, state, false)
-            {
-                edits.push(PropEdit::SpotlightDim(col));
-            }
-            let mut f = s.feather;
-            if widgets::slider(ui, "Feather", &mut f, 0.0..=60.0, " px") {
-                edits.push(PropEdit::SpotlightFeather(f));
-            }
+    if c.spotlight
+        && let ObjectKind::Spotlight(s) = &p.kind
+    {
+        if let Some(v) = segmented(ui, s.ellipse, &[(false, "Rectangle"), (true, "Ellipse")]) {
+            edits.push(PropEdit::SpotlightEllipse(v));
+        }
+        caption(ui, "Dim");
+        if let Some(col) =
+            color_button(ui, "Dim colour", s.dim, ColorField::SpotlightDim, state, false)
+        {
+            edits.push(PropEdit::SpotlightDim(col));
+        }
+        let mut f = s.feather;
+        if widgets::slider(ui, "Feather", &mut f, 0.0..=60.0, " px") {
+            edits.push(PropEdit::SpotlightFeather(f));
         }
     }
-    if c.grid {
-        if let ObjectKind::Grid(g) = &p.kind {
-            egui::ComboBox::from_id_salt("grid-pattern")
-                .selected_text(grid_name(g.pattern))
-                .width(96.0)
-                .show_ui(ui, |ui| {
-                    for pat in [
-                        GridPattern::Grid,
-                        GridPattern::HatchForward,
-                        GridPattern::HatchBackward,
-                        GridPattern::CrossHatch,
-                        GridPattern::Dots,
-                    ] {
-                        if ui.selectable_label(g.pattern == pat, grid_name(pat)).clicked() {
-                            edits.push(PropEdit::GridPattern(pat));
-                        }
+    if c.grid
+        && let ObjectKind::Grid(g) = &p.kind
+    {
+        egui::ComboBox::from_id_salt("grid-pattern")
+            .selected_text(grid_name(g.pattern))
+            .width(96.0)
+            .show_ui(ui, |ui| {
+                for pat in [
+                    GridPattern::Grid,
+                    GridPattern::HatchForward,
+                    GridPattern::HatchBackward,
+                    GridPattern::CrossHatch,
+                    GridPattern::Dots,
+                ] {
+                    if ui.selectable_label(g.pattern == pat, grid_name(pat)).clicked() {
+                        edits.push(PropEdit::GridPattern(pat));
                     }
-                });
-            let mut s = g.spacing;
-            if widgets::slider(ui, "Spacing", &mut s, 4.0..=80.0, " px") {
-                edits.push(PropEdit::GridSpacing(s));
-            }
+                }
+            });
+        let mut s = g.spacing;
+        if widgets::slider(ui, "Spacing", &mut s, 4.0..=80.0, " px") {
+            edits.push(PropEdit::GridSpacing(s));
         }
     }
-    if c.cursor {
-        if let ObjectKind::Cursor(cur) = &p.kind {
-            if let Some(k) = segmented(
-                ui,
-                cur.kind,
-                &[
-                    (CursorKind::Arrow, "Arrow"),
-                    (CursorKind::IBeam, "I-beam"),
-                    (CursorKind::Crosshair, "Cross"),
-                ],
-            ) {
-                edits.push(PropEdit::CursorKind(k));
-            }
-            let mut s = cur.scale;
-            if widgets::slider(ui, "Size", &mut s, 0.5..=4.0, "x") {
-                edits.push(PropEdit::CursorScale(s));
-            }
+    if c.cursor
+        && let ObjectKind::Cursor(cur) = &p.kind
+    {
+        if let Some(k) = segmented(
+            ui,
+            cur.kind,
+            &[
+                (CursorKind::Arrow, "Arrow"),
+                (CursorKind::IBeam, "I-beam"),
+                (CursorKind::Crosshair, "Cross"),
+            ],
+        ) {
+            edits.push(PropEdit::CursorKind(k));
+        }
+        let mut s = cur.scale;
+        if widgets::slider(ui, "Size", &mut s, 0.5..=4.0, "x") {
+            edits.push(PropEdit::CursorScale(s));
         }
     }
-    if c.balloon {
-        if let ObjectKind::Balloon(b) = &p.kind {
-            let mut w = b.tail_width;
-            if widgets::slider(ui, "Tail", &mut w, 4.0..=80.0, " px") {
-                edits.push(PropEdit::TailWidth(w));
-            }
+    if c.balloon
+        && let ObjectKind::Balloon(b) = &p.kind
+    {
+        let mut w = b.tail_width;
+        if widgets::slider(ui, "Tail", &mut w, 4.0..=80.0, " px") {
+            edits.push(PropEdit::TailWidth(w));
         }
     }
-    if c.sticker {
-        if let ObjectKind::Sticker(s) = &p.kind {
-            sticker_picker(ui, &s.source, &mut edits);
-        }
+    if c.sticker
+        && let ObjectKind::Sticker(s) = &p.kind
+    {
+        sticker_picker(ui, &s.source, &mut edits);
     }
     if c.opacity {
         let mut o = st.opacity * 100.0;
@@ -462,7 +462,7 @@ fn text_controls(ui: &mut Ui, state: &mut AppState, p: &Props, edits: &mut Vec<P
     let mut has_outline = t.outline.is_some();
     if ui.checkbox(&mut has_outline, "Outline").changed() {
         edits.push(PropEdit::TextOutline(
-            has_outline.then(|| TextOutline { color: Color::BLACK, width: 2.0 }),
+            has_outline.then_some(TextOutline { color: Color::BLACK, width: 2.0 }),
         ));
     }
     if let Some(o) = t.outline {

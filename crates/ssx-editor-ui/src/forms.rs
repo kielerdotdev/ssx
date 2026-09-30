@@ -13,6 +13,8 @@ use crate::export::{ExportSettings, SaveFormat};
 
 /// Largest side length the editor accepts for resize/canvas operations.
 pub const MAX_SIDE: u32 = 32_768;
+/// [`MAX_SIDE`] as a signed value, for spinners that also accept negative deltas.
+pub const MAX_SIDE_I32: i32 = 32_768;
 
 /// "Save as" form.
 #[derive(Debug, Clone, PartialEq)]
@@ -285,6 +287,11 @@ impl CutForm {
         }
     }
 
+    /// `true` for a zero-length image (never a valid document, but keeps `len` honest).
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Validates the strip.
     pub fn strip(&self) -> Result<(Axis, i32, i32), String> {
         let len = self.len();
@@ -297,7 +304,8 @@ impl CutForm {
         if self.start == 0 && self.end == len {
             return Err("That would remove the whole image.".into());
         }
-        Ok((self.axis, self.start as i32, self.end as i32))
+        let conv = |v: u32| i32::try_from(v).unwrap_or(i32::MAX);
+        Ok((self.axis, conv(self.start), conv(self.end)))
     }
 }
 

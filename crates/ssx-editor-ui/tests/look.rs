@@ -1,7 +1,6 @@
 //! Exploration helper: dumps renderings of several states to `SSX_UI_DUMP` for a human to look
 //! at. Not a golden test (see `snapshots.rs`).
 
-mod annotate;
 mod common;
 
 use common::*;
@@ -19,7 +18,7 @@ fn dump_states() {
     }
     let mut h = window(app_for(dashboard()), [1280.0, 800.0]);
     settle(&mut h);
-    annotate::annotate(&mut h);
+    common::annotate::annotate(&mut h);
     settle(&mut h);
     dump(&mut h, "annotated");
 

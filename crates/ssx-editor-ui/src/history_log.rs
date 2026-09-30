@@ -65,10 +65,10 @@ pub fn label_of(cmd: &Command) -> String {
         }
         Command::Reorder { .. } => "Change order".into(),
         Command::SetDocument { before, after } => {
-            if before.image_size() != after.image_size() {
-                "Change image size".into()
-            } else {
+            if before.image_size() == after.image_size() {
                 "Change image".into()
+            } else {
+                "Change image size".into()
             }
         }
         Command::Batch(_) => "Several changes".into(),
@@ -140,10 +140,10 @@ impl HistoryLog {
             std::cmp::Ordering::Equal => {
                 // A coalesced edit (typing, dragging, a slider) keeps its step but its
                 // description may have changed, e.g. "Add text" -> "Edit text".
-                if let (Some(l), Some(last)) = (label, self.undo.last_mut()) {
-                    if !last.starts_with("Add ") || l.starts_with("Add ") {
-                        *last = l;
-                    }
+                if let (Some(l), Some(last)) = (label, self.undo.last_mut())
+                    && (!last.starts_with("Add ") || l.starts_with("Add "))
+                {
+                    *last = l;
                 }
             }
             std::cmp::Ordering::Less => self.undo.truncate(undo_len),

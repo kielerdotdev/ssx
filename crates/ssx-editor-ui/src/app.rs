@@ -250,7 +250,7 @@ impl EditorApp {
             },
         );
         self.absorb(&ctx, &pumped);
-        self.drop_overlay(&ctx);
+        Self::drop_overlay(&ctx);
         dialogs::show(&ctx, &mut self.state, &self.doc, &self.preview);
         self.process_actions();
         if self.preview.active() && !matches!(self.state.dialog, Some(Dialog::Effect(_))) {
@@ -292,7 +292,7 @@ impl EditorApp {
             .show(ui, |ui| props_bar::show(ui, &mut self.state, &self.doc));
     }
 
-    fn drop_overlay(&self, ctx: &Context) {
+    fn drop_overlay(ctx: &Context) {
         let hovering = ctx.input(|i| !i.raw.hovered_files.is_empty());
         if !hovering {
             return;
@@ -343,11 +343,12 @@ impl EditorApp {
             let w = &mut self.state.prefs.window;
             w.maximized = v.maximized.unwrap_or(false);
             if !w.maximized && v.fullscreen != Some(true) {
-                if let Some(r) = v.inner_rect {
-                    if r.width() > 100.0 && r.height() > 100.0 {
-                        w.width = r.width();
-                        w.height = r.height();
-                    }
+                if let Some(r) = v.inner_rect
+                    && r.width() > 100.0
+                    && r.height() > 100.0
+                {
+                    w.width = r.width();
+                    w.height = r.height();
                 }
                 if let Some(r) = v.outer_rect {
                     w.x = Some(r.min.x);
@@ -508,10 +509,10 @@ impl EditorApp {
         if let Some(t) = &p.clipboard_text {
             self.pending_clipboard_text = Some(t.clone());
         }
-        if let Some(t) = p.tool_changed {
-            if self.state.tool.engine() != t {
-                self.state.select_tool(ToolId::from_engine(t));
-            }
+        if let Some(t) = p.tool_changed
+            && self.state.tool.engine() != t
+        {
+            self.state.select_tool(ToolId::from_engine(t));
         }
         p
     }
@@ -569,12 +570,11 @@ impl EditorApp {
             },
             Action::SaveTo { path, settings } => {
                 self.write_to(&path, settings);
-                if self.state.dialog.is_none()
-                    || matches!(self.state.dialog, Some(Dialog::SaveAs(_)))
+                if (self.state.dialog.is_none()
+                    || matches!(self.state.dialog, Some(Dialog::SaveAs(_))))
+                    && !matches!(self.state.dialog, Some(Dialog::Error { .. }))
                 {
-                    if !matches!(self.state.dialog, Some(Dialog::Error { .. })) {
-                        self.state.close_dialog();
-                    }
+                    self.state.close_dialog();
                 }
             }
             Action::BrowseSaveTarget => {
@@ -838,13 +838,14 @@ impl EditorApp {
                 Some(p) => self.doc.session.styles_mut().remember(Tool::Text, p),
                 None => self.doc.session.styles_mut().reset(Tool::Text),
             },
-            ToolId::TextBoxed => match self.state.prefs.text_boxed.clone() {
-                Some(p) => self.doc.session.styles_mut().remember(Tool::Text, p),
-                None => {
+            ToolId::TextBoxed => {
+                if let Some(p) = self.state.prefs.text_boxed.clone() {
+                    self.doc.session.styles_mut().remember(Tool::Text, p);
+                } else {
                     self.doc.session.styles_mut().reset(Tool::Text);
                     props::make_text_boxed(&mut self.doc.session);
                 }
-            },
+            }
             _ => {}
         }
         if t == ToolId::Image && !self.state.has_pending_image {
@@ -912,8 +913,9 @@ impl EditorApp {
 
     fn save(&mut self) {
         match self.save_target() {
-            Some(SaveTarget::Image(p)) => self.write_to(&p, self.state.export_settings()),
-            Some(SaveTarget::Project(p)) => self.write_to(&p, self.state.export_settings()),
+            Some(SaveTarget::Image(p) | SaveTarget::Project(p)) => {
+                self.write_to(&p, self.state.export_settings());
+            }
             None => self.open_save_dialog(false),
         }
     }
@@ -1093,7 +1095,7 @@ impl EditorApp {
                         self.set_pending_image(f);
                     }
                     Err(e) => {
-                        self.error("Cannot load the image", format!("{}: {e}", path.display()))
+                        self.error("Cannot load the image", format!("{}: {e}", path.display()));
                     }
                 }
             }

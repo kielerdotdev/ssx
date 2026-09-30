@@ -246,13 +246,15 @@ mod tests {
     fn round_trip_through_a_file() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("sub").join(FILE_NAME);
-        let mut p = Prefs::default();
-        p.window = WindowPrefs {
-            width: 1000.0,
-            height: 700.0,
-            x: Some(10.0),
-            y: Some(20.0),
-            maximized: true,
+        let mut p = Prefs {
+            window: WindowPrefs {
+                width: 1000.0,
+                height: 700.0,
+                x: Some(10.0),
+                y: Some(20.0),
+                maximized: true,
+            },
+            ..Prefs::default()
         };
         p.last_tool = ToolId::TextBoxed;
         p.remember_color(Color::rgb(1, 2, 3));

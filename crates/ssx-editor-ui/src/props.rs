@@ -469,6 +469,7 @@ pub fn make_text_boxed(session: &mut EditorSession) {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // exact values are what these tests assert
 mod tests {
     use ssx_editor::{Modifiers, PointF, object::Axis};
     use ssx_imgfx::solid_frame;

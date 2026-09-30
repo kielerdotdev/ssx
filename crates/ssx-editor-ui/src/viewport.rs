@@ -4,7 +4,7 @@
 //!
 //! Everything here is in **screen units**, and the canvas widget chooses those to be
 //! *physical pixels* (egui points multiplied by `pixels_per_point`). That makes `zoom` "device
-//! pixels per canvas pixel" so 100 % really is one image pixel per screen pixel on a HiDPI
+//! pixels per canvas pixel" so 100 % really is one image pixel per screen pixel on a `HiDPI`
 //! display, and the tile renderer can ask the engine for `scale = zoom` and blit the result
 //! 1:1 without resampling. The conversion to points happens once, at the widget boundary.
 //!
@@ -259,6 +259,7 @@ impl Viewport {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // exact values are what these tests assert
 mod tests {
     use super::*;
     use proptest::prelude::*;
@@ -419,6 +420,16 @@ mod tests {
             let anchor = pos2(anchor.x.round(), anchor.y.round());
             let before = v.screen_to_canvas(anchor);
             let z0 = v.zoom();
+            // The loose clamp deliberately moves content that would end up with less than the
+            // "keep visible" strip on screen; the property is about the unclamped case.
+            let new_zoom = (z0 * factor).clamp(MIN_ZOOM, MAX_ZOOM);
+            let k = new_zoom / z0;
+            let off = anchor.to_vec2() - (anchor.to_vec2() - v.origin()) * k;
+            let size = v.content() * new_zoom;
+            let keep_x = MIN_VISIBLE.min(size.x).min(v.view().x / 2.0).max(1.0);
+            let keep_y = MIN_VISIBLE.min(size.y).min(v.view().y / 2.0).max(1.0);
+            prop_assume!(off.x >= keep_x - size.x && off.x <= v.view().x - keep_x);
+            prop_assume!(off.y >= keep_y - size.y && off.y <= v.view().y - keep_y);
             v.zoom_at(anchor, factor);
             prop_assert!(v.zoom() >= MIN_ZOOM && v.zoom() <= MAX_ZOOM);
             let after = v.screen_to_canvas(anchor);

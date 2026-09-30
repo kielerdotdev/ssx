@@ -88,10 +88,10 @@ pub fn tool_slot_button(
         let tip = pos2(r.right() - 3.0, r.bottom() - 3.0);
         let tri = vec![tip, pos2(tip.x - 5.0, tip.y), pos2(tip.x, tip.y - 5.0)];
         ui.painter().add(egui::Shape::convex_polygon(tri, theme::TEXT_DIM, Stroke::NONE));
-        if resp.clicked() {
-            if let Some(p) = resp.interact_pointer_pos() {
-                caret_clicked = p.x > r.right() - 10.0 && p.y > r.bottom() - 10.0;
-            }
+        if resp.clicked()
+            && let Some(p) = resp.interact_pointer_pos()
+        {
+            caret_clicked = p.x > r.right() - 10.0 && p.y > r.bottom() - 10.0;
         }
     }
     (resp, caret_clicked)

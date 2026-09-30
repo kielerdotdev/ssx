@@ -241,7 +241,7 @@ fn toned(p: Prim, tone: Tone) -> Prim {
 fn wide(p: Prim, width: f32) -> Prim {
     match p {
         Prim::Stroke { pts, closed, tone, .. } => Prim::Stroke { pts, closed, width, tone },
-        other => other,
+        Prim::Fill { pts, tone } => Prim::Fill { pts, tone },
     }
 }
 
@@ -535,12 +535,12 @@ impl Icon {
                     let r = rotated_rect(12.5, 12.0, 15.0, 7.5, -45.0);
                     [
                         [
-                            (r[0][0] + r[3][0]) / 2.0 + (r[1][0] - r[0][0]) * 0.4,
-                            (r[0][1] + r[3][1]) / 2.0 + (r[1][1] - r[0][1]) * 0.4,
+                            f32::midpoint(r[0][0], r[3][0]) + (r[1][0] - r[0][0]) * 0.4,
+                            f32::midpoint(r[0][1], r[3][1]) + (r[1][1] - r[0][1]) * 0.4,
                         ],
                         [
-                            (r[1][0] + r[2][0]) / 2.0 - (r[1][0] - r[0][0]) * 0.6,
-                            (r[1][1] + r[2][1]) / 2.0 - (r[1][1] - r[0][1]) * 0.6,
+                            f32::midpoint(r[1][0], r[2][0]) - (r[1][0] - r[0][0]) * 0.6,
+                            f32::midpoint(r[1][1], r[2][1]) - (r[1][1] - r[0][1]) * 0.6,
                         ],
                     ]
                 }),

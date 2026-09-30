@@ -2,6 +2,8 @@
 //! and pointer/keyboard simulation helpers that go through egui's real event path.
 #![allow(dead_code)] // each test binary uses a different subset
 
+pub mod annotate;
+
 use std::path::PathBuf;
 
 use egui::{Event, Modifiers, PointerButton, Pos2, Vec2, pos2};

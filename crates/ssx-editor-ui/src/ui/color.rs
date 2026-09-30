@@ -201,10 +201,10 @@ pub fn color_button(
         });
         out
     });
-    if let Some(inner) = shown {
-        if let Some(c) = inner.inner {
-            result = Some(c);
-        }
+    if let Some(inner) = shown
+        && let Some(c) = inner.inner
+    {
+        result = Some(c);
     }
     // Remember the final colour when the popup closes after a change.
     let open_now = Popup::is_id_open(ui.ctx(), Popup::default_response_id(&resp));

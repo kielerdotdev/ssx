@@ -2,7 +2,7 @@
 //! documentation screenshot.
 #![allow(dead_code)]
 
-use crate::common::*;
+use super::*;
 use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use ssx_editor_ui::app::EditorApp;

@@ -244,7 +244,7 @@ mod tests {
     fn jpeg_quality_changes_size() {
         let mut data = Vec::new();
         for i in 0..(128 * 128u32) {
-            data.extend_from_slice(&[(i * 7) as u8, (i * 13 >> 3) as u8, (i % 251) as u8, 255]);
+            data.extend_from_slice(&[(i * 7) as u8, ((i * 13) >> 3) as u8, (i % 251) as u8, 255]);
         }
         let f = Frame::from_rgba8(128, 128, data).unwrap();
         let lo =

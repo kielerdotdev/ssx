@@ -103,10 +103,11 @@ pub fn route(key: Key, m: &egui::Modifiers, text_editing: bool) -> Routed {
     if let Some(a) = resolve(chord) {
         return Routed::App(a.clone());
     }
-    if !chord.ctrl && !chord.alt {
-        if let Some(k) = session_key(key, false) {
-            return Routed::Session(k, session_mods(m));
-        }
+    if !chord.ctrl
+        && !chord.alt
+        && let Some(k) = session_key(key, false)
+    {
+        return Routed::Session(k, session_mods(m));
     }
     Routed::Ignore
 }

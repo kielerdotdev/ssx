@@ -125,6 +125,11 @@ fn frame_to_image(frame: &Frame, w: usize, h: usize) -> ColorImage {
     ColorImage::from_rgba_unmultiplied([w, h], &data)
 }
 
+/// `u32` pixel count to `i32` coordinates (images never approach the limit).
+fn px_i32(v: u32) -> i32 {
+    i32::try_from(v).unwrap_or(i32::MAX)
+}
+
 fn pf(p: PointF) -> Pos2 {
     pos2(p.x, p.y)
 }
@@ -268,7 +273,7 @@ impl Canvas {
                     zoom,
                 );
                 let ir =
-                    IRect::new(out.x, out.y, out.x + out.width as i32, out.y + out.height as i32);
+                    IRect::new(out.x, out.y, out.x + px_i32(out.width), out.y + px_i32(out.height));
                 dropped.extend(self.planner.mark_dirty(ir, view));
             }
             for k in dropped {
@@ -444,12 +449,11 @@ impl Canvas {
 
         // Zoom gestures (pinch, ctrl+wheel) first: egui already merged them.
         if resp.hovered() || self.panning.is_some() {
-            let z = ui.input(|i| i.zoom_delta());
-            if (z - 1.0).abs() > f32::EPSILON {
-                if let Some(h) = hover {
-                    self.viewport
-                        .zoom_at(pos2((h.x - rect.min.x) * ppp, (h.y - rect.min.y) * ppp), z);
-                }
+            let z = ui.input(egui::InputState::zoom_delta);
+            if (z - 1.0).abs() > f32::EPSILON
+                && let Some(h) = hover
+            {
+                self.viewport.zoom_at(pos2((h.x - rect.min.x) * ppp, (h.y - rect.min.y) * ppp), z);
             }
         }
 
@@ -534,11 +538,12 @@ impl Canvas {
                 _ => {}
             }
         }
-        if can_draw && resp.double_clicked() {
-            if let Some(p) = resp.interact_pointer_pos().or(hover) {
-                let img = to_img(self, p, doc);
-                doc.session.double_click(img, ssx_mods(live_mods));
-            }
+        if can_draw
+            && resp.double_clicked()
+            && let Some(p) = resp.interact_pointer_pos().or(hover)
+        {
+            let img = to_img(self, p, doc);
+            doc.session.double_click(img, ssx_mods(live_mods));
         }
 
         // Hover readout for the status bar.
@@ -546,7 +551,7 @@ impl Canvas {
             let img = to_img(self, h, doc);
             let (w, hh) = doc.doc().image_size();
             let (px, py) = (img.x.floor() as i32, img.y.floor() as i32);
-            let inside = px >= 0 && py >= 0 && px < w as i32 && py < hh as i32;
+            let inside = px >= 0 && py >= 0 && px < px_i32(w) && py < px_i32(hh);
             state.hover.pixel = inside.then_some((px, py));
             state.hover.color =
                 if inside && !self.captured { Some(self.probe_color(doc, px, py)) } else { None };
@@ -575,17 +580,18 @@ impl Canvas {
     /// The composited colour at an image pixel (transparent outside the canvas).
     fn probe_color(&mut self, doc: &EditorDoc, x: i32, y: i32) -> [u8; 4] {
         let rev = doc.revision();
-        if let Some((r, p, c)) = self.probe {
-            if r == rev && p == (x, y) {
-                return c;
-            }
+        if let Some((r, p, c)) = self.probe
+            && r == rev
+            && p == (x, y)
+        {
+            return c;
         }
         let d = doc.doc();
         let (ox, oy) = d.canvas_offset();
-        let px = x + ox as i32;
-        let py = y + oy as i32;
+        let px = x + px_i32(ox);
+        let py = y + px_i32(oy);
         let (cw, chh) = d.canvas_size();
-        let c = if px < 0 || py < 0 || px >= cw as i32 || py >= chh as i32 {
+        let c = if px < 0 || py < 0 || px >= px_i32(cw) || py >= px_i32(chh) {
             [0; 4]
         } else {
             let f = ssx_editor::render(

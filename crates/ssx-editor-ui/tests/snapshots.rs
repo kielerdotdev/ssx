@@ -5,7 +5,6 @@
 //! plus a small budget of differing pixels) so different Vulkan drivers' anti-aliasing does not
 //! cause false alarms.
 
-mod annotate;
 mod common;
 
 use common::*;
@@ -83,7 +82,7 @@ fn properties_bar_for_text() {
 fn full_window_with_an_annotated_screenshot() {
     let mut h = window(app_for(dashboard()), [1280.0, 800.0]);
     settle(&mut h);
-    annotate::annotate(&mut h);
+    common::annotate::annotate(&mut h);
     h.key_press(Key::V);
     settle(&mut h);
     // Deselect and move the pointer away so no hover state leaks into the golden.
@@ -99,7 +98,7 @@ fn full_window_with_an_annotated_screenshot() {
 fn selection_handles_and_object_list() {
     let mut h = window(app_for(dashboard()), [1280.0, 800.0]);
     settle(&mut h);
-    annotate::annotate(&mut h);
+    common::annotate::annotate(&mut h);
     h.key_press(Key::V);
     settle(&mut h);
     h.state_mut().state.push(Action::ToggleLayers);

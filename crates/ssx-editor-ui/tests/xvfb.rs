@@ -1,6 +1,6 @@
 //! Smoke test of the *real binary* in a real X11 window: starts `ssx-editor-ui` under Xvfb on
 //! the Vulkan software rasteriser (lavapipe), drives it with `xdotool`, screenshots the root
-//! window with ImageMagick's `import`, and checks that it paints the loaded image, draws where
+//! window with `ImageMagick`'s `import`, and checks that it paints the loaded image, draws where
 //! the mouse drags, undoes, saves, and exits with the documented JSON and exit code.
 //!
 //! Skips (with a printed reason) when Xvfb, xdotool, import or a Vulkan software driver is

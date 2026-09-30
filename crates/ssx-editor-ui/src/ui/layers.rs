@@ -17,7 +17,7 @@ use crate::{
 
 /// The label of an object row: kind plus a hint of its content.
 pub fn object_label(doc: &EditorDoc, o: &Object) -> String {
-    let base = match &o.kind {
+    match &o.kind {
         ObjectKind::Text(t) => {
             let first = t.content.text.lines().next().unwrap_or("").trim();
             if first.is_empty() {
@@ -43,8 +43,7 @@ pub fn object_label(doc: &EditorDoc, o: &Object) -> String {
             let mut c = n.chars();
             c.next().map_or_else(String::new, |f| f.to_uppercase().collect::<String>() + c.as_str())
         }
-    };
-    base
+    }
 }
 
 fn shorten(s: &str, n: usize) -> String {

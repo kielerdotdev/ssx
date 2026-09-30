@@ -68,7 +68,7 @@ impl Bench {
                 match t {
                     0..=39 => app.bench_zoom(1.045),
                     40..=79 => app.bench_pan(vec2(
-                        if t % 2 == 0 { 34.0 } else { -6.0 },
+                        if t.is_multiple_of(2) { 34.0 } else { -6.0 },
                         19.0 * if t < 60 { 1.0 } else { -1.0 },
                     )),
                     80..=119 => app.bench_zoom(1.0 / 1.045),
@@ -97,7 +97,7 @@ impl Bench {
                     false
                 } else if t < 140 {
                     // With 100 objects on the picture: pan and zoom.
-                    if t % 2 == 0 {
+                    if t.is_multiple_of(2) {
                         app.bench_zoom(if t < 120 { 1.06 } else { 1.0 / 1.06 });
                     } else {
                         app.bench_pan(vec2(28.0, 12.0));

@@ -100,6 +100,8 @@ impl Preview {
         }
         self.generation += 1;
         self.requested = Some(effect.clone());
+        // A new request supersedes the previous failure, so `is_busy` is true until it finishes.
+        self.error = None;
         let _ = self.tx.send(Job { generation: self.generation, doc: base.clone(), effect });
     }
 

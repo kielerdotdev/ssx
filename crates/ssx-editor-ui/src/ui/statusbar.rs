@@ -68,26 +68,23 @@ pub fn show(ui: &mut Ui, state: &mut AppState) {
             ui.label(RichText::new(format!("{w} x {h}")).monospace().size(12.0).color(theme::TEXT));
             widgets::separator(ui);
             // Pixel colour.
-            match (state.hover.pixel, state.hover.color) {
-                (Some(_), Some([r, g, b, a])) => {
-                    ui.label(
-                        RichText::new(format!("#{r:02x}{g:02x}{b:02x}  rgba({r},{g},{b},{a})"))
-                            .monospace()
-                            .size(12.0)
-                            .color(theme::TEXT_DIM),
-                    );
-                    let (rect, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
-                    paint_swatch(ui, rect, ssx_editor::Color::rgba(r, g, b, a), false);
-                }
-                _ => {
-                    let (rect, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
-                    ui.painter().rect_stroke(
-                        rect,
-                        3.0,
-                        egui::Stroke::new(1.0, Color32::from_gray(70)),
-                        egui::StrokeKind::Inside,
-                    );
-                }
+            if let (Some(_), Some([r, g, b, a])) = (state.hover.pixel, state.hover.color) {
+                ui.label(
+                    RichText::new(format!("#{r:02x}{g:02x}{b:02x}  rgba({r},{g},{b},{a})"))
+                        .monospace()
+                        .size(12.0)
+                        .color(theme::TEXT_DIM),
+                );
+                let (rect, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
+                paint_swatch(ui, rect, ssx_editor::Color::rgba(r, g, b, a), false);
+            } else {
+                let (rect, _) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::hover());
+                ui.painter().rect_stroke(
+                    rect,
+                    3.0,
+                    egui::Stroke::new(1.0, Color32::from_gray(70)),
+                    egui::StrokeKind::Inside,
+                );
             }
             widgets::separator(ui);
             // Pointer position.

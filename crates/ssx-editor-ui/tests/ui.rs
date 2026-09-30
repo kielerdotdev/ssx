@@ -618,7 +618,10 @@ fn saving_the_project_keeps_annotations_editable() {
     settle(&mut h);
     let target = dir.path().join("work.ssxe");
     if let Some(Dialog::SaveAs(f)) = &mut h.state_mut().state.dialog {
-        assert!(f.path.ends_with(".ssxe"));
+        assert_eq!(
+            std::path::Path::new(&f.path).extension().and_then(|e| e.to_str()),
+            Some("ssxe")
+        );
         f.path = target.display().to_string();
     } else {
         panic!("save dialog expected");
