@@ -37,7 +37,7 @@ use crate::{
     tool::{Preset, StyleMemory, Tool},
 };
 
-pub use textedit::TextEditState;
+pub use textedit::{TextEditState, sync_text_rect};
 
 /// Pixels of hit slack around thin objects and handles, in *screen* pixels.
 const HIT_SLACK_PX: f32 = 5.0;

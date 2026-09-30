@@ -409,7 +409,7 @@ impl Renderer {
         {
             let mut paint = paint;
             paint.anti_alias = false;
-            pm.fill_rect(r, &paint, Transform::identity(), None);
+            fill_rect_clamped(pm, r, &paint);
         }
         let Some((base, opaque)) = self.base_pixmap(doc) else { return };
         let (w, h) = doc.image_size();
@@ -448,7 +448,7 @@ impl Renderer {
             anti_alias: false,
             force_hq_pipeline: false,
         };
-        pm.fill_rect(r, &paint, Transform::identity(), None);
+        fill_rect_clamped(pm, r, &paint);
     }
 
     fn draw_object(
@@ -808,6 +808,17 @@ impl Renderer {
                 p[3] = (f32::from(p[3]) * (1.0 - k) + 255.0 * k).round().clamp(0.0, 255.0) as u8;
             }
         });
+    }
+}
+
+/// `fill_rect` with the rectangle clipped to the pixmap first. tiny-skia's non-AA rectangle
+/// fill covers one column too many when the rectangle starts left of the pixmap (negative x),
+/// which would smear the base image's edge pixel into the padding in viewport renders.
+fn fill_rect_clamped(pm: &mut Pixmap, r: tiny_skia::Rect, paint: &Paint) {
+    let (w, h) = (pm.width() as f32, pm.height() as f32);
+    let (l, t, rt, b) = (r.left().max(0.0), r.top().max(0.0), r.right().min(w), r.bottom().min(h));
+    if let Some(c) = tiny_skia::Rect::from_ltrb(l, t, rt, b) {
+        pm.fill_rect(c, paint, Transform::identity(), None);
     }
 }
 

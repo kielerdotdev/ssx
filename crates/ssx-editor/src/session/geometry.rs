@@ -485,7 +485,7 @@ mod tests {
         assert!(g.is_empty());
         // Moving rect whose right edge (170) is near target 150+... choose nearest line.
         let (dx, dy, g) = snap_rect(RectF::new(96.0, 400.0, 10.0, 10.0), &t, 5.0, ext);
-        assert_eq!((dx, dy), (4.0, 0.0));
+        assert_eq!((dx, dy), (-1.0, 0.0)); // centre line 101 -> 100
         assert_eq!(g.len(), 1);
     }
 

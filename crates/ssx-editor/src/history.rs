@@ -431,7 +431,7 @@ mod tests {
         let mut d = doc();
         let mut h = History::default();
         let key = Some(CoalesceKey { kind: "drag", tag: 1 });
-        h.execute(&mut d, add(&d, rect(1, 0.0)), key);
+        { let c = add(&d, rect(1, 0.0)); h.execute(&mut d, c, key); }
         for x in 1..=5 {
             let before = vec![d.object(ObjectId(1)).unwrap().clone()];
             let after = vec![rect(1, x as f32)];
@@ -452,7 +452,7 @@ mod tests {
     fn different_keys_do_not_merge() {
         let mut d = doc();
         let mut h = History::default();
-        h.execute(&mut d, add(&d, rect(1, 0.0)), None);
+        { let c = add(&d, rect(1, 0.0)); h.execute(&mut d, c, None); }
         let mk = |x: f32, d: &Document| Command::Modify {
             before: vec![d.object(ObjectId(1)).unwrap().clone()],
             after: vec![rect(1, x)],
@@ -468,10 +468,10 @@ mod tests {
     fn redo_is_invalidated_by_new_command() {
         let mut d = doc();
         let mut h = History::default();
-        h.execute(&mut d, add(&d, rect(1, 0.0)), None);
+        { let c = add(&d, rect(1, 0.0)); h.execute(&mut d, c, None); }
         h.undo(&mut d);
         assert!(h.can_redo());
-        h.execute(&mut d, add(&d, rect(2, 0.0)), None);
+        { let c = add(&d, rect(2, 0.0)); h.execute(&mut d, c, None); }
         assert!(!h.can_redo());
         assert!(h.redo(&mut d).is_none());
     }
@@ -481,7 +481,7 @@ mod tests {
         let mut d = doc();
         let mut h = History::new(HistoryLimits { max_entries: 3, max_bytes: usize::MAX });
         for i in 0..10 {
-            h.execute(&mut d, add(&d, rect(i + 1, 0.0)), None);
+            { let c = add(&d, rect(i + 1, 0.0)); h.execute(&mut d, c, None); }
         }
         assert_eq!(h.undo_len(), 3);
         assert_eq!(d.objects().len(), 10);
@@ -491,8 +491,8 @@ mod tests {
         assert_eq!(d.objects().len(), 7, "only 3 steps were undoable");
         let mut tiny = History::new(HistoryLimits { max_entries: 100, max_bytes: 1 });
         let mut d2 = doc();
-        tiny.execute(&mut d2, add(&d2, rect(1, 0.0)), None);
-        tiny.execute(&mut d2, add(&d2, rect(2, 0.0)), None);
+        { let c = add(&d2, rect(1, 0.0)); tiny.execute(&mut d2, c, None); }
+        { let c = add(&d2, rect(2, 0.0)); tiny.execute(&mut d2, c, None); }
         assert_eq!(tiny.undo_len(), 1, "byte budget evicts, newest step always survives");
     }
 
@@ -524,10 +524,10 @@ mod tests {
         let mut d = doc();
         let mut h = History::default();
         let key = Some(CoalesceKey { kind: "drag", tag: 1 });
-        h.execute(&mut d, add(&d, rect(1, 0.0)), key);
+        { let c = add(&d, rect(1, 0.0)); h.execute(&mut d, c, key); }
         assert!(h.discard_open(&mut d, |c| matches!(c, Command::Add { .. })));
         assert!(d.objects().is_empty() && !h.can_undo() && !h.can_redo());
-        h.execute(&mut d, add(&d, rect(1, 0.0)), key);
+        { let c = add(&d, rect(1, 0.0)); h.execute(&mut d, c, key); }
         h.seal();
         assert!(!h.discard_open(&mut d, |_| true), "sealed entries are permanent");
     }
