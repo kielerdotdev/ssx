@@ -182,7 +182,7 @@ fn validate_capture(s: &Settings, out: &mut Sink) {
     if !h.knee.is_finite() || !(0.0..=1.0).contains(&h.knee) {
         out.error(
             "capture.hdr.knee",
-            format!("{} is out of range; knee must be between 0 and 1 (default 0.75)", h.knee),
+            format!("{} is out of range; knee must be between 0 and 1 (default 1)", h.knee),
         );
     }
     if !h.exposure.is_finite() || !(-10.0..=10.0).contains(&h.exposure) {

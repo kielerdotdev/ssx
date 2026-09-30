@@ -357,3 +357,16 @@ fn every_builtin_workflow_validates_cleanly() {
         assert!(s.validate().is_empty(), "{}: {:?}", w.id, s.validate());
     }
 }
+
+#[test]
+fn hdr_default_is_faithful_and_presets_validate() {
+    let d = HdrConfig::default();
+    assert_eq!(d, HdrConfig::faithful());
+    assert!((d.knee - 1.0).abs() < f32::EPSILON, "default must leave SDR content untouched");
+    let mut s = Settings::default();
+    for preset in [HdrConfig::faithful(), HdrConfig::preserve_highlights()] {
+        s.capture.hdr = preset;
+        assert!(s.validate().is_ok(), "{preset:?} must be a valid configuration");
+    }
+    assert!(HdrConfig::preserve_highlights().knee < 1.0);
+}

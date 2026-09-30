@@ -162,14 +162,31 @@ pub struct HdrConfig {
 }
 
 impl Default for HdrConfig {
+    /// The **faithful** preset: everything at or below SDR white (all normal desktop and UI
+    /// content) is byte-identical to an SDR screenshot, and only values *above* SDR white are
+    /// rolled off. SDR white is also the top of 8-bit output, so there is no headroom above
+    /// it: highlights keep their colour but lose detail. See [`HdrConfig::preserve_highlights`].
     fn default() -> Self {
+        Self::faithful()
+    }
+}
+
+impl HdrConfig {
+    /// Matches SDR screenshots exactly (knee at SDR white); highlights clip hue-preservingly.
+    pub fn faithful() -> Self {
         Self {
             operator: TonemapOperator::ReinhardExtended,
             peak: 4.0,
-            knee: 0.75,
+            knee: 1.0,
             dither: true,
             exposure: 0.0,
         }
+    }
+
+    /// Keeps highlight detail by starting the roll-off below SDR white. The cost is that the
+    /// top of the SDR range is compressed, so UI white lands slightly below 255.
+    pub fn preserve_highlights() -> Self {
+        Self { knee: 0.8, ..Self::faithful() }
     }
 }
 
