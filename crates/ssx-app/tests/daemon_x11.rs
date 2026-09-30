@@ -675,5 +675,4 @@ fn idle_cost_and_memory_stay_flat() {
         after < before + 80 * 1024,
         "frames must be dropped after each run: {before} -> {after} KiB"
     );
-    let _ = have("true");
 }

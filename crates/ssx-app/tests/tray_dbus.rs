@@ -580,3 +580,23 @@ fn hotkeys_without_a_portal_are_announced_once_with_the_cli_commands() {
     assert_eq!(env.request(&Request::Quit), Response::Ok);
     assert!(d2.wait_exit(Duration::from_secs(20)).is_some());
 }
+
+#[test]
+fn an_idle_daemon_with_a_tray_costs_next_to_nothing() {
+    if skip_unless(&["dbus-daemon", "Xvfb"]) {
+        return;
+    }
+    let Some(bus) = Bus::start("idle") else { return };
+    let Some(mut f) = fixture() else { return };
+    let watcher = Watcher::start(&bus);
+    let d = start_with_bus(&mut f, &bus, "KDE");
+    assert!(wait_until(Duration::from_secs(15), || watcher.items().first().cloned()).is_some());
+    std::thread::sleep(Duration::from_secs(2));
+    let secs: u64 = std::env::var("SSX_IDLE_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(8);
+    let (t0, _) = d.proc_usage().expect("proc");
+    std::thread::sleep(Duration::from_secs(secs));
+    let (t1, rss) = d.proc_usage().expect("proc");
+    let cpu = (t1 - t0) as f64 / 100.0 / secs as f64 * 100.0;
+    eprintln!("idle with tray over {secs} s: CPU {cpu:.3} % of one core, RSS {rss} KiB");
+    assert!(cpu < 1.0, "idle CPU {cpu} %");
+}
