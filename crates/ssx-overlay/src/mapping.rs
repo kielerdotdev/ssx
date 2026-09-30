@@ -104,12 +104,16 @@ fn find_at_scale(o: &LogicalOutput, s: f64, monitors: &[Monitor], taken: &[bool]
 
 /// Maps a pointer position local to an output's surface (logical, possibly fractional) to a
 /// desktop pixel. `surface` is the surface's logical size as configured by the compositor.
+///
+/// Positions outside the surface are **not** clamped: during a button press Wayland keeps
+/// delivering motion to the surface that received the press, with coordinates that run past
+/// its edges, and that is exactly how a drag continues onto the neighbouring monitor. The
+/// selection model clamps to the whole desktop.
 pub fn surface_to_desktop(monitor: Rect, surface: (u32, u32), local: (f64, f64)) -> Point {
+    const LIMIT: f64 = 1.0e7;
     let (sw, sh) = (f64::from(surface.0.max(1)), f64::from(surface.1.max(1)));
-    let px = (local.0 * f64::from(monitor.width) / sw).floor();
-    let py = (local.1 * f64::from(monitor.height) / sh).floor();
-    let px = px.clamp(0.0, f64::from(monitor.width.saturating_sub(1)));
-    let py = py.clamp(0.0, f64::from(monitor.height.saturating_sub(1)));
+    let px = (local.0 * f64::from(monitor.width) / sw).floor().clamp(-LIMIT, LIMIT);
+    let py = (local.1 * f64::from(monitor.height) / sh).floor().clamp(-LIMIT, LIMIT);
     Point::new(monitor.x.saturating_add(px as i32), monitor.y.saturating_add(py as i32))
 }
 
@@ -199,8 +203,11 @@ mod tests {
         // Second monitor at an offset; 1:1 (highest scale).
         let r2 = Rect::new(1600, 0, 640, 480);
         assert_eq!(surface_to_desktop(r2, (320, 240), (100.0, 100.0)), Point::new(1800, 200));
-        // Out-of-range positions clamp to the monitor.
-        assert_eq!(surface_to_desktop(r2, (320, 240), (-5.0, 9999.0)), Point::new(1600, 479));
+        // Out-of-range positions (an implicit grab dragging past the edge) continue linearly,
+        // so a drag can leave this monitor for the next one.
+        assert_eq!(surface_to_desktop(r2, (320, 240), (-5.0, 250.0)), Point::new(1590, 500));
+        assert_eq!(surface_to_desktop(r2, (320, 240), (330.0, 0.0)), Point::new(2260, 0));
+        assert_eq!(surface_to_desktop(r2, (320, 240), (f64::MAX, f64::NAN)).y, 0);
         // Negative origin.
         let r3 = Rect::new(-1920, 0, 1920, 1080);
         assert_eq!(surface_to_desktop(r3, (1920, 1080), (5.0, 5.0)), Point::new(-1915, 5));

@@ -110,6 +110,57 @@ impl MappedFrame {
     }
 }
 
+/// A writable memfd-backed buffer for `wl_shm` pools: we render into the mapping, the
+/// compositor reads the same pages through the fd.
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+pub struct ShmMap {
+    file: File,
+    map: memmap2::MmapMut,
+}
+
+#[cfg(target_os = "linux")]
+impl ShmMap {
+    /// Creates a zeroed buffer of `len` bytes.
+    pub fn new(len: usize) -> std::io::Result<Self> {
+        use rustix::fs::{MemfdFlags, SealFlags, fcntl_add_seals, ftruncate, memfd_create};
+        let fd = memfd_create("ssx-overlay-buffer", MemfdFlags::CLOEXEC | MemfdFlags::ALLOW_SEALING)?;
+        ftruncate(&fd, len as u64)?;
+        // The compositor must not be able to shrink the file under our mapping (SIGBUS);
+        // sealing the size makes that impossible while leaving content writable.
+        fcntl_add_seals(&fd, SealFlags::SHRINK | SealFlags::GROW | SealFlags::SEAL)?;
+        let file = File::from(fd);
+        // SAFETY: the file is a private memfd whose size is sealed, so the mapping cannot be
+        // truncated or extended; nothing else in this process maps or resizes it. The
+        // compositor only reads the pages. Concurrent reads by the compositor while we write
+        // are the normal wl_shm contract (a torn frame at worst, never UB for us since we
+        // only ever access the memory through this exclusive `&mut [u8]`).
+        let map = unsafe { memmap2::MmapMut::map_mut(&file)? };
+        Ok(Self { file, map })
+    }
+
+    /// The pixels.
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        &mut self.map
+    }
+
+    /// Size in bytes.
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    /// `true` for a zero-length map.
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    /// The descriptor to hand to `wl_shm.create_pool`.
+    pub fn fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        use std::os::fd::AsFd;
+        self.file.as_fd()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ssx_types::Point;

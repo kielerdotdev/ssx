@@ -13,6 +13,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+pub mod sway;
+
 use ssx_overlay::{OverlayInput, OverlayOptions};
 use ssx_types::{Frame, Monitor, Point, Rect, WindowInfo};
 
