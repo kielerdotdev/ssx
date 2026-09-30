@@ -533,8 +533,9 @@ fn problem(ui: &mut Ui, p: &Problem) {
 /// A believable report for tests and screenshots.
 pub fn sample_report() -> DoctorReport {
     use ssx_cli::commands::doctor::{
-        Attempt, CaptureInfo, ClipboardInfo, EditorInfo, HotkeyInfo, KeyringInfo, NotificationInfo,
-        OsInfo, PathsInfo, SessionInfo, SettingsInfo, UploaderState,
+        Attempt, CaptureInfo, ClipboardInfo, DaemonInfo, EditorInfo, EncoderState, HelperInfo,
+        HelpersInfo, HotkeyInfo, KeyringInfo, NotificationInfo, OsInfo, PathsInfo, RecorderInfo,
+        SessionInfo, SettingsInfo, UploaderState,
     };
     let mut r = DoctorReport {
         version: "0.1.0".to_owned(),
@@ -615,6 +616,36 @@ pub fn sample_report() -> DoctorReport {
         uploaders: vec![UploaderState { name: "local".into(), kind: "local".into(), error: None }],
         editor: EditorInfo { found: true, path: Some("/usr/local/bin/ssx-editor-ui".into()) },
         shell_integrations: vec![],
+        daemon: DaemonInfo {
+            program: Some("/usr/local/bin/ssx-app".into()),
+            running: true,
+            version: Some("0.1.0".into()),
+            tray: Some(true),
+            hotkey_backend: Some("sway bindsym include file".into()),
+            hotkeys_registered: Some(4),
+            hotkey_problems: vec![],
+            autostart: "enabled".into(),
+        },
+        helpers: HelpersInfo {
+            overlay: HelperInfo {
+                found: true,
+                disabled: false,
+                path: Some("/usr/local/bin/ssx-overlay".into()),
+            },
+            settings_ui: HelperInfo {
+                found: true,
+                disabled: false,
+                path: Some("/usr/local/bin/ssx-settings-ui".into()),
+            },
+        },
+        recorder: RecorderInfo {
+            built_in: true,
+            ffmpeg: true,
+            encoders: vec![
+                EncoderState { name: "h264_vaapi".into(), usable: true, detail: String::new() },
+                EncoderState { name: "libx264".into(), usable: true, detail: String::new() },
+            ],
+        },
         hotkeys: HotkeyInfo {
             recommended: "sway bindsym include file".into(),
             strategies: vec!["sway bindsym include file".into()],
