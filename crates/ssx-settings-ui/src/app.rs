@@ -452,7 +452,7 @@ impl SettingsApp {
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing.y = 0.0;
                 ui.label(RichText::new("ssx").strong().size(15.0).color(Color32::WHITE));
-                ui.label(RichText::new("Settings").size(11.5).color(theme::TEXT_DIM));
+                ui.label(RichText::new("Settings").size(11.5).color(ui_kit::DIM_TEXT));
             });
         });
         ui.add_space(14.0);
@@ -476,7 +476,7 @@ impl SettingsApp {
             ui.label(
                 RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
                     .size(11.0)
-                    .color(theme::TEXT_DIM),
+                    .color(ui_kit::DIM_TEXT),
             );
         });
     }

@@ -47,12 +47,19 @@ impl SecretLocation {
     /// The sentence shown when the field has no value.
     pub fn empty_text(&self) -> String {
         match self {
-            SecretLocation::MemoryOnly(why) => {
-                format!(
-                    "not set; there is no keyring here ({why}), so a value would only be kept in memory"
-                )
+            SecretLocation::MemoryOnly(_) => {
+                "not set; there is no keyring here, so a value would only be kept in memory"
+                    .to_owned()
             }
             _ => "not set".to_owned(),
+        }
+    }
+
+    /// Why there is no keyring (for a tooltip; the technical message can be long).
+    pub fn reason(&self) -> Option<&str> {
+        match self {
+            SecretLocation::MemoryOnly(why) => Some(why),
+            _ => None,
         }
     }
 
@@ -287,7 +294,7 @@ mod tests {
         assert_eq!(k.empty_text(), "not set");
         let m = SecretLocation::MemoryOnly("no bus".into());
         assert!(m.stored_text().contains("memory only") && m.stored_text().contains("closes"));
-        assert!(m.empty_text().contains("no bus") && !m.is_persistent());
+        assert!(m.reason() == Some("no bus") && !m.is_persistent());
         assert!(SecretLocation::Probing.stored_text().contains("checking"));
     }
 

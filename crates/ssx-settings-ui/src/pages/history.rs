@@ -367,15 +367,19 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         ui.spacing_mut().item_spacing.x = 12.0;
         // top-down inside: `allocate_ui` would inherit the row's left-to-right layout
         let top_down = egui::Layout::top_down(egui::Align::Min);
-        ui.allocate_ui_with_layout(vec2((total_w - detail_w - 30.0).max(300.0), avail.max(200.0)), top_down, |ui| {
-            egui::ScrollArea::vertical()
-                .id_salt("history-scroll")
-                .auto_shrink([false, false])
-                .show(ui, |ui| match st.view {
-                    View::Grid => grid(ui, st, cx),
-                    View::List => list(ui, st, cx),
-                });
-        });
+        ui.allocate_ui_with_layout(
+            vec2((total_w - detail_w - 30.0).max(300.0), avail.max(200.0)),
+            top_down,
+            |ui| {
+                egui::ScrollArea::vertical()
+                    .id_salt("history-scroll")
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| match st.view {
+                        View::Grid => grid(ui, st, cx),
+                        View::List => list(ui, st, cx),
+                    });
+            },
+        );
         ui.allocate_ui_with_layout(vec2(detail_w, avail.max(200.0)), top_down, |ui| {
             egui::ScrollArea::vertical()
                 .id_salt("history-detail")
@@ -529,7 +533,7 @@ fn paging(ui: &mut Ui, st: &mut State) {
             }
             ui.label(
                 RichText::new(format!("Page {} of {pages}", st.filter.page + 1))
-                    .color(theme::TEXT_DIM),
+                    .color(ui_kit::DIM_TEXT),
             );
             if ui_kit::button_if(ui, "Previous", st.filter.page > 0, "First page").clicked() {
                 st.filter.page -= 1;
@@ -581,7 +585,7 @@ fn paint_thumb(ui: &mut Ui, st: &mut State, e: &Entry, rect: egui::Rect) {
                 egui::Align2::CENTER_CENTER,
                 "...",
                 egui::FontId::proportional(14.0),
-                theme::TEXT_DIM,
+                ui_kit::DIM_TEXT,
             );
         }
         Some(ThumbState::Missing(_)) => {
@@ -590,7 +594,7 @@ fn paint_thumb(ui: &mut Ui, st: &mut State, e: &Entry, rect: egui::Rect) {
                 ui.painter(),
                 kind_icon(e.kind),
                 egui::Rect::from_center_size(rect.center(), vec2(s, s)),
-                IconColors::with_ink(theme::TEXT_DIM),
+                IconColors::with_ink(ui_kit::DIM_TEXT),
             );
         }
     }
@@ -674,7 +678,7 @@ fn grid(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                 egui::Align2::LEFT_TOP,
                 subtitle(e, cx.now),
                 egui::FontId::proportional(11.0),
-                if selected { Color32::from_rgb(200, 210, 230) } else { theme::TEXT_DIM },
+                if selected { Color32::from_rgb(200, 210, 230) } else { ui_kit::DIM_TEXT },
             );
             resp.on_hover_text(title);
         }
@@ -701,7 +705,7 @@ fn badges(ui: &mut Ui, st: &State, e: &Entry, thumb: egui::Rect) {
         put(ui, "file missing", ui_kit::WARN_TEXT, true);
     }
     if e.upload_url.as_deref().is_some_and(|u| !u.is_empty()) {
-        put(ui, "uploaded", theme::ACCENT, false);
+        put(ui, "uploaded", ui_kit::ACCENT_TEXT, false);
     }
     if e.kind != EntryKind::Image {
         put(ui, kind_word(e.kind), theme::TEXT, false);
@@ -767,13 +771,13 @@ fn list(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             egui::Align2::LEFT_TOP,
             subtitle(e, cx.now),
             egui::FontId::proportional(11.0),
-            theme::TEXT_DIM,
+            ui_kit::DIM_TEXT,
         );
         let mut rx = rect.right() - 10.0;
         for (text, color) in [
             (st.is_orphan(e.id).then_some("file missing"), ui_kit::WARN_TEXT),
-            (e.uploader.as_deref(), theme::ACCENT),
-            (Some(kind_word(e.kind)), theme::TEXT_DIM),
+            (e.uploader.as_deref(), ui_kit::ACCENT_TEXT),
+            (Some(kind_word(e.kind)), ui_kit::DIM_TEXT),
         ] {
             if let Some(t) = text {
                 let g = ui.painter().layout_no_wrap(
@@ -826,7 +830,7 @@ fn detail(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         ui.add_space(8.0);
         ui.label(RichText::new(entry_title(&e)).strong().size(14.0).color(Color32::WHITE));
         ui.horizontal_wrapped(|ui| {
-            ui_kit::badge(ui, kind_word(e.kind), theme::ACCENT);
+            ui_kit::badge(ui, kind_word(e.kind), ui_kit::ACCENT_TEXT);
             if actions.orphan {
                 ui_kit::badge(ui, "file missing", ui_kit::WARN_TEXT);
             }
@@ -865,7 +869,7 @@ fn detail(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             rows.push(("Note", t.clone()));
         }
         for (k, v) in rows {
-            ui.label(RichText::new(k).size(11.5).color(theme::TEXT_DIM));
+            ui.label(RichText::new(k).size(11.5).color(ui_kit::DIM_TEXT));
             ui.add(egui::Label::new(RichText::new(v).size(12.5)).wrap().selectable(true));
             ui.add_space(3.0);
         }

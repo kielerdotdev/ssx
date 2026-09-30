@@ -323,20 +323,26 @@ impl fmt::Debug for Host {
     }
 }
 
-/// The `ssx` command-line program next to this executable, else the bare name (found on
-/// `PATH`).
+/// The `ssx` command-line program: next to this executable, else the first one on `PATH`,
+/// else where it would be next to this executable (an absolute path, so the Integration page
+/// can say "not found" instead of refusing to work), else the bare name.
 pub fn discover_ssx_exe() -> PathBuf {
     let name = format!("ssx{}", std::env::consts::EXE_SUFFIX);
-    std::env::current_exe()
+    let sibling = std::env::current_exe()
         .ok()
         .and_then(|p| std::fs::canonicalize(p).ok())
-        .and_then(|p| p.parent().map(|d| d.join(&name)))
+        .and_then(|p| p.parent().map(|d| d.join(&name)));
+    sibling
+        .clone()
         .filter(|p| p.is_file())
         .or_else(|| {
             std::env::var_os("PATH").and_then(|p| {
-                std::env::split_paths(&p).map(|d| d.join(&name)).find(|c| c.is_file())
+                std::env::split_paths(&p)
+                    .map(|d| d.join(&name))
+                    .find(|c| c.is_absolute() && c.is_file())
             })
         })
+        .or(sibling)
         .unwrap_or_else(|| PathBuf::from(name))
 }
 

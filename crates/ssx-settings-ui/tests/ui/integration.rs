@@ -114,7 +114,11 @@ fn one_failing_file_manager_does_not_stop_the_others() {
     assert!(has(&h, "failed:"), "{:?}", labels(&h));
     assert!(has(&h, "The others were processed normally."));
     assert!(!home_files(&fx).is_empty(), "Dolphin and Thunar were still installed");
-    assert_eq!(std::fs::read_to_string(&blocked).unwrap(), "in the way", "the user's file is untouched");
+    assert_eq!(
+        std::fs::read_to_string(&blocked).unwrap(),
+        "in the way",
+        "the user's file is untouched"
+    );
 }
 
 #[test]
@@ -130,11 +134,16 @@ fn details_show_what_would_be_written() {
 
 #[test]
 fn without_a_usable_context_the_page_explains_and_offers_no_install() {
-    let (app, _fx) = demo_app_custom(Page::Integration, |_| {}, |host| {
-        let mut shell = ShellHost::sandboxed(std::path::Path::new("/nonexistent"), &host.ssx_exe);
-        shell.context = Err("no home directory".to_owned());
-        host.shell = shell;
-    });
+    let (app, _fx) = demo_app_custom(
+        Page::Integration,
+        |_| {},
+        |host| {
+            let mut shell =
+                ShellHost::sandboxed(std::path::Path::new("/nonexistent"), &host.ssx_exe);
+            shell.context = Err("no home directory".to_owned());
+            host.shell = shell;
+        },
+    );
     let mut h = window(app, vec2(1200.0, 1700.0));
     wait_busy(&mut h, 20);
     assert!(has(&h, "The menus cannot be installed: no home directory"));
@@ -153,7 +162,11 @@ fn the_diagnostics_are_shown_and_copy_report_gives_what_doctor_prints() {
 
 #[test]
 fn a_failed_diagnosis_is_reported_and_there_is_nothing_to_copy() {
-    let (app, _fx) = demo_app_custom(Page::Integration, |_| {}, |host| host.doctor = std::sync::Arc::new(FixedDoctor(Err("probe crashed".into()))));
+    let (app, _fx) = demo_app_custom(
+        Page::Integration,
+        |_| {},
+        |host| host.doctor = std::sync::Arc::new(FixedDoctor(Err("probe crashed".into()))),
+    );
     let mut h = window(app, vec2(1200.0, 1700.0));
     wait_busy(&mut h, 20);
     assert!(has(&h, "The diagnostics failed: probe crashed"));

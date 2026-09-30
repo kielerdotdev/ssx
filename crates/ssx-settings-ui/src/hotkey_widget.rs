@@ -64,7 +64,7 @@ pub fn hotkey_field(
             .show(ui, |ui| {
                 ui.set_min_width(136.0);
                 let r = if text.is_empty() {
-                    ui.label(RichText::new("Not set").color(theme::TEXT_DIM))
+                    ui.label(RichText::new("Not set").color(ui_kit::DIM_TEXT))
                 } else {
                     ui.label(RichText::new(&text).monospace().color(Color32::WHITE))
                 };

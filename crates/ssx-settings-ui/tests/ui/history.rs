@@ -74,7 +74,11 @@ fn an_empty_history_says_so() {
 
 #[test]
 fn a_history_that_cannot_be_opened_is_reported_and_not_touched() {
-    let (app, _fx) = demo_app_custom(Page::History, |_| {}, |host| host.history = Arc::new(BrokenHistory("database is locked".into())));
+    let (app, _fx) = demo_app_custom(
+        Page::History,
+        |_| {},
+        |host| host.history = Arc::new(BrokenHistory("database is locked".into())),
+    );
     let mut h = window(app, vec2(1500.0, 1200.0));
     wait_busy(&mut h, 20);
     assert!(has(&h, "database is locked"));
@@ -204,7 +208,10 @@ fn copy_link_and_open_link_use_the_entrys_link() {
     assert_eq!(copied, ["https://i.imgur.com/k000Ab.png"]);
     click(&mut h, "Open link");
     click(&mut h, "Open delete link");
-    assert_eq!(*opener.urls.lock().unwrap(), ["https://i.imgur.com/k000Ab.png", "https://imgur.com/delete/000xyz"]);
+    assert_eq!(
+        *opener.urls.lock().unwrap(),
+        ["https://i.imgur.com/k000Ab.png", "https://imgur.com/delete/000xyz"]
+    );
 }
 
 #[test]
@@ -235,7 +242,10 @@ fn an_entry_whose_file_is_gone_is_marked_and_cannot_open_it() {
     click(&mut h, &card(LOST));
     assert!(has_exact(&h, "file missing"));
     click(&mut h, "Open file");
-    assert!(opener.paths.lock().unwrap().is_empty(), "nothing is opened for a file that does not exist");
+    assert!(
+        opener.paths.lock().unwrap().is_empty(),
+        "nothing is opened for a file that does not exist"
+    );
 }
 
 #[test]
@@ -249,7 +259,10 @@ fn entries_with_missing_files_can_be_removed_in_one_go() {
     click(&mut h, "Remove");
     wait_busy(&mut h, 20);
     assert_eq!(total(&h), 32);
-    assert!(has_exact(&h, "Remove 0 with missing files..."), "no more orphans, the button is disabled");
+    assert!(
+        has_exact(&h, "Remove 0 with missing files..."),
+        "no more orphans, the button is disabled"
+    );
 }
 
 #[test]
@@ -301,10 +314,14 @@ fn pruning_asks_first_and_applies_the_retention_limits() {
 
 #[test]
 fn prune_is_unavailable_without_limits() {
-    let (app, _fx) = demo_app_custom(Page::History, |s| {
-        s.history.max_entries = 0;
-        s.history.max_age_days = 0;
-    }, |_| {});
+    let (app, _fx) = demo_app_custom(
+        Page::History,
+        |s| {
+            s.history.max_entries = 0;
+            s.history.max_age_days = 0;
+        },
+        |_| {},
+    );
     let mut h = window(app, vec2(1500.0, 1200.0));
     wait_busy(&mut h, 20);
     click(&mut h, "Prune now...");
@@ -315,13 +332,17 @@ fn prune_is_unavailable_without_limits() {
 fn thumbnails_are_decoded_lazily_and_a_missing_one_is_a_placeholder() {
     let (mut h, _fx) = open();
     let st = &mut h.state_mut().history;
-    assert!(matches!(st.thumb_state(1), Some(ThumbState::Ready(_))), "entry 0 has a stored thumbnail");
+    assert!(
+        matches!(st.thumb_state(1), Some(ThumbState::Ready(_))),
+        "entry 0 has a stored thumbnail"
+    );
     // entry 5 (id 6) has neither a stored thumbnail nor a decodable file
     assert!(matches!(st.thumb_state(6), Some(ThumbState::Missing(_))));
 }
 
 fn reupload_app(tester: FakeTester) -> (Harness<'static, SettingsApp>, Fixture) {
-    let (app, fx) = demo_app_custom(Page::History, |_| {}, move |host| host.uploads = Arc::new(tester));
+    let (app, fx) =
+        demo_app_custom(Page::History, |_| {}, move |host| host.uploads = Arc::new(tester));
     let mut h = window(app, vec2(1500.0, 1200.0));
     wait_busy(&mut h, 20);
     (h, fx)
@@ -362,7 +383,11 @@ fn a_failed_re_upload_stays_in_the_dialog_with_the_reason_and_changes_nothing() 
 
 #[test]
 fn a_re_upload_can_be_cancelled_and_then_changes_nothing() {
-    let t = FakeTester { steps: vec![(0, 10), (5, 10), (10, 10)], delay: Duration::from_millis(300), ..FakeTester::default() };
+    let t = FakeTester {
+        steps: vec![(0, 10), (5, 10), (10, 10)],
+        delay: Duration::from_millis(300),
+        ..FakeTester::default()
+    };
     let (mut h, _fx) = reupload_app(t);
     click(&mut h, &card(NO_LINK));
     click(&mut h, "Upload again...");

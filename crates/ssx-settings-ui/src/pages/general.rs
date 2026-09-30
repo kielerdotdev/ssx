@@ -380,7 +380,7 @@ fn file_names(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                 ui.label(
                     RichText::new("Preview: where the next screenshot goes")
                         .size(11.5)
-                        .color(theme::TEXT_DIM),
+                        .color(ui_kit::DIM_TEXT),
                 );
                 ui.add_space(2.0);
                 let dir = p.full.parent().map(|d| d.display().to_string()).unwrap_or_default();
@@ -391,7 +391,7 @@ fn file_names(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                     j.append(
                         &format!("{dir}{sep}"),
                         0.0,
-                        egui::TextFormat::simple(mono.clone(), theme::TEXT_DIM),
+                        egui::TextFormat::simple(mono.clone(), ui_kit::DIM_TEXT),
                     );
                     j.append(&p.file_name, 0.0, egui::TextFormat::simple(mono, Color32::WHITE));
                     j.wrap.max_width = ui.available_width();
@@ -477,7 +477,7 @@ fn cheat_sheet(ui: &mut Ui, st: &State, cx: &mut Cx<'_>) {
                 }
             }
             ui.add_space(6.0);
-            ui.label(RichText::new(doc.meaning).size(12.5).color(theme::TEXT_DIM));
+            ui.label(RichText::new(doc.meaning).size(12.5).color(ui_kit::DIM_TEXT));
         });
     }
     ui.add_space(8.0);
@@ -485,7 +485,7 @@ fn cheat_sheet(ui: &mut Ui, st: &State, cx: &mut Cx<'_>) {
     for (tok, why) in unsupported_tokens() {
         ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new(*tok).monospace().color(ui_kit::WARN_TEXT));
-            ui.label(RichText::new(*why).size(12.5).color(theme::TEXT_DIM));
+            ui.label(RichText::new(*why).size(12.5).color(ui_kit::DIM_TEXT));
         });
     }
     let _ = names_in;

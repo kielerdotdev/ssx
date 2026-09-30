@@ -470,7 +470,7 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     };
     ui_kit::card(ui, Some(&name), |ui| {
         ui.horizontal(|ui| {
-            ui_kit::badge(ui, &info.kind, theme::ACCENT);
+            ui_kit::badge(ui, &info.kind, ui_kit::ACCENT_TEXT);
             let origin = match Registry::source(&info) {
                 Source::Builtin => "built in".to_owned(),
                 Source::Table => "defined in settings.toml".to_owned(),
@@ -481,7 +481,7 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                         .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
                 ),
             };
-            ui.label(RichText::new(origin).color(theme::TEXT_DIM));
+            ui.label(RichText::new(origin).color(ui_kit::DIM_TEXT));
         });
         ui.add_space(4.0);
         let mut accepts: Vec<&str> = info.uploads.clone();
@@ -732,14 +732,17 @@ fn secret_field(
         if line.ok {
             ui.label(RichText::new("\u{2714}").color(ui_kit::OK_TEXT));
         }
-        ui.add(
+        let text = ui.add(
             egui::Label::new(RichText::new(&line.text).size(12.5).color(if line.ok {
                 ui_kit::OK_TEXT
             } else {
-                theme::TEXT_DIM
+                ui_kit::DIM_TEXT
             }))
             .wrap(),
         );
+        if let Some(why) = location.reason() {
+            text.on_hover_text(format!("Why there is no keyring: {why}"));
+        }
     });
     if env_var.is_none() {
         let input = st.secret_inputs.entry(spec.key.to_owned()).or_default();
@@ -854,7 +857,7 @@ fn test_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, name: &str, usable: b
 
 fn url_row(ui: &mut Ui, cx: &mut Cx<'_>, label: &str, url: &str) {
     ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new(label).color(theme::TEXT_DIM));
+        ui.label(RichText::new(label).color(ui_kit::DIM_TEXT));
         ui.add(egui::Label::new(RichText::new(url).monospace().size(12.5)).selectable(true));
         if ui_kit::button(ui, "Copy").on_hover_text("Copy the URL").clicked() {
             ui.ctx().copy_text(url.to_owned());

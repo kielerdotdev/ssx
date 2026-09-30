@@ -122,7 +122,7 @@ fn severity_color(s: DoctorSeverity) -> Color32 {
     match s {
         DoctorSeverity::Error => ui_kit::ERROR_TEXT,
         DoctorSeverity::Warning => ui_kit::WARN_TEXT,
-        DoctorSeverity::Info => theme::ACCENT,
+        DoctorSeverity::Info => ui_kit::ACCENT_TEXT,
     }
 }
 
@@ -256,7 +256,7 @@ fn menus_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                     } else if e.status.is_failure() {
                         ("\u{2716}", ui_kit::ERROR_TEXT)
                     } else {
-                        ("\u{2013}", theme::TEXT_DIM)
+                        ("\u{2013}", ui_kit::DIM_TEXT)
                     };
                     ui.label(RichText::new(mark).color(color));
                     ui.label(RichText::new(e.name).strong());
@@ -264,7 +264,7 @@ fn menus_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                         egui::Label::new(RichText::new(text).color(if e.status.is_failure() {
                             ui_kit::ERROR_TEXT
                         } else {
-                            theme::TEXT_DIM
+                            ui_kit::DIM_TEXT
                         }))
                         .wrap(),
                     );
@@ -284,12 +284,12 @@ fn file_manager_row(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, s: &Integratio
         ui_kit::badge(
             ui,
             if s.detected { "found" } else { "not found" },
-            if s.detected { ui_kit::OK_TEXT } else { theme::TEXT_DIM },
+            if s.detected { ui_kit::OK_TEXT } else { ui_kit::DIM_TEXT },
         );
         ui_kit::badge(
             ui,
             if s.installed { "menu installed" } else { "no menu" },
-            if s.installed { theme::ACCENT } else { theme::TEXT_DIM },
+            if s.installed { ui_kit::ACCENT_TEXT } else { ui_kit::DIM_TEXT },
         );
         let open = st.details_open.as_deref() == Some(s.id.as_str());
         if ui_kit::link(ui, if open { "Hide details" } else { "Details" }).clicked() {
@@ -312,7 +312,7 @@ fn file_manager_row(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, s: &Integratio
                 for a in &d.artefacts {
                     ui.add(
                         egui::Label::new(
-                            RichText::new(a).monospace().size(11.5).color(theme::TEXT_DIM),
+                            RichText::new(a).monospace().size(11.5).color(ui_kit::DIM_TEXT),
                         )
                         .wrap()
                         .selectable(true),
@@ -393,7 +393,7 @@ fn kv(ui: &mut Ui, key: &str, value: impl Into<String>) {
             egui::Align2::LEFT_TOP,
             key,
             egui::FontId::proportional(12.5),
-            theme::TEXT_DIM,
+            ui_kit::DIM_TEXT,
         );
         ui.add(egui::Label::new(RichText::new(value.into()).size(12.5)).wrap().selectable(true));
     });

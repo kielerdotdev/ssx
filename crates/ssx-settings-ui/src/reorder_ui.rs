@@ -33,7 +33,7 @@ fn handle_id(list: Id, i: usize) -> Id {
 }
 
 fn paint_grip(ui: &Ui, rect: Rect, hot: bool) {
-    let c = if hot { Color32::WHITE } else { theme::TEXT_DIM };
+    let c = if hot { Color32::WHITE } else { crate::ui_kit::DIM_TEXT };
     let centre = rect.center();
     for dx in [-2.5, 2.5] {
         for dy in [-5.0, 0.0, 5.0] {

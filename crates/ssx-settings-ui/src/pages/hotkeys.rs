@@ -163,8 +163,8 @@ fn strategy_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     let info = explain(&detection, &cx.host.hotkey_env);
     ui_kit::card(ui, Some("How shortcuts work on this desktop"), |ui| {
         ui.horizontal(|ui| {
-            ui_kit::badge(ui, info.desktop, theme::ACCENT);
-            ui_kit::badge(ui, info.session, theme::ACCENT);
+            ui_kit::badge(ui, info.desktop, ui_kit::ACCENT_TEXT);
+            ui_kit::badge(ui, info.session, ui_kit::ACCENT_TEXT);
             ui_kit::badge(
                 ui,
                 if info.automatic { "automatic" } else { "needs setup" },

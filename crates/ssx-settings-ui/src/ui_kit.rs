@@ -26,6 +26,11 @@ pub const MAX_CONTENT_WIDTH: f32 = 900.0;
 /// Width of the label column.
 pub const LABEL_W: f32 = 178.0;
 
+/// Secondary text. The editor's `TEXT_DIM` is a little too faint on the card background for
+/// WCAG AA (4.5:1), so this window uses a slightly lighter grey.
+pub const DIM_TEXT: Color32 = Color32::from_rgb(148, 152, 162);
+/// The accent blue as text (links, badges): the editor's `ACCENT` is 4.2:1 on the cards.
+pub const ACCENT_TEXT: Color32 = Color32::from_rgb(104, 166, 240);
 /// Card background.
 pub const CARD_BG: Color32 = Color32::from_rgb(43, 44, 49);
 /// Card outline.
@@ -113,11 +118,11 @@ pub fn list_item(
         let sub_job = truncated(
             subtitle,
             FontId::proportional(11.5),
-            if selected { Color32::from_rgb(196, 208, 230) } else { theme::TEXT_DIM },
+            if selected { Color32::from_rgb(196, 208, 230) } else { DIM_TEXT },
             text_w,
         );
         let g = ui.painter().layout_job(sub_job);
-        ui.painter().galley(pos2(rect.left() + 11.0, rect.top() + 25.0), g, theme::TEXT_DIM);
+        ui.painter().galley(pos2(rect.left() + 11.0, rect.top() + 25.0), g, DIM_TEXT);
         if let Some(sev) = marker {
             paint_severity(ui.painter(), pos2(rect.right() - 14.0, rect.center().y), sev);
         }
@@ -147,12 +152,12 @@ pub fn card<R>(ui: &mut Ui, title: Option<&str>, add: impl FnOnce(&mut Ui) -> R)
 
 /// A dimmed, wrapping help line.
 pub fn hint(ui: &mut Ui, text: &str) {
-    ui.add(egui::Label::new(RichText::new(text).size(12.0).color(theme::TEXT_DIM)).wrap());
+    ui.add(egui::Label::new(RichText::new(text).size(12.0).color(DIM_TEXT)).wrap());
 }
 
 /// A dimmed, wrapping help line with a monospace part removed: plain text only.
 pub fn hint_rich(ui: &mut Ui, text: impl Into<RichText>) {
-    ui.add(egui::Label::new(text.into().size(12.0).color(theme::TEXT_DIM)).wrap());
+    ui.add(egui::Label::new(text.into().size(12.0).color(DIM_TEXT)).wrap());
 }
 
 /// The validation messages of `path`, one line each with a severity marker.
@@ -494,7 +499,7 @@ pub fn mini_icon_button(
             );
         }
         let ink = if !enabled {
-            theme::TEXT_DIM.gamma_multiply(0.5)
+            DIM_TEXT.gamma_multiply(0.5)
         } else if hovered {
             Color32::WHITE
         } else {
@@ -513,8 +518,7 @@ pub fn mini_icon_button(
 /// A borderless text-like button (links inside a sentence, "Show" toggles).
 pub fn link(ui: &mut Ui, text: &str) -> Response {
     let r = ui.add(
-        egui::Label::new(RichText::new(text).color(theme::ACCENT).underline())
-            .sense(Sense::click()),
+        egui::Label::new(RichText::new(text).color(ACCENT_TEXT).underline()).sense(Sense::click()),
     );
     r.widget_info(|| WidgetInfo::labeled(WidgetType::Link, true, text));
     r.on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -753,7 +757,7 @@ mod tests {
             let (x, y) = (lum(a), lum(b));
             (x.max(y) + 0.05) / (x.min(y) + 0.05)
         };
-        for fg in [ERROR_TEXT, WARN_TEXT, OK_TEXT, theme::TEXT, theme::TEXT_DIM, theme::ACCENT] {
+        for fg in [ERROR_TEXT, WARN_TEXT, OK_TEXT, theme::TEXT, DIM_TEXT, ACCENT_TEXT] {
             for bg in [CARD_BG, PAGE_BG] {
                 assert!(contrast(fg, bg) >= 4.5, "{fg:?} on {bg:?}: {}", contrast(fg, bg));
             }

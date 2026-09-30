@@ -123,7 +123,7 @@ fn list_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         input_style(ui);
         let menu = ui.menu_button("New workflow", |ui| {
             ui.set_min_width(300.0);
-            ui.label(RichText::new("Start from").size(12.0).color(theme::TEXT_DIM));
+            ui.label(RichText::new("Start from").size(12.0).color(ui_kit::DIM_TEXT));
             for t in templates() {
                 if ui.button(&t.label).clicked() {
                     let w = instantiate(&t.workflow, &cx.settings.workflows);

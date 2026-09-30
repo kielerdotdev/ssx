@@ -50,8 +50,21 @@ fn ms(rfc: &str) -> i64 {
 
 /// 40 entries around 2025-03-09 14:05 (+01:00). Files that "exist" are real, in `files_dir`.
 pub fn demo_history(files_dir: &Path) -> Arc<History> {
-    std::fs::create_dir_all(files_dir).unwrap();
     let db = Arc::new(History::open_in_memory().unwrap());
+    fill_history(&db, files_dir);
+    db
+}
+
+/// The same history in a database file (for the real binary).
+pub fn demo_history_file(files_dir: &Path, db_path: &Path) {
+    std::fs::create_dir_all(db_path.parent().unwrap()).unwrap();
+    let db = History::open(db_path).unwrap();
+    fill_history(&db, files_dir);
+}
+
+/// Writes the 40 demo entries into `db`.
+pub fn fill_history(db: &History, files_dir: &Path) {
+    std::fs::create_dir_all(files_dir).unwrap();
     let base = ms("2025-03-09T14:00:00+01:00");
     for i in 0..40i64 {
         let kind = match i % 9 {
@@ -114,7 +127,6 @@ pub fn demo_history(files_dir: &Path) -> Arc<History> {
             Some(if i % 3 == 0 { "capture-region" } else { "capture-fullscreen" }.to_owned());
         db.insert(&e).unwrap();
     }
-    db
 }
 
 /// Settings with a couple of uploaders and a few edits, like a lived-in install.

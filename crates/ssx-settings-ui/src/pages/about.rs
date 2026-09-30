@@ -100,7 +100,7 @@ pub fn ui(ui: &mut Ui, cx: &mut Cx<'_>) {
                         egui::Align2::LEFT_CENTER,
                         label,
                         egui::FontId::proportional(13.0),
-                        theme::TEXT_DIM,
+                        ui_kit::DIM_TEXT,
                     );
                     ui.add(
                         egui::Label::new(
@@ -122,7 +122,7 @@ pub fn ui(ui: &mut Ui, cx: &mut Cx<'_>) {
                 |ui| {
                     for n in NOTICES {
                         ui.label(RichText::new(n.name).color(Color32::WHITE));
-                        ui.label(RichText::new(n.purpose).color(theme::TEXT_DIM));
+                        ui.label(RichText::new(n.purpose).color(ui_kit::DIM_TEXT));
                         ui.label(RichText::new(n.license).monospace().size(12.0));
                         ui.end_row();
                     }

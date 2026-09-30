@@ -352,7 +352,7 @@ fn readout(ui: &mut Ui, r: &Readout) {
             r.highlight_clipped * 100.0
         ))
         .size(12.0)
-        .color(theme::TEXT_DIM),
+        .color(ui_kit::DIM_TEXT),
     );
 }
 
