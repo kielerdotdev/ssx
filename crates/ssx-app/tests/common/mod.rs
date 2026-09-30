@@ -131,6 +131,14 @@ impl Out {
         }
     }
 
+    /// Standard output as JSON.
+    #[track_caller]
+    pub fn json(&self) -> serde_json::Value {
+        serde_json::from_str(&self.stdout).unwrap_or_else(|e| {
+            panic!("stdout is not JSON ({e})\n--- stdout ---\n{}\n--- stderr ---\n{}", self.stdout, self.stderr)
+        })
+    }
+
     /// Panics with both streams unless the command exited with 0.
     #[track_caller]
     pub fn ok(self) -> Self {

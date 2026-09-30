@@ -572,6 +572,7 @@ impl Supervisor {
 
     fn execute(self: &Arc<Self>, job: &Job) {
         let interactive = matches!(job.spec.class(), Class::Interactive | Class::Record { .. });
+        tracing::info!(run_id = job.run_id, workflow = %job.name, interactive, "run started");
         self.ui.emit(UiEvent::RunStarted {
             run_id: job.run_id,
             name: job.name.clone(),
@@ -599,6 +600,7 @@ impl Supervisor {
 
     fn finish(self: &Arc<Self>, run_id: u64, name: &str, output: RunOutput) {
         self.recording.run_ended(run_id);
+        tracing::info!(run_id, workflow = name, outcome = ?output.summary.outcome, "run finished");
         {
             let mut inner = self.lock();
             inner.active.remove(&run_id);
