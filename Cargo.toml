@@ -18,6 +18,8 @@ ssx-capture = { path = "crates/ssx-capture" }
 ssx-capture-win = { path = "crates/ssx-capture-win" }
 ssx-capture-x11 = { path = "crates/ssx-capture-x11" }
 ssx-capture-wayland = { path = "crates/ssx-capture-wayland" }
+ssx-capture-portal = { path = "crates/ssx-capture-portal" }
+ssx-gpu = { path = "crates/ssx-gpu" }
 ssx-platform = { path = "crates/ssx-platform" }
 ssx-editor = { path = "crates/ssx-editor" }
 ssx-upload = { path = "crates/ssx-upload" }

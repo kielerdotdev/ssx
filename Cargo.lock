@@ -3000,8 +3000,16 @@ dependencies = [
 name = "ssx-platform"
 version = "0.1.0"
 dependencies = [
+ "half",
  "ssx-capture",
+ "ssx-capture-portal",
+ "ssx-capture-wayland",
+ "ssx-capture-win",
+ "ssx-capture-x11",
+ "ssx-hdr",
  "ssx-types",
+ "thiserror 2.0.21",
+ "tracing",
 ]
 
 [[package]]

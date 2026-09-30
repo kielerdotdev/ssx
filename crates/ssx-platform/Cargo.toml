@@ -1,5 +1,6 @@
 [package]
 name = "ssx-platform"
+description = "Wires the OS capture backends and HDR tone-mapping into one ScreenSource that always returns 8-bit sRGB frames."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,6 +11,20 @@ publish = false
 [dependencies]
 ssx-types.workspace = true
 ssx-capture.workspace = true
+ssx-hdr.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+ssx-capture-win.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ssx-capture-wayland.workspace = true
+ssx-capture-portal.workspace = true
+ssx-capture-x11.workspace = true
+
+[dev-dependencies]
+half.workspace = true
 
 [lints]
 workspace = true
