@@ -55,65 +55,123 @@ impl std::fmt::Debug for Renderer {
     }
 }
 
+/// A borrowed 8-bit sRGB pixel buffer: a [`Frame`], or memory mapped from a helper request.
+#[derive(Debug, Clone, Copy)]
+pub struct PixelView<'a> {
+    /// Size in pixels.
+    pub size: Size,
+    /// Bytes per row.
+    pub stride: usize,
+    /// Channel order (`Rgba8` or `Bgra8`).
+    pub format: PixelFormat,
+    /// Colour space (must be sRGB).
+    pub color_space: ColorSpace,
+    /// Pixel bytes.
+    pub data: &'a [u8],
+    /// Desktop position of the first pixel.
+    pub origin: Point,
+    /// Desktop pixels per logical pixel.
+    pub scale_factor: f64,
+}
+
+impl<'a> PixelView<'a> {
+    /// Views a [`Frame`].
+    pub fn of(frame: &'a Frame) -> Self {
+        Self {
+            size: frame.size(),
+            stride: frame.stride(),
+            format: frame.format(),
+            color_space: frame.color_space(),
+            data: frame.data(),
+            origin: frame.origin,
+            scale_factor: frame.scale_factor,
+        }
+    }
+
+    /// Desktop rectangle covered.
+    pub fn rect(&self) -> Rect {
+        Rect::from_origin_size(self.origin, self.size)
+    }
+}
+
 impl Renderer {
     /// Builds the renderer from an 8-bit sRGB frame. `dim` is 0.0..=1.0.
-    ///
-    /// Converts to BGRA/opaque and pre-dims in a single multi-threaded pass over the frame.
     pub fn new(frame: &Frame, dim: f32) -> Result<Self, OverlayError> {
-        if frame.width() == 0 || frame.height() == 0 {
+        Self::from_view(PixelView::of(frame), dim)
+    }
+
+    /// Builds the renderer from a pixel view.
+    ///
+    /// Converts to BGRA/opaque and pre-dims in a single multi-threaded pass over the source
+    /// (which may be a memory-mapped file: it is read exactly once).
+    pub fn from_view(v: PixelView<'_>, dim: f32) -> Result<Self, OverlayError> {
+        if v.size.is_empty() {
             return Err(OverlayError::InvalidInput("the desktop frame is empty".into()));
         }
-        if !frame.is_sdr8() || frame.color_space() != ColorSpace::Srgb {
+        if !matches!(v.format, PixelFormat::Rgba8 | PixelFormat::Bgra8)
+            || v.color_space != ColorSpace::Srgb
+        {
             return Err(OverlayError::InvalidInput(format!(
                 "the overlay needs an 8-bit sRGB frame, got {:?}/{:?}; tone-map it first",
-                frame.format(),
-                frame.color_space()
+                v.format, v.color_space
             )));
         }
-        let (w, h) = (frame.width() as usize, frame.height() as usize);
-        let n = w
+        let (w, h) = (v.size.width as usize, v.size.height as usize);
+        let row = w * 4;
+        let need = v.stride.checked_mul(h - 1).and_then(|n| n.checked_add(row));
+        if v.stride < row || need.is_none_or(|n| v.data.len() < n) {
+            return Err(OverlayError::InvalidInput(format!(
+                "pixel buffer of {} bytes is too small for {}x{} with stride {}",
+                v.data.len(),
+                w,
+                h,
+                v.stride
+            )));
+        }
+        let n = row
             .checked_mul(h)
-            .and_then(|p| p.checked_mul(4))
             .ok_or_else(|| OverlayError::InvalidInput("frame too large".into()))?;
         let mut base = vec![0u8; n];
         let mut dimmed = vec![0u8; n];
         let keep = (1.0 - dim.clamp(0.0, 1.0)).clamp(0.0, 1.0);
         let mut lut = [0u8; 256];
-        for (v, o) in lut.iter_mut().enumerate() {
-            *o = (v as f32 * keep + 0.5) as u8;
+        for (i, o) in lut.iter_mut().enumerate() {
+            *o = (i as f32 * keep + 0.5) as u8;
         }
-        let swap = frame.format() == PixelFormat::Rgba8;
+        let swap = v.format == PixelFormat::Rgba8;
         let threads = std::thread::available_parallelism().map_or(1, usize::from).clamp(1, 8);
         let rows_per = h.div_ceil(threads).max(1);
         std::thread::scope(|s| {
-            let stride = w * 4;
             for (ci, (b, d)) in
-                base.chunks_mut(rows_per * stride).zip(dimmed.chunks_mut(rows_per * stride)).enumerate()
+                base.chunks_mut(rows_per * row).zip(dimmed.chunks_mut(rows_per * row)).enumerate()
             {
                 let lut = &lut;
                 s.spawn(move || {
-                    for (ri, (brow, drow)) in b.chunks_exact_mut(stride).zip(d.chunks_exact_mut(stride)).enumerate() {
-                        let src = frame.row((ci * rows_per + ri) as u32);
+                    for (ri, (brow, drow)) in
+                        b.chunks_exact_mut(row).zip(d.chunks_exact_mut(row)).enumerate()
+                    {
+                        let y = ci * rows_per + ri;
+                        let src = &v.data[y * v.stride..y * v.stride + row];
                         for ((bp, dp), sp) in brow
                             .chunks_exact_mut(4)
                             .zip(drow.chunks_exact_mut(4))
                             .zip(src.chunks_exact(4))
                         {
-                            let (c0, c1, c2) = if swap { (sp[2], sp[1], sp[0]) } else { (sp[0], sp[1], sp[2]) };
+                            let (c0, c1, c2) =
+                                if swap { (sp[2], sp[1], sp[0]) } else { (sp[0], sp[1], sp[2]) };
                             bp.copy_from_slice(&[c0, c1, c2, 255]);
-                            dp.copy_from_slice(&[lut[usize::from(c0)], lut[usize::from(c1)], lut[usize::from(c2)], 255]);
+                            dp.copy_from_slice(&[
+                                lut[usize::from(c0)],
+                                lut[usize::from(c1)],
+                                lut[usize::from(c2)],
+                                255,
+                            ]);
                         }
                     }
                 });
             }
         });
-        Ok(Self {
-            bounds: frame.rect(),
-            width: w,
-            base,
-            dimmed,
-            scratch: Vec::new(),
-        })
+        Ok(Self { bounds: v.rect(), width: w, base, dimmed, scratch: Vec::new() })
     }
 
     /// Desktop rectangle the renderer covers.

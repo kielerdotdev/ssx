@@ -26,10 +26,10 @@ memmap2 = "0.9"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"] }
 
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "1", features = ["fs", "event", "pipe"] }
+rustix = { version = "1", features = ["fs", "event", "time"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-x11rb = { version = "0.14", features = ["xfixes", "randr"] }
+x11rb = { version = "0.14", features = ["xkb"] }
 wayland-client = "0.31"
 wayland-protocols = { version = "0.32", features = ["client", "staging", "unstable"] }
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
