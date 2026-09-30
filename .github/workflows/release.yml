@@ -163,6 +163,13 @@ jobs:
         env:
           FFMPEG_DIR: ${{ env.FFMPEG_PREFIX }}
           PKG_CONFIG_PATH: ${{ env.FFMPEG_PREFIX }}/lib/pkgconfig
+          # The embedded FFmpeg is built with VA-API (hardware encoding), whose libraries stay
+          # dynamic on purpose: VA-API loads the distribution's driver stack at run time. The
+          # static FFmpeg archive does not carry its own link dependencies, so name them here.
+          # --error-limit=0 makes the linker list every unresolved symbol, not just the first 20.
+          RUSTFLAGS: >-
+            -C link-arg=-lva -C link-arg=-lva-drm -C link-arg=-lva-x11
+            -C link-arg=-lX11 -C link-arg=-ldrm -C link-arg=-Wl,--error-limit=0
         run: |
           # shellcheck disable=SC2086  # $PACKAGES is a list of -p flags; splitting is intended
           cargo build --release --locked --no-default-features $PACKAGES \
