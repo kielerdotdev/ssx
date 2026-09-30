@@ -830,7 +830,7 @@ pub enum DaemonCmd {
 /// `ssx daemon autostart`.
 #[derive(Debug, Subcommand)]
 pub enum AutostartCmd {
-    /// Start ssx-app at login (XDG autostart entry, `HKCU` Run value, or LaunchAgent)
+    /// Start ssx-app at login (XDG autostart entry, `HKCU` Run value, or `LaunchAgent`)
     Enable,
     /// Remove what `enable` added
     Disable,

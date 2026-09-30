@@ -16,8 +16,8 @@ use std::{
 };
 
 use common::{
-    Daemon, Fixture, TestEnv, WORKFLOWS, Xdo, Xvfb, fixture, fixture_sized, expect_error, expected_scene, finished, have,
-    overlay_bin, skip_unless, wait_until,
+    Daemon, Fixture, TestEnv, WORKFLOWS, Xdo, Xvfb, expect_error, expected_scene, finished,
+    fixture, fixture_sized, overlay_bin, skip_unless, wait_until,
 };
 use ssx_core::ipc::{
     CaptureKind, ErrorCode, PostAction, RecordSpec, RecordTarget, RegionMode, Request, Response,

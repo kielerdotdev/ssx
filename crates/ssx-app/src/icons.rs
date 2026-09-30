@@ -3,8 +3,8 @@
 //! No image files ship with the daemon: the icon is a handful of shapes in unit coordinates
 //! (a dark rounded square, viewfinder corner brackets, a centre dot; a red disc while
 //! recording; a red "!" badge after an error), rasterised at whatever size the desktop
-//! asks for with 4x4 supersampling. That keeps the icon crisp at 16 to 64 px and at HiDPI
-//! scales (the StatusNotifier protocol lets us offer several sizes and the host picks the closest;
+//! asks for with 4x4 supersampling. That keeps the icon crisp at 16 to 64 px and at `HiDPI`
+//! scales (the `StatusNotifier` protocol lets us offer several sizes and the host picks the closest;
 //! Windows takes one image at the size we choose), and there is nothing to lose or mis-package.
 //!
 //! Shapes are described once ([`layers`]) and shared by every size, so the picture cannot drift
@@ -14,7 +14,7 @@
 
 use crate::menu::IconKind;
 
-/// Sizes offered to StatusNotifier hosts (they pick the closest and scale).
+/// Sizes offered to `StatusNotifier` hosts (they pick the closest and scale).
 pub const SNI_SIZES: [u32; 5] = [16, 24, 32, 48, 64];
 
 const SAMPLES: u32 = 4;
@@ -49,7 +49,7 @@ impl IconImage {
     }
 
     /// The pixels as ARGB32 in network byte order (A, R, G, B per pixel): the format of the
-    /// StatusNotifierItem `IconPixmap` property.
+    /// `StatusNotifierItem` `IconPixmap` property.
     pub fn to_argb32(&self) -> Vec<u8> {
         self.rgba.chunks_exact(4).flat_map(|p| [p[3], p[0], p[1], p[2]]).collect()
     }

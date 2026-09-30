@@ -129,21 +129,20 @@ impl<W> CoalesceState<W> {
         paths: Vec<PathBuf>,
         waiter: Option<W>,
     ) -> Added<W> {
-        let idx = match self.open.iter().position(|o| &o.action == action) {
-            Some(i) => i,
-            None => {
-                self.open.push(Open {
-                    id: self.ids.next_id(),
-                    action: action.clone(),
-                    paths: Vec::new(),
-                    seen: HashSet::new(),
-                    waiters: Vec::new(),
-                    requests: 0,
-                    first: now,
-                    deadline: now,
-                });
-                self.open.len() - 1
-            }
+        let idx = if let Some(i) = self.open.iter().position(|o| &o.action == action) {
+            i
+        } else {
+            self.open.push(Open {
+                id: self.ids.next_id(),
+                action: action.clone(),
+                paths: Vec::new(),
+                seen: HashSet::new(),
+                waiters: Vec::new(),
+                requests: 0,
+                first: now,
+                deadline: now,
+            });
+            self.open.len() - 1
         };
         let b = &mut self.open[idx];
         for p in paths {
@@ -267,7 +266,7 @@ impl<W: Send + 'static> Coalescer<W> {
     }
 
     /// Makes the timer thread re-read the clock (tests advance a [`FakeClock`]
-    /// (crate::clock::FakeClock) and call this; real time needs no poke).
+    /// (`crate::clock::FakeClock`) and call this; real time needs no poke).
     pub fn poke(&self) {
         // Taking the lock orders the poke after any state change the caller just made.
         drop(self.shared.lock());

@@ -95,8 +95,9 @@ fn rig() -> Option<Rig> {
     env.write_uploader(&mock.url());
     let save = env.path("shots");
     env.write_settings(&common::settings_with_mock_uploader(&format!(
-        "[general]\nsave_dir = {save:?}\nuse_type_subfolders = false\nfolder_pattern = \"\"\n\
-         file_name_pattern = \"shot_%i\"\nshow_notifications = false\n\n{WORKFLOWS}"
+        "[general]\nsave_dir = \"{}\"\nuse_type_subfolders = false\nfolder_pattern = \"\"\n\
+         file_name_pattern = \"shot_%i\"\nshow_notifications = false\n\n{WORKFLOWS}",
+        save.display()
     )));
     sway.input().set_layout(W, H);
     Some(Rig { sway, env, save, _mock: mock })

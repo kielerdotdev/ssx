@@ -99,8 +99,7 @@ pub fn run(cli: Cli) -> i32 {
             let stop = first.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
             match (n, stop) {
                 (0, Some(t)) => t.cancel(),
-                (0, None) => c.cancel(),
-                (1, Some(_)) => c.cancel(),
+                (0, None) | (1, Some(_)) => c.cancel(),
                 _ => std::process::exit(ExitCode::Cancelled.code()),
             }
         });

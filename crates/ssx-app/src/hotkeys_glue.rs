@@ -14,7 +14,7 @@
 //!   it on the main thread elsewhere.
 //!
 //! Which mechanism is used is `ssx_hotkeys::open_best_manager`'s decision (global-hotkey on
-//! Windows/macOS/X11, the GlobalShortcuts portal on Wayland where available). When there is
+//! Windows/macOS/X11, the `GlobalShortcuts` portal on Wayland where available). When there is
 //! none, the runner records *why* and the CLI commands, and [`HotkeyStatus`] carries them to the
 //! one-time notification and the log.
 

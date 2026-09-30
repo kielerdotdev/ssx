@@ -417,9 +417,14 @@ mod tests {
     #[test]
     fn the_view_reflects_state_and_settings() {
         let settings = Settings::default();
-        let mut s = UiInner::default();
-        s.hotkeys =
-            HotkeyView { enabled: true, backend: Some("global-hotkey".into()), problems: 0 };
+        let mut s = UiInner {
+            hotkeys: HotkeyView {
+                enabled: true,
+                backend: Some("global-hotkey".into()),
+                problems: 0,
+            },
+            ..UiInner::default()
+        };
         let v = build_view(&settings, &s, RecordingView::Idle);
         assert_eq!(v.tooltip, "ssx: Ready");
         assert_eq!(v.icon, crate::menu::IconKind::Idle);

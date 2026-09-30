@@ -8,7 +8,7 @@
 //! * [`prepare`] is the pure part: it cleans the text (control characters, length), escapes the
 //!   markup notification servers interpret, and picks the click target. It is what the tests pin.
 //! * [`NoticeStore`] remembers which *one-time* advice was already shown ("install the
-//!   AppIndicator extension", "run `ssx hotkeys install`") in a small file in the data directory,
+//!   `AppIndicator` extension", "run `ssx hotkeys install`") in a small file in the data directory,
 //!   so the user is told once per installation, not at every login.
 
 use std::{

@@ -1,7 +1,7 @@
 //! What every tray backend shares: the view it renders, the handle the app updates it
 //! through, and the advice shown when the desktop has no tray.
 //!
-//! Backends: `tray_ksni` (Linux, StatusNotifierItem over D-Bus, no GTK) and `tray_native`
+//! Backends: `tray_ksni` (Linux, `StatusNotifierItem` over D-Bus, no GTK) and `tray_native`
 //! (Windows and macOS, `tray-icon` + `tao`). Both are thin: they translate a [`TrayView`]
 //! (the [`Menu`] model, a tooltip, an [`IconKind`]) into their toolkit's items and hand clicks
 //! back as [`Action`]s. Everything else is decided in `menu`.
@@ -44,7 +44,7 @@ pub struct TrayProblem {
     pub notice_key: &'static str,
 }
 
-/// The advice for a desktop that has no StatusNotifierWatcher. `desktop` is
+/// The advice for a desktop that has no `StatusNotifierWatcher`. `desktop` is
 /// `XDG_CURRENT_DESKTOP` (may be empty).
 pub fn missing_watcher_advice(desktop: &str) -> TrayProblem {
     let d = desktop.to_ascii_lowercase();

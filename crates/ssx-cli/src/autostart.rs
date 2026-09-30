@@ -6,7 +6,7 @@
 //! |---|---|
 //! | Linux (and other Unix) | XDG autostart entry `$XDG_CONFIG_HOME/autostart/ssx.desktop` |
 //! | Windows | the value `ssx` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` |
-//! | macOS | a LaunchAgent `~/Library/LaunchAgents/io.ssx.app.plist` (loaded at the next login) |
+//! | macOS | a `LaunchAgent` `~/Library/LaunchAgents/io.ssx.app.plist` (loaded at the next login) |
 //!
 //! The text generators are pure and tested for every platform on every OS; the real
 //! registry is behind [`RunKey`] (a fake is used in tests; the Windows implementation is
@@ -25,13 +25,13 @@ use std::{
 pub const MARKER: &str =
     "Managed by ssx (`ssx daemon autostart`); remove with `ssx daemon autostart disable`.";
 
-/// The registry value name and the LaunchAgent label.
+/// The registry value name and the `LaunchAgent` label.
 pub const NAME: &str = "ssx";
 
 /// The registry key of per-user autostart values (relative to `HKCU`).
 pub const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 
-/// LaunchAgent label / file stem.
+/// `LaunchAgent` label / file stem.
 pub const LAUNCH_LABEL: &str = "io.ssx.app";
 
 /// Which mechanism applies.
@@ -41,7 +41,7 @@ pub enum Platform {
     Linux,
     /// `HKCU\...\Run`.
     Windows,
-    /// LaunchAgent.
+    /// `LaunchAgent`.
     MacOs,
 }
 
@@ -97,7 +97,7 @@ pub fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 
-/// The LaunchAgent plist.
+/// The `LaunchAgent` plist.
 pub fn launch_agent(app: &Path) -> String {
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\

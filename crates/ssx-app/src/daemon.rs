@@ -965,9 +965,7 @@ mod tests {
         fn run(&self, job: &Job, _ui: &dyn UiSink) -> RunOutput {
             let (tx, rx) = mpsc::channel();
             self.gates.lock().unwrap().insert(job.run_id, tx);
-            if *self.panic_on.lock().unwrap() == Some(job.run_id) {
-                panic!("boom");
-            }
+            assert!(*self.panic_on.lock().unwrap() != Some(job.run_id), "boom");
             let recording = matches!(job.spec, JobSpec::Record { .. });
             if recording && !self.selecting.load(std::sync::atomic::Ordering::SeqCst) {
                 self.recording.mark_started();

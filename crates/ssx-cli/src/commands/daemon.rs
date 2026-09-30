@@ -153,40 +153,39 @@ pub fn human_duration(secs: u64) -> String {
 
 /// The human text of `daemon status`.
 pub fn render_status(s: &DaemonStatus) -> String {
+    use std::fmt::Write as _;
     let mut out = format!(
         "ssx-app {} is running (pid {}, up {})\n",
         s.app_version,
         s.pid,
         human_duration(s.uptime_secs)
     );
-    out.push_str(&format!("config:   {}\n", s.config_dir));
-    out.push_str(&format!("tray:     {}\n", if s.tray { "showing" } else { "not showing" }));
-    out.push_str(&format!(
-        "hotkeys:  {} registered via {}\n",
-        s.hotkeys_registered, s.hotkey_backend
-    ));
+    let _ = writeln!(out, "config:   {}", s.config_dir);
+    let _ = writeln!(out, "tray:     {}", if s.tray { "showing" } else { "not showing" });
+    let _ = writeln!(out, "hotkeys:  {} registered via {}", s.hotkeys_registered, s.hotkey_backend);
     for p in &s.hotkey_problems {
-        out.push_str(&format!("          problem: {p}\n"));
+        let _ = writeln!(out, "          problem: {p}");
     }
     if s.recording.active {
-        out.push_str(&format!(
-            "recording: {} ({})\n",
+        let _ = writeln!(
+            out,
+            "recording: {} ({})",
             s.recording.workflow.as_deref().unwrap_or("?"),
             if s.recording.selecting {
                 "choosing a region".to_owned()
             } else {
                 format!("{} s", s.recording.elapsed_ms / 1000)
             }
-        ));
+        );
     }
     for r in &s.active_runs {
-        out.push_str(&format!("running:  #{} {} ({} s)\n", r.run_id, r.name, r.running_secs));
+        let _ = writeln!(out, "running:  #{} {} ({} s)", r.run_id, r.name, r.running_secs);
     }
     if s.queued_runs > 0 {
-        out.push_str(&format!("queued:   {}\n", s.queued_runs));
+        let _ = writeln!(out, "queued:   {}", s.queued_runs);
     }
     if let Some(p) = &s.settings_problem {
-        out.push_str(&format!("settings: NOT reloaded: {p}\n"));
+        let _ = writeln!(out, "settings: NOT reloaded: {p}");
     }
     out
 }

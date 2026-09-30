@@ -202,7 +202,7 @@ impl SettingsWatcher {
                     match w.watch(&dir, RecursiveMode::NonRecursive) {
                         Ok(()) => watcher = Some(w),
                         Err(e) => {
-                            tracing::warn!("cannot watch {}: {e}; polling instead", dir.display())
+                            tracing::warn!("cannot watch {}: {e}; polling instead", dir.display());
                         }
                     }
                 }

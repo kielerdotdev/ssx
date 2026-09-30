@@ -135,7 +135,10 @@ impl Out {
     #[track_caller]
     pub fn json(&self) -> serde_json::Value {
         serde_json::from_str(&self.stdout).unwrap_or_else(|e| {
-            panic!("stdout is not JSON ({e})\n--- stdout ---\n{}\n--- stderr ---\n{}", self.stdout, self.stderr)
+            panic!(
+                "stdout is not JSON ({e})\n--- stdout ---\n{}\n--- stderr ---\n{}",
+                self.stdout, self.stderr
+            )
         })
     }
 
@@ -612,8 +615,9 @@ pub fn fixture_sized(screen: &str, workflows: &str) -> Option<Fixture> {
     env.write_uploader(&mock.url());
     let save = env.path("shots");
     env.write_settings(&settings_with_mock_uploader(&format!(
-        "[general]\nsave_dir = {save:?}\nuse_type_subfolders = false\nfolder_pattern = \"\"\n\
-         file_name_pattern = \"shot_%i\"\nshow_notifications = false\n\n{workflows}"
+        "[general]\nsave_dir = \"{}\"\nuse_type_subfolders = false\nfolder_pattern = \"\"\n\
+         file_name_pattern = \"shot_%i\"\nshow_notifications = false\n\n{workflows}",
+        save.display()
     )));
     Some(Fixture { x, _painter: painter, _ids: ids, env, mock, save })
 }
@@ -621,4 +625,3 @@ pub fn fixture_sized(screen: &str, workflows: &str) -> Option<Fixture> {
 pub fn fixture() -> Option<Fixture> {
     fixture_sized("800x600x24", WORKFLOWS)
 }
-

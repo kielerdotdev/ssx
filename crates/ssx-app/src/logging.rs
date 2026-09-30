@@ -24,7 +24,8 @@ use crate::{cli::Args, notify::DaemonNotifier};
 /// Keeps the non-blocking writer alive; dropping it flushes the log.
 #[derive(Debug)]
 pub struct LogGuard {
-    _file: Option<WorkerGuard>,
+    #[allow(dead_code)] // held only to flush the log on drop
+    file: Option<WorkerGuard>,
     /// Where the log file lives.
     pub dir: std::path::PathBuf,
 }
@@ -115,7 +116,7 @@ pub fn init(data_dir: &Path, args: &Args) -> LogGuard {
     });
     // A second initialisation (tests calling `run` twice) is harmless: ignore the error.
     let _ = tracing_subscriber::registry().with(file_layer).with(terminal_layer).try_init();
-    LogGuard { _file: guard, dir }
+    LogGuard { file: guard, dir }
 }
 
 /// Logs panics (with a backtrace) and tells the user. See the module docs.
@@ -172,6 +173,6 @@ mod tests {
     fn an_unwritable_data_dir_is_not_fatal() {
         let args = <Args as clap::Parser>::try_parse_from(["ssx-app"]).unwrap();
         let g = init(Path::new("/proc/no/such/place"), &args);
-        assert!(g._file.is_none());
+        assert!(g.file.is_none());
     }
 }

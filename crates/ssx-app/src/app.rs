@@ -245,12 +245,13 @@ impl App {
         let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
         let notifier = Arc::new(DaemonNotifier::system());
         let selector = OverlaySelector::discover().map(Arc::new);
-        match &selector {
-            Some(s) => tracing::info!("selection overlay: {}", s.helper().display()),
-            None => tracing::info!(
+        if let Some(s) = &selector {
+            tracing::info!("selection overlay: {}", s.helper().display());
+        } else {
+            tracing::info!(
                 "selection overlay: {}",
                 OverlaySelector::discovery().describe(ssx_services::overlay::HELPER_ENV)
-            ),
+            );
         }
         let settings_ui = helpers::discover("ssx-settings-ui", "SSX_SETTINGS_UI");
 
@@ -451,7 +452,7 @@ impl App {
     pub fn handle_hotkey(self: &Arc<Self>, target: HotkeyTarget) {
         match target {
             HotkeyTarget::Workflow(id) => {
-                self.handle_action(Action::RunWorkflow(id), Origin::Hotkey)
+                self.handle_action(Action::RunWorkflow(id), Origin::Hotkey);
             }
             HotkeyTarget::OpenHistory => self.handle_action(Action::OpenHistory, Origin::Hotkey),
             HotkeyTarget::OpenSettings => self.handle_action(Action::OpenSettings, Origin::Hotkey),
@@ -562,8 +563,9 @@ impl App {
                     u.reason
                 );
                 for c in &plan.commands {
+                    use std::fmt::Write as _;
                     tracing::info!("hotkey command: {} ({}): {}", c.label, c.hotkey, c.command);
-                    body.push_str(&format!("{}: {}\n", c.hotkey, c.command));
+                    let _ = writeln!(body, "{}: {}", c.hotkey, c.command);
                 }
                 if self.notices.first_time("hotkeys-cli") {
                     self.say(NotificationLevel::Warning, "ssx: global hotkeys", body.trim_end());
@@ -760,6 +762,7 @@ impl UiSink for LateSink {
 }
 
 #[cfg(feature = "file-dialog")]
+#[allow(clippy::unnecessary_wraps)] // the same signature as the build without a file chooser
 fn pick_files() -> Result<Vec<PathBuf>, String> {
     Ok(rfd::FileDialog::new().set_title("Upload files with ssx").pick_files().unwrap_or_default())
 }

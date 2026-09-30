@@ -496,8 +496,10 @@ mod tests {
     #[test]
     fn recording_state_replaces_the_record_entries_with_stop() {
         let s = Settings::default();
-        let mut ui = UiState::default();
-        ui.recording = RecordingView::Recording { elapsed: Duration::from_secs(75) };
+        let mut ui = UiState {
+            recording: RecordingView::Recording { elapsed: Duration::from_secs(75) },
+            ..UiState::default()
+        };
         let m = build_menu(&s, &ui);
         let stop = m.entry(&Action::StopRecording).unwrap();
         assert_eq!(stop.label, "Stop recording (1:15)");
@@ -579,6 +581,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn custom_workflows_show_up_and_hotkeys_with_odd_values_are_handled() {
         let mut s = Settings::default();
         s.workflows = vec![

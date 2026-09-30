@@ -205,10 +205,7 @@ impl RecordingMachine {
     /// The IPC description at `now`.
     pub fn status(&self, now: Duration) -> RecordingStatus {
         let elapsed_ms = match &self.state {
-            RecState::Recording { since, .. } => {
-                u64::try_from(now.saturating_sub(*since).as_millis()).unwrap_or(u64::MAX)
-            }
-            RecState::Stopping { since, .. } => {
+            RecState::Recording { since, .. } | RecState::Stopping { since, .. } => {
                 u64::try_from(now.saturating_sub(*since).as_millis()).unwrap_or(u64::MAX)
             }
             _ => 0,
@@ -470,7 +467,7 @@ mod tests {
         assert_eq!(m.view(ms(0)), RecordingView::Idle);
         m.begin(7, "record-screen").unwrap();
         assert_eq!(m.view(ms(0)), RecordingView::Selecting);
-        assert_eq!(m.status(ms(0)).selecting, true);
+        assert!(m.status(ms(0)).selecting);
         assert!(m.started(ms(1_000)));
         assert_eq!(m.view(ms(3_500)), RecordingView::Recording { elapsed: ms(2_500) });
         let st = m.status(ms(3_500));

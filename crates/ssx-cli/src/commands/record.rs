@@ -97,7 +97,7 @@ fn via_app(cmd: &RecordCmd) -> CliResult<()> {
         }
         RecordCmd::Stop => match daemon.call(Request::StopRecording).map_err(CliError::new)? {
             Response::Ok => {
-                err_line("stopping the recording; the workflow carries on with the file")
+                err_line("stopping the recording; the workflow carries on with the file");
             }
             Response::Error { code: ErrorCode::NotRunning, .. } => {
                 return Err(CliError::new("no recording is running"));
@@ -187,28 +187,25 @@ mod standalone {
             return Err("--gif and an .mp4 file name contradict each other".to_owned());
         }
         let kind = if gif { RecordKind::Gif } else { RecordKind::Video };
-        let (dir, stem) = match output {
-            Some(p) => {
-                let abs = std::path::absolute(p)
-                    .map_err(|e| format!("cannot resolve {}: {e}", p.display()))?;
-                let stem = abs
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .filter(|s| !s.is_empty())
-                    .ok_or_else(|| format!("{} has no file name", p.display()))?
-                    .to_owned();
-                let dir = abs.parent().map_or_else(|| PathBuf::from("."), Path::to_path_buf);
-                (dir, stem)
-            }
-            None => {
-                let root = settings.general.resolve_save_dir();
-                let dir = if settings.general.use_type_subfolders {
-                    root.join(&settings.general.subfolders.video)
-                } else {
-                    root
-                };
-                (dir, format!("Recording_{now}"))
-            }
+        let (dir, stem) = if let Some(p) = output {
+            let abs = std::path::absolute(p)
+                .map_err(|e| format!("cannot resolve {}: {e}", p.display()))?;
+            let stem = abs
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| format!("{} has no file name", p.display()))?
+                .to_owned();
+            let dir = abs.parent().map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+            (dir, stem)
+        } else {
+            let root = settings.general.resolve_save_dir();
+            let dir = if settings.general.use_type_subfolders {
+                root.join(&settings.general.subfolders.video)
+            } else {
+                root
+            };
+            (dir, format!("Recording_{now}"))
         };
         let ext = if gif { "gif" } else { "mp4" };
         let path = dir.join(format!("{stem}.{ext}"));

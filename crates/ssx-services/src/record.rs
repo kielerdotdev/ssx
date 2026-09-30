@@ -289,7 +289,7 @@ impl SourceFactory for PlanFactory {
 /// One encoder candidate and whether it works on this machine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncoderProbe {
-    /// FFmpeg encoder name (`libx264`, `h264_vaapi`, `mpeg4`, ...).
+    /// `FFmpeg` encoder name (`libx264`, `h264_vaapi`, `mpeg4`, ...).
     pub name: String,
     /// It opened and encoded a test picture.
     pub usable: bool,
@@ -298,7 +298,7 @@ pub struct EncoderProbe {
 }
 
 /// Probes the H.264 encoder chain (hardware first, then software) on this machine: what
-/// `ssx doctor` shows under "recorder". Empty when built without FFmpeg.
+/// `ssx doctor` shows under "recorder". Empty when built without `FFmpeg`.
 pub fn probe_encoders() -> Vec<EncoderProbe> {
     #[cfg(feature = "ffmpeg")]
     {
@@ -334,7 +334,7 @@ pub fn probe_encoders() -> Vec<EncoderProbe> {
     }
 }
 
-/// `true` when this build can encode MP4 (FFmpeg linked); GIF needs nothing extra.
+/// `true` when this build can encode MP4 (`FFmpeg` linked); GIF needs nothing extra.
 pub const fn has_ffmpeg() -> bool {
     cfg!(feature = "ffmpeg")
 }

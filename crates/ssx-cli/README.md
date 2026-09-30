@@ -6,7 +6,7 @@ is done by `ssx-core` (workflow engine, settings, history) and `ssx-services` (r
 ```text
 ssx capture fullscreen -o shot.png          # pixel-exact PNG of all monitors
 ssx capture region --rect 100,100,800,600 --upload --copy-url
-ssx capture region [--mode rect|window|ellipse|monitor]   # interactive, on the selection overlay
+ssx capture region [--mode rect|ellipse|freeform|window|monitor]   # interactive, on the selection overlay
 ssx capture window --active | monitor [--id ID] | last-region
 ssx record [--rect X,Y,W,H | --monitor ID | --region] [--gif] [--audio ...] [--seconds N] [-o FILE]
 ssx record start | stop | toggle | status    # control a recording in the background app

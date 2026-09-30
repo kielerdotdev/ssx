@@ -2,17 +2,19 @@
 //!
 //! The real `ssx-app` runs against:
 //!
-//! * a mock `org.kde.StatusNotifierWatcher` (what a KDE panel, waybar or the GNOME AppIndicator
+//! * a mock `org.kde.StatusNotifierWatcher` (what a KDE panel, waybar or the GNOME `AppIndicator`
 //!   extension provide) that records what registers;
 //! * a mock `org.freedesktop.Notifications` server that records every notification.
 //!
-//! The test then plays the tray host: reads the StatusNotifierItem properties, calls
+//! The test then plays the tray host: reads the `StatusNotifierItem` properties, calls
 //! `com.canonical.dbusmenu.GetLayout` and compares it with the pure menu model the daemon
 //! builds, and sends the dbusmenu `Event` a click produces. What a mock cannot say is how a
 //! real host (Plasma, GNOME Shell) renders the menu; the README has that checklist.
 //!
 //! Skips when `dbus-daemon` (or, for the workflow click, `Xvfb`) is missing.
 #![cfg(target_os = "linux")]
+// The zbus interface macros expand to code these pedantic lints dislike.
+#![allow(clippy::unused_self, clippy::used_underscore_binding)]
 
 mod common;
 
@@ -275,7 +277,9 @@ fn unwrap_variant<'a>(v: &'a Value<'a>) -> &'a Value<'a> {
 }
 
 fn parse_node(v: &Value<'_>) -> Node {
-    let Value::Structure(s) = unwrap_variant(v) else { panic!("a dbusmenu node is a struct: {v:?}") };
+    let Value::Structure(s) = unwrap_variant(v) else {
+        panic!("a dbusmenu node is a struct: {v:?}")
+    };
     let fields = s.fields();
     let Value::I32(id) = unwrap_variant(&fields[0]) else { panic!("node id: {:?}", fields[0]) };
     let Value::Dict(d) = unwrap_variant(&fields[1]) else { panic!("props: {:?}", fields[1]) };
@@ -334,11 +338,9 @@ impl Host {
 
     fn layout(&self) -> Node {
         let p = self.proxy(&self.menu_path(), "com.canonical.dbusmenu");
-        let reply = async_io::block_on(p.call_method(
-            "GetLayout",
-            &(0i32, -1i32, Vec::<String>::new()),
-        ))
-        .expect("GetLayout");
+        let reply =
+            async_io::block_on(p.call_method("GetLayout", &(0i32, -1i32, Vec::<String>::new())))
+                .expect("GetLayout");
         let body = reply.body();
         let whole: zbus::zvariant::Structure<'_> = body.deserialize().expect("layout body");
         let root = whole.fields()[1].clone();
@@ -351,6 +353,9 @@ impl Host {
             .expect("Event");
     }
 }
+
+/// `(icon name, icon pixmaps, title, description)`.
+type ToolTip = (String, Vec<(i32, i32, Vec<u8>)>, String, String);
 
 // ---- the tests --------------------------------------------------------------------------
 
@@ -401,7 +406,7 @@ fn the_tray_registers_serves_the_model_as_dbusmenu_and_a_click_runs_a_workflow()
         assert_eq!(data.len(), (*w * *h * 4) as usize, "ARGB32 {w}x{h}");
         assert!(data.chunks(4).any(|px| px[0] != 0), "some opaque pixel in {w}x{h}");
     }
-    let tip: (String, Vec<(i32, i32, Vec<u8>)>, String, String) = host.item_prop("ToolTip");
+    let tip: ToolTip = host.item_prop("ToolTip");
     assert_eq!(tip.2, "ssx: Ready");
 
     // 3. GetLayout mirrors the model row for row.
@@ -563,8 +568,9 @@ fn hotkeys_without_a_portal_are_announced_once_with_the_cli_commands() {
     env.set("XDG_CURRENT_DESKTOP", "sway");
     let mut d = Daemon::start(&env, &["--no-tray"]);
 
-    let toast = wait_until(Duration::from_secs(15), || notes.mentioning("hotkeys").first().cloned())
-        .unwrap_or_else(|| panic!("no hotkey notice\n{}", env.daemon_log()));
+    let toast =
+        wait_until(Duration::from_secs(15), || notes.mentioning("hotkeys").first().cloned())
+            .unwrap_or_else(|| panic!("no hotkey notice\n{}", env.daemon_log()));
     assert!(toast.body.contains("ssx hotkeys install"), "{}", toast.body);
     assert!(toast.body.contains("ssx run"), "the CLI commands are listed: {}", toast.body);
     let Response::Status(st) = env.request(&Request::Status) else { panic!("status") };

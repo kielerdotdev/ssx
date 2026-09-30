@@ -1,11 +1,11 @@
-//! The Linux tray: a StatusNotifierItem served by `ksni` (pure Rust over D-Bus, no GTK).
+//! The Linux tray: a `StatusNotifierItem` served by `ksni` (pure Rust over D-Bus, no GTK).
 //!
 //! `ksni` runs its own thread and asks [`SsxTray`] for the icon, the tooltip and the menu
 //! whenever we tell it something changed ([`TrayHandle::refresh`]). Menu clicks call closures
 //! that send the [`Action`] to the app's [`ActionSink`] and return at once.
 //!
 //! **No watcher, no failure.** Without `org.kde.StatusNotifierWatcher` (GNOME without the
-//! AppIndicator extension, a bare compositor) the first attempt fails with
+//! `AppIndicator` extension, a bare compositor) the first attempt fails with
 //! `Error::Watcher`. [`start`] then reports the reason and advice to the caller (which shows a
 //! one-time notification) and starts the tray again in "assume it will appear" mode, so the icon
 //! shows up as soon as the user enables the extension or starts their bar, without restarting
@@ -41,7 +41,7 @@ pub fn dbusmenu_shortcut(accel: &str) -> Vec<Vec<String>> {
             _ => p.to_owned(),
         })
         .collect();
-    if parts.len() < 2 && parts.first().is_none_or(|p| p.is_empty()) {
+    if parts.len() < 2 && parts.first().is_none_or(std::string::String::is_empty) {
         return Vec::new();
     }
     vec![parts]
@@ -188,7 +188,7 @@ impl TrayHandle for KsniHandle {
 pub enum Started {
     /// The tray is up and registered.
     Running(Arc<dyn TrayHandle>),
-    /// There is no StatusNotifierWatcher yet: the tray will appear when one does. The
+    /// There is no `StatusNotifierWatcher` yet: the tray will appear when one does. The
     /// problem should be shown to the user once.
     Waiting(Arc<dyn TrayHandle>, TrayProblem),
     /// No tray is possible in this session (no D-Bus).
@@ -321,9 +321,12 @@ mod tests {
         idle.sink = Arc::new(move |a| sent2.lock().unwrap().push(a));
         idle.activate(0, 0);
         assert!(sent.lock().unwrap().is_empty());
-        let mut ui = UiState::default();
-        ui.recording =
-            crate::events::RecordingView::Recording { elapsed: std::time::Duration::ZERO };
+        let ui = UiState {
+            recording: crate::events::RecordingView::Recording {
+                elapsed: std::time::Duration::ZERO,
+            },
+            ..UiState::default()
+        };
         let mut rec = tray_for(&ui);
         let sent3 = Arc::clone(&sent);
         rec.sink = Arc::new(move |a| sent3.lock().unwrap().push(a));

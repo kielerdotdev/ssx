@@ -321,7 +321,7 @@ pub struct EncoderState {
 pub struct RecorderInfo {
     /// This build can record at all.
     pub built_in: bool,
-    /// This build can encode MP4 (FFmpeg linked).
+    /// This build can encode MP4 (`FFmpeg` linked).
     pub ffmpeg: bool,
     /// The H.264 encoder chain, best first.
     pub encoders: Vec<EncoderState>,

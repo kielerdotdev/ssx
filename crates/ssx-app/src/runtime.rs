@@ -65,14 +65,14 @@ impl Snapshot {
         settings: Settings,
         paths: &Paths,
         backend: Option<BackendKind>,
-        selector: &Option<Arc<OverlaySelector>>,
+        selector: Option<&Arc<OverlaySelector>>,
         recorder: &Arc<dyn ssx_core::workflow::Recorder>,
         naming: &Naming,
-        history: &Option<Arc<History>>,
+        history: Option<&Arc<History>>,
         notifier: &Arc<DaemonNotifier>,
     ) -> Self {
         let selector: Option<Arc<dyn RegionSelector>> =
-            selector.clone().map(|s| s as Arc<dyn RegionSelector>);
+            selector.cloned().map(|s| s as Arc<dyn RegionSelector>);
         let services = ProductionServices::new(
             &settings,
             paths,
@@ -85,7 +85,7 @@ impl Snapshot {
                 ..ProductionOptions::default()
             },
         );
-        let history = history.clone().filter(|_| settings.history.enabled);
+        let history = history.cloned().filter(|_| settings.history.enabled);
         Self {
             engine: Engine::new(settings.clone(), naming.clone()),
             settings: Arc::new(settings),
@@ -200,7 +200,14 @@ impl Runtime {
         ));
 
         let first = Arc::new(Snapshot::build(
-            settings, &paths, backend, &selector, &recorder, &naming, &history, &notifier,
+            settings,
+            &paths,
+            backend,
+            selector.as_ref(),
+            &recorder,
+            &naming,
+            history.as_ref(),
+            &notifier,
         ));
         Self {
             current: RwLock::new(first),
@@ -221,10 +228,10 @@ impl Runtime {
             settings,
             &self.paths,
             self.backend,
-            &self.selector,
+            self.selector.as_ref(),
             &self.recorder,
             &self.naming,
-            &self.history,
+            self.history.as_ref(),
             &self.notifier,
         ))
     }

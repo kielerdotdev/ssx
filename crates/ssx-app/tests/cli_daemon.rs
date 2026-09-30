@@ -19,9 +19,11 @@ fn socket_gone(env: &TestEnv) -> bool {
 }
 
 fn find_video(dir: &Path) -> Option<std::path::PathBuf> {
-    std::fs::read_dir(dir).ok()?.flatten().map(|e| e.path()).find(|p| {
-        p.extension().is_some_and(|e| e == "mp4" || e == "gif")
-    })
+    std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| p.extension().is_some_and(|e| e == "mp4" || e == "gif"))
 }
 
 #[test]
