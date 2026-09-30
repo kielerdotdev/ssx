@@ -1,0 +1,84 @@
+# Example GitHub Actions workflow for the statically linked FFmpeg builds of ssx-record.
+#
+# UNVERIFIED: this file has never run. It lives here (not in .github/workflows) because the
+# task that produced it was confined to crates/ssx-record. Copy it to .github/workflows/ and
+# adjust runners, caches and the feature list. See README.md in this directory for what each
+# step is for and what to look at when it fails.
+name: ssx-record static ffmpeg
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "crates/ssx-record/**"
+
+env:
+  CARGO_TERM_COLOR: always
+  # Portable code: never -march=native in a release artefact.
+  FFMPEG_MARCH: x86-64-v2
+  FEATURES: gif,audio,gpu,portal,gpl
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache the FFmpeg prefix
+        id: ffcache
+        uses: actions/cache@v4
+        with:
+          path: ~/ffmpeg-static
+          key: ffmpeg-static-linux-${{ hashFiles('crates/ssx-record/build/build-ffmpeg.sh') }}
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm yasm pkg-config cmake git build-essential \
+            libva-dev libdrm-dev libpipewire-0.3-dev libasound2-dev libpulse-dev \
+            libwayland-dev libx11-dev libxcb1-dev libclang-dev
+      - name: Build the static FFmpeg prefix
+        if: steps.ffcache.outputs.cache-hit != 'true'
+        run: crates/ssx-record/build/build-ffmpeg.sh "$HOME/ffmpeg-static"
+      - name: Build ssx-record against it
+        env:
+          PKG_CONFIG_ALL_STATIC: "1"
+        run: |
+          export FFMPEG_DIR="$HOME/ffmpeg-static"
+          export PKG_CONFIG_PATH="$HOME/ffmpeg-static/lib/pkgconfig"
+          cargo build --release -p ssx-record --no-default-features \
+            --features "static-prebuilt,${FEATURES}" --example record
+          # No dynamic FFmpeg or codec libraries may remain (libva stays dynamic on purpose).
+          if ldd target/release/examples/record | grep -E 'libav|libsw|libx264|libx265|libvpx|libopus'; then
+            echo "dynamic FFmpeg/codec dependency found" >&2; exit 1
+          fi
+      - name: Test against the static build
+        run: |
+          export FFMPEG_DIR="$HOME/ffmpeg-static"
+          export PKG_CONFIG_PATH="$HOME/ffmpeg-static/lib/pkgconfig"
+          cargo test -p ssx-record --no-default-features \
+            --features "static-prebuilt,${FEATURES}"
+
+  windows:
+    runs-on: windows-latest
+    env:
+      VCPKGRS_TRIPLET: x64-windows-static-md
+      VCPKG_ROOT: C:\vcpkg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: FFmpeg from vcpkg (static libraries, dynamic CRT)
+        run: >
+          C:\vcpkg\vcpkg.exe install
+          "ffmpeg[x264,x265,vpx,opus,nvcodec,amf,avcodec,avformat,swscale,swresample,gpl]:x64-windows-static-md"
+      - name: Build
+        run: >
+          cargo build --release -p ssx-record --no-default-features
+          --features "static-prebuilt,gif,audio,gpu,gpl" --example record
+      - name: Lint (includes the WGC glue)
+        run: >
+          cargo clippy -p ssx-record --no-default-features
+          --features "static-prebuilt,gif,audio,gpu,gpl" --all-targets -- -D warnings
+      # The WGC and WASAPI loopback code has never run on Windows. Hosted runners have no
+      # interactive desktop, so this needs a self-hosted interactive runner:
+      # - name: WGC smoke test
+      #   run: cargo test -p ssx-record --no-default-features --features "static-prebuilt,gif,audio,gpu,gpl" -- --ignored records_the_primary_monitor
