@@ -30,7 +30,8 @@ pub struct SaveForm {
 impl SaveForm {
     /// A form pre-filled with a suggested path.
     pub fn new(path: PathBuf, settings: ExportSettings) -> Self {
-        let format = SaveFormat::from_path(&path).unwrap_or(SaveFormat::Image(ssx_types::ImageFormat::Png));
+        let format =
+            SaveFormat::from_path(&path).unwrap_or(SaveFormat::Image(ssx_types::ImageFormat::Png));
         Self {
             path: path.display().to_string(),
             format,
@@ -119,14 +120,22 @@ pub struct ResizeForm {
 impl ResizeForm {
     /// A form for an image of the given size.
     pub fn new(w: u32, h: u32) -> Self {
-        Self { orig_w: w, orig_h: h, width: w, height: h, lock_aspect: true, filter: ResizeFilter::Lanczos3 }
+        Self {
+            orig_w: w,
+            orig_h: h,
+            width: w,
+            height: h,
+            lock_aspect: true,
+            filter: ResizeFilter::Lanczos3,
+        }
     }
 
     /// Sets the width, adjusting the height when the aspect is locked.
     pub fn set_width(&mut self, w: u32) {
         self.width = w.clamp(1, MAX_SIDE);
         if self.lock_aspect && self.orig_w > 0 {
-            let h = (f64::from(self.width) * f64::from(self.orig_h) / f64::from(self.orig_w)).round();
+            let h =
+                (f64::from(self.width) * f64::from(self.orig_h) / f64::from(self.orig_w)).round();
             self.height = (h as u32).clamp(1, MAX_SIDE);
         }
     }
@@ -135,7 +144,8 @@ impl ResizeForm {
     pub fn set_height(&mut self, h: u32) {
         self.height = h.clamp(1, MAX_SIDE);
         if self.lock_aspect && self.orig_h > 0 {
-            let w = (f64::from(self.height) * f64::from(self.orig_w) / f64::from(self.orig_h)).round();
+            let w =
+                (f64::from(self.height) * f64::from(self.orig_w) / f64::from(self.orig_h)).round();
             self.width = (w as u32).clamp(1, MAX_SIDE);
         }
     }
@@ -149,7 +159,11 @@ impl ResizeForm {
 
     /// The current width as a percentage of the original.
     pub fn percent(&self) -> f32 {
-        if self.orig_w == 0 { 100.0 } else { (f64::from(self.width) / f64::from(self.orig_w) * 100.0) as f32 }
+        if self.orig_w == 0 {
+            100.0
+        } else {
+            (f64::from(self.width) / f64::from(self.orig_w) * 100.0) as f32
+        }
     }
 
     /// Validates the target size.

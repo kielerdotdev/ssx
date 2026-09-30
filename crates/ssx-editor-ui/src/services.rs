@@ -78,7 +78,10 @@ impl Services {
 
     /// Scripted in-memory services for tests.
     pub fn fake() -> Self {
-        Self { dialogs: Box::new(FakeDialogs::default()), clipboard: Box::new(MemoryClipboard::default()) }
+        Self {
+            dialogs: Box::new(FakeDialogs::default()),
+            clipboard: Box::new(MemoryClipboard::default()),
+        }
     }
 }
 
@@ -120,11 +123,14 @@ impl FileDialogs for SystemDialogs {
             }
             let path = match purpose {
                 DialogPurpose::OpenDocument => d
-                    .add_filter("Images and projects", &["png", "jpg", "jpeg", "webp", "bmp", "gif", "ssxe"])
+                    .add_filter(
+                        "Images and projects",
+                        &["png", "jpg", "jpeg", "webp", "bmp", "gif", "ssxe"],
+                    )
                     .pick_file(),
-                DialogPurpose::InsertImage => {
-                    d.add_filter("Images", &["png", "jpg", "jpeg", "webp", "bmp", "gif"]).pick_file()
-                }
+                DialogPurpose::InsertImage => d
+                    .add_filter("Images", &["png", "jpg", "jpeg", "webp", "bmp", "gif"])
+                    .pick_file(),
                 DialogPurpose::SaveTarget => {
                     if let Some(n) = name {
                         d = d.set_file_name(n);
@@ -175,8 +181,12 @@ impl SystemClipboard {
 impl ClipboardService for SystemClipboard {
     fn image(&mut self) -> Option<Frame> {
         let img = self.get().ok()?.get_image().ok()?;
-        Frame::from_rgba8(u32::try_from(img.width).ok()?, u32::try_from(img.height).ok()?, img.bytes.into_owned())
-            .ok()
+        Frame::from_rgba8(
+            u32::try_from(img.width).ok()?,
+            u32::try_from(img.height).ok()?,
+            img.bytes.into_owned(),
+        )
+        .ok()
     }
 
     fn set_image(&mut self, frame: &Frame) -> Result<(), String> {
@@ -258,7 +268,10 @@ mod tests {
         d.request(DialogPurpose::SaveTarget, None, Some("n.png"));
         assert_eq!(
             d.poll(),
-            Some(DialogReply { purpose: DialogPurpose::OpenDocument, path: Some(PathBuf::from("/a.png")) })
+            Some(DialogReply {
+                purpose: DialogPurpose::OpenDocument,
+                path: Some(PathBuf::from("/a.png"))
+            })
         );
         assert_eq!(d.poll(), Some(DialogReply { purpose: DialogPurpose::SaveTarget, path: None }));
         assert_eq!(d.poll(), None);

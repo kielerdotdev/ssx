@@ -1,15 +1,21 @@
 //! Everything the user can ask the editor to do, as plain data.
 //!
-//! Menus, toolbar buttons, keyboard shortcuts and the canvas all *queue* an [`Action`] instead
-//! of mutating state directly. The app drains the queue once per frame. That keeps the drawing
-//! code trivial, makes every command reachable from the tests without a display, and gives the
-//! shortcut table one thing to point at.
+//! Menus, toolbar buttons, keyboard shortcuts, dialogs and the canvas all *queue* an
+//! [`Action`] instead of mutating state directly. The app drains the queue while it draws a
+//! frame. That keeps the drawing code trivial, makes every command reachable from tests without
+//! a display, and gives the shortcut table one thing to point at.
 
 use std::path::PathBuf;
 
-use ssx_editor::object::Orient;
+use ssx_editor::{
+    Color, ObjectId,
+    object::{Axis, Orient},
+};
+use ssx_imgfx::{Effect, ResizeFilter};
 
-use crate::tools::ToolId;
+use crate::{export::ExportSettings, props::PropEdit, tools::ToolId};
+
+pub use crate::effects::EffectKind;
 
 /// How a "Done" button ends the editing session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,8 +51,16 @@ pub enum DialogKind {
     Settings,
 }
 
-/// Identifies which image effect a dialog edits (see [`crate::effects`]).
-pub use crate::effects::EffectKind;
+/// The answer to the "unsaved changes" question.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnsavedAnswer {
+    /// Save, then continue.
+    Save,
+    /// Continue without saving.
+    Discard,
+    /// Stay.
+    Cancel,
+}
 
 /// A user command.
 #[derive(Debug, Clone, PartialEq)]
@@ -64,6 +78,15 @@ pub enum Action {
     SaveAs,
     /// Save the editable `.ssxe` project.
     SaveProject,
+    /// Write the file chosen in the Save dialog.
+    SaveTo {
+        /// Target file; the extension picks the format.
+        path: PathBuf,
+        /// Encoder options.
+        settings: ExportSettings,
+    },
+    /// Browse for the Save dialog's target.
+    BrowseSaveTarget,
     /// Copy the finished image to the system clipboard.
     CopyImage,
     /// Hand the image to the caller for upload and close.
@@ -72,6 +95,8 @@ pub enum Action {
     Done(Finish),
     /// The window was asked to close (checks for unsaved changes first).
     RequestClose,
+    /// Answer to the unsaved-changes prompt.
+    Unsaved(UnsavedAnswer),
 
     // ---- edit -------------------------------------------------------------------------
     /// Undo one step.
@@ -88,6 +113,19 @@ pub enum Action {
     SelectAll,
     /// Clear the selection.
     Deselect,
+    /// Select these objects (object list); `additive` toggles them in the current selection.
+    SelectObjects {
+        /// The objects.
+        ids: Vec<ObjectId>,
+        /// Toggle instead of replace.
+        additive: bool,
+    },
+    /// Show or hide an object.
+    SetVisible(ObjectId, bool),
+    /// Lock or unlock an object.
+    SetLocked(ObjectId, bool),
+    /// Delete one object (object list).
+    DeleteObject(ObjectId),
     /// Duplicate the selection.
     Duplicate,
     /// Copy: the selected objects, or the whole image when nothing is selected.
@@ -110,6 +148,10 @@ pub enum Action {
     Raise,
     /// Selection one step down.
     Lower,
+    /// Change a property of the selection or the active tool.
+    Prop(PropEdit),
+    /// Set the number the first step marker shows.
+    SetStepStart(u32),
 
     // ---- tools ------------------------------------------------------------------------
     /// Choose a tool.
@@ -139,26 +181,78 @@ pub enum Action {
     /// Rotate or flip the whole image.
     Orient(Orient),
     /// Apply the pending crop.
-    ApplyCrop,
+    ApplyPendingCrop,
     /// Discard the pending crop.
-    CancelCrop,
-    /// Crop away uniform borders.
-    AutoCrop,
+    CancelPendingCrop,
+    /// Crop to this rectangle (image pixels).
+    CropTo(ssx_types::Rect),
+    /// Crop away uniform borders (tolerance 0-255).
+    AutoCrop(u8),
+    /// Remove a strip and join the rest.
+    CutOut {
+        /// Which axis the strip spans.
+        axis: Axis,
+        /// First removed pixel.
+        start: i32,
+        /// One past the last removed pixel.
+        end: i32,
+    },
+    /// Scale the whole image.
+    Resize {
+        /// New width.
+        width: u32,
+        /// New height.
+        height: u32,
+        /// Resampling filter.
+        filter: ResizeFilter,
+    },
+    /// Grow or shrink the canvas.
+    ResizeCanvas {
+        /// Left delta.
+        left: i32,
+        /// Top delta.
+        top: i32,
+        /// Right delta.
+        right: i32,
+        /// Bottom delta.
+        bottom: i32,
+        /// Canvas fill (`None` = transparent).
+        background: Option<Color>,
+    },
     /// Bake all annotations into the image.
     Flatten,
+    /// Apply an image effect to the whole image.
+    ApplyEffect(Effect),
     /// Open a dialog.
     OpenDialog(DialogKind),
     /// Open the live-preview dialog of an effect.
     OpenEffect(EffectKind),
-
-    // ---- misc -------------------------------------------------------------------------
     /// Dismiss whatever dialog is open.
     CloseDialog,
+
+    // ---- misc -------------------------------------------------------------------------
+    /// Forget the remembered tool styles.
+    ResetToolStyles,
+    /// Forget the recent colours.
+    ClearRecentColors,
 }
 
 impl Action {
     /// `true` for actions that replace the document (and so must ask about unsaved changes).
     pub fn replaces_document(&self) -> bool {
         matches!(self, Action::NewFromClipboard | Action::OpenPath(_))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_document_replacing_actions_are_flagged() {
+        assert!(Action::NewFromClipboard.replaces_document());
+        assert!(Action::OpenPath(PathBuf::from("/x.png")).replaces_document());
+        assert!(!Action::Open.replaces_document(), "choosing a file changes nothing yet");
+        assert!(!Action::Undo.replaces_document());
     }
 }

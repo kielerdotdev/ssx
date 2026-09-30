@@ -5,7 +5,7 @@
 //! turns slider values back into an `Effect`, so one generic dialog (with live preview) serves
 //! them all and a new effect only needs a row here.
 
-use ssx_imgfx::{Effect, EdgeSides, Rgba, ShadowParams};
+use ssx_imgfx::{EdgeSides, Effect, Rgba, ShadowParams};
 
 /// The effects the menu offers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -77,7 +77,13 @@ const fn pf(
     ParamSpec { label, min, max, default, integer: false, suffix }
 }
 
-const fn pi(label: &'static str, min: f32, max: f32, default: f32, suffix: &'static str) -> ParamSpec {
+const fn pi(
+    label: &'static str,
+    min: f32,
+    max: f32,
+    default: f32,
+    suffix: &'static str,
+) -> ParamSpec {
     ParamSpec { label, min, max, default, integer: true, suffix }
 }
 
@@ -156,11 +162,15 @@ impl EffectKind {
             EffectKind::GaussianBlur => const { &[pf("Radius", 0.5, 50.0, 4.0, " px")] },
             EffectKind::Pixelate => const { &[pi("Block size", 2.0, 96.0, 8.0, " px")] },
             EffectKind::Sharpen => const { &[pf("Amount", 0.0, 3.0, 0.6, "")] },
-            EffectKind::UnsharpMask => const { &[
-                pf("Radius", 0.5, 20.0, 2.0, " px"),
-                pf("Amount", 0.0, 5.0, 1.0, ""),
-                pi("Threshold", 0.0, 255.0, 0.0, ""),
-            ] },
+            EffectKind::UnsharpMask => {
+                const {
+                    &[
+                        pf("Radius", 0.5, 20.0, 2.0, " px"),
+                        pf("Amount", 0.0, 5.0, 1.0, ""),
+                        pi("Threshold", 0.0, 255.0, 0.0, ""),
+                    ]
+                }
+            }
             EffectKind::Brightness => const { &[pf("Amount", -1.0, 1.0, 0.15, "")] },
             EffectKind::Contrast => const { &[pf("Amount", -1.0, 1.0, 0.2, "")] },
             EffectKind::Saturation => const { &[pf("Amount", 0.0, 3.0, 1.4, "")] },
@@ -168,23 +178,30 @@ impl EffectKind {
             EffectKind::Gamma => const { &[pf("Gamma", 0.2, 4.0, 1.4, "")] },
             EffectKind::Threshold => const { &[pi("Level", 0.0, 255.0, 128.0, "")] },
             EffectKind::Grayscale | EffectKind::Sepia | EffectKind::Invert => const { &[] },
-            EffectKind::DropShadow => const { &[
-                pi("Offset X", -60.0, 60.0, 6.0, " px"),
-                pi("Offset Y", -60.0, 60.0, 6.0, " px"),
-                pf("Blur", 0.0, 40.0, 8.0, " px"),
-            ] },
+            EffectKind::DropShadow => {
+                const {
+                    &[
+                        pi("Offset X", -60.0, 60.0, 6.0, " px"),
+                        pi("Offset Y", -60.0, 60.0, 6.0, " px"),
+                        pf("Blur", 0.0, 40.0, 8.0, " px"),
+                    ]
+                }
+            }
             EffectKind::Border => const { &[pi("Width", 1.0, 100.0, 8.0, " px")] },
             EffectKind::Outline => const { &[pi("Width", 1.0, 50.0, 4.0, " px")] },
             EffectKind::RoundedCorners => const { &[pf("Radius", 0.0, 300.0, 16.0, " px")] },
-            EffectKind::TornEdge => const { &[
-                pf("Depth", 1.0, 60.0, 8.0, " px"),
-                pf("Tooth width", 2.0, 100.0, 12.0, " px"),
-                pi("Pattern", 0.0, 999.0, 7.0, ""),
-            ] },
-            EffectKind::WaveEdge => const { &[
-                pf("Depth", 1.0, 60.0, 8.0, " px"),
-                pf("Wavelength", 4.0, 200.0, 24.0, " px"),
-            ] },
+            EffectKind::TornEdge => {
+                const {
+                    &[
+                        pf("Depth", 1.0, 60.0, 8.0, " px"),
+                        pf("Tooth width", 2.0, 100.0, 12.0, " px"),
+                        pi("Pattern", 0.0, 999.0, 7.0, ""),
+                    ]
+                }
+            }
+            EffectKind::WaveEdge => {
+                const { &[pf("Depth", 1.0, 60.0, 8.0, " px"), pf("Wavelength", 4.0, 200.0, 24.0, " px")] }
+            }
         }
     }
 

@@ -167,8 +167,14 @@ mod tests {
             route(Key::ArrowLeft, &Modifiers::SHIFT, true),
             Routed::Session(SKey::Left, SMods::SHIFT)
         );
-        assert_eq!(route(Key::Enter, &Modifiers::NONE, true), Routed::Session(SKey::Enter, SMods::NONE));
-        assert_eq!(route(Key::Escape, &Modifiers::NONE, true), Routed::Session(SKey::Escape, SMods::NONE));
+        assert_eq!(
+            route(Key::Enter, &Modifiers::NONE, true),
+            Routed::Session(SKey::Enter, SMods::NONE)
+        );
+        assert_eq!(
+            route(Key::Escape, &Modifiers::NONE, true),
+            Routed::Session(SKey::Escape, SMods::NONE)
+        );
         assert_eq!(
             route(Key::Backspace, &Modifiers::NONE, true),
             Routed::Session(SKey::Backspace, SMods::NONE),
@@ -188,10 +194,22 @@ mod tests {
 
     #[test]
     fn arrows_nudge_and_delete_deletes_outside_text() {
-        assert_eq!(route(Key::ArrowUp, &Modifiers::NONE, false), Routed::Session(SKey::Up, SMods::NONE));
-        assert_eq!(route(Key::Delete, &Modifiers::NONE, false), Routed::App(Action::DeleteSelection));
-        assert_eq!(route(Key::Enter, &Modifiers::NONE, false), Routed::Session(SKey::Enter, SMods::NONE));
-        assert_eq!(route(Key::Enter, &ctrl(), false), Routed::App(Action::Done(crate::action::Finish::Save)));
+        assert_eq!(
+            route(Key::ArrowUp, &Modifiers::NONE, false),
+            Routed::Session(SKey::Up, SMods::NONE)
+        );
+        assert_eq!(
+            route(Key::Delete, &Modifiers::NONE, false),
+            Routed::App(Action::DeleteSelection)
+        );
+        assert_eq!(
+            route(Key::Enter, &Modifiers::NONE, false),
+            Routed::Session(SKey::Enter, SMods::NONE)
+        );
+        assert_eq!(
+            route(Key::Enter, &ctrl(), false),
+            Routed::App(Action::Done(crate::action::Finish::Save))
+        );
     }
 
     #[test]
@@ -206,8 +224,19 @@ mod tests {
     #[test]
     fn every_table_entry_routes_back_to_itself() {
         for s in SHORTCUTS.iter() {
-            let m = Modifiers { alt: s.chord.alt, ctrl: false, shift: s.chord.shift, mac_cmd: false, command: s.chord.ctrl };
-            assert_eq!(route(s.chord.key, &m, false), Routed::App(s.action.clone()), "{}", s.chord.display());
+            let m = Modifiers {
+                alt: s.chord.alt,
+                ctrl: false,
+                shift: s.chord.shift,
+                mac_cmd: false,
+                command: s.chord.ctrl,
+            };
+            assert_eq!(
+                route(s.chord.key, &m, false),
+                Routed::App(s.action.clone()),
+                "{}",
+                s.chord.display()
+            );
         }
     }
 
@@ -221,9 +250,18 @@ mod tests {
     #[test]
     fn every_cursor_hint_maps() {
         for h in [
-            CursorHint::Default, CursorHint::Crosshair, CursorHint::Text, CursorHint::Move,
-            CursorHint::Grabbing, CursorHint::ResizeNs, CursorHint::ResizeEw, CursorHint::ResizeNwse,
-            CursorHint::ResizeNesw, CursorHint::Rotate, CursorHint::Eraser, CursorHint::NotAllowed,
+            CursorHint::Default,
+            CursorHint::Crosshair,
+            CursorHint::Text,
+            CursorHint::Move,
+            CursorHint::Grabbing,
+            CursorHint::ResizeNs,
+            CursorHint::ResizeEw,
+            CursorHint::ResizeNwse,
+            CursorHint::ResizeNesw,
+            CursorHint::Rotate,
+            CursorHint::Eraser,
+            CursorHint::NotAllowed,
         ] {
             let _ = cursor_icon(h);
         }

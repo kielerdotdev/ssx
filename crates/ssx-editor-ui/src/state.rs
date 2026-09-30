@@ -6,15 +6,19 @@
 //! choice, only one dialog at a time, actions run in order, toasts expire) are unit-tested
 //! without a display.
 
-use std::{collections::VecDeque, path::PathBuf, time::{Duration, Instant}};
+use std::{
+    collections::VecDeque,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use ssx_editor::Color;
 
 use crate::{
     action::{Action, DialogKind},
     effects::{EffectForm, EffectKind},
-    forms::{CanvasForm, CropForm, CutForm, OpenForm, ResizeForm, SaveForm},
     export::ExportSettings,
+    forms::{CanvasForm, CropForm, CutForm, OpenForm, ResizeForm, SaveForm},
     prefs::Prefs,
     props::ColorField,
     tools::{Slot, TOOLBAR, ToolId},
@@ -199,12 +203,20 @@ impl AppState {
 
     /// Shows a message in the status bar for a few seconds.
     pub fn toast(&mut self, text: impl Into<String>) {
-        self.toast = Some(Toast { text: text.into(), error: false, until: Instant::now() + Duration::from_secs(4) });
+        self.toast = Some(Toast {
+            text: text.into(),
+            error: false,
+            until: Instant::now() + Duration::from_secs(4),
+        });
     }
 
     /// Shows an error message, longer.
     pub fn toast_error(&mut self, text: impl Into<String>) {
-        self.toast = Some(Toast { text: text.into(), error: true, until: Instant::now() + Duration::from_secs(8) });
+        self.toast = Some(Toast {
+            text: text.into(),
+            error: true,
+            until: Instant::now() + Duration::from_secs(8),
+        });
     }
 
     /// Drops the toast when it has expired; returns whether one is still showing.
@@ -226,11 +238,23 @@ impl AppState {
     }
 
     /// Creates the dialog for `kind` for an image of `size`.
-    pub fn dialog_for(&self, kind: DialogKind, size: (u32, u32), suggested_save: PathBuf) -> Dialog {
+    pub fn dialog_for(
+        &self,
+        kind: DialogKind,
+        size: (u32, u32),
+        suggested_save: PathBuf,
+    ) -> Dialog {
         match kind {
-            DialogKind::SaveAs => Dialog::SaveAs(SaveForm::new(suggested_save, self.export_settings())),
+            DialogKind::SaveAs => {
+                Dialog::SaveAs(SaveForm::new(suggested_save, self.export_settings()))
+            }
             DialogKind::Open => Dialog::Open(OpenForm {
-                path: self.prefs.last_dir.as_ref().map(|d| format!("{}/", d.display())).unwrap_or_default(),
+                path: self
+                    .prefs
+                    .last_dir
+                    .as_ref()
+                    .map(|d| format!("{}/", d.display()))
+                    .unwrap_or_default(),
             }),
             DialogKind::Resize => Dialog::Resize(ResizeForm::new(size.0, size.1)),
             DialogKind::Canvas => Dialog::Canvas(CanvasForm::new(size)),
@@ -330,7 +354,14 @@ mod tests {
         assert!(matches!(d, Dialog::Resize(ref f) if f.width == 640 && f.height == 480));
         let d = s.dialog_for(DialogKind::SaveAs, (1, 1), PathBuf::from("/x.png"));
         assert!(matches!(d, Dialog::SaveAs(ref f) if f.path == "/x.png"));
-        for k in [DialogKind::Open, DialogKind::Canvas, DialogKind::Crop, DialogKind::CutOut, DialogKind::Shortcuts, DialogKind::Settings] {
+        for k in [
+            DialogKind::Open,
+            DialogKind::Canvas,
+            DialogKind::Crop,
+            DialogKind::CutOut,
+            DialogKind::Shortcuts,
+            DialogKind::Settings,
+        ] {
             let _ = s.dialog_for(k, (10, 10), PathBuf::new());
         }
         assert!(matches!(AppState::effect_dialog(EffectKind::Sepia), Dialog::Effect(_)));

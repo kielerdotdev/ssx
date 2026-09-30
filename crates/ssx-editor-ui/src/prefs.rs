@@ -240,7 +240,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("sub").join(FILE_NAME);
         let mut p = Prefs::default();
-        p.window = WindowPrefs { width: 1000.0, height: 700.0, x: Some(10.0), y: Some(20.0), maximized: true };
+        p.window = WindowPrefs {
+            width: 1000.0,
+            height: 700.0,
+            x: Some(10.0),
+            y: Some(20.0),
+            maximized: true,
+        };
         p.last_tool = ToolId::TextBoxed;
         p.remember_color(Color::rgb(1, 2, 3));
         p.last_dir = Some(PathBuf::from("/tmp/x"));
@@ -286,7 +292,9 @@ mod tests {
 
     #[test]
     fn insane_values_are_repaired() {
-        let w = WindowPrefs { width: 1.0, height: 1e9, x: Some(1e9), y: Some(5.0), maximized: false }.sanitized();
+        let w =
+            WindowPrefs { width: 1.0, height: 1e9, x: Some(1e9), y: Some(5.0), maximized: false }
+                .sanitized();
         assert_eq!((w.width, w.height), (640.0, 8192.0));
         assert_eq!((w.x, w.y), (None, None), "a half-valid position is dropped");
         let w = WindowPrefs { width: f32::NAN, ..WindowPrefs::default() }.sanitized();

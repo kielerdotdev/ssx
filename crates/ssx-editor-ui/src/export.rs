@@ -205,7 +205,10 @@ mod tests {
         }
         for f in SaveFormat::ALL {
             assert!(!f.label().is_empty());
-            assert_eq!(SaveFormat::from_path(&Path::new("x").with_extension(f.extension())), Some(f));
+            assert_eq!(
+                SaveFormat::from_path(&Path::new("x").with_extension(f.extension())),
+                Some(f)
+            );
         }
     }
 
@@ -244,8 +247,12 @@ mod tests {
             data.extend_from_slice(&[(i * 7) as u8, (i * 13 >> 3) as u8, (i % 251) as u8, 255]);
         }
         let f = Frame::from_rgba8(128, 128, data).unwrap();
-        let lo = encode(&f, ImageFormat::Jpeg, ExportSettings { jpeg_quality: 10, png_fast: false }).unwrap();
-        let hi = encode(&f, ImageFormat::Jpeg, ExportSettings { jpeg_quality: 95, png_fast: false }).unwrap();
+        let lo =
+            encode(&f, ImageFormat::Jpeg, ExportSettings { jpeg_quality: 10, png_fast: false })
+                .unwrap();
+        let hi =
+            encode(&f, ImageFormat::Jpeg, ExportSettings { jpeg_quality: 95, png_fast: false })
+                .unwrap();
         assert!(lo.len() < hi.len());
     }
 
@@ -253,17 +260,21 @@ mod tests {
     fn unknown_extension_is_a_clear_error() {
         let f = solid_frame(2, 2, [1; 4]);
         let dir = tempfile::tempdir().unwrap();
-        let err = write_image(&f, &dir.path().join("x.tiff"), ExportSettings::default()).unwrap_err();
+        let err =
+            write_image(&f, &dir.path().join("x.tiff"), ExportSettings::default()).unwrap_err();
         assert!(matches!(err, ExportError::UnknownFormat(ref e) if e == "tiff"));
         assert!(err.to_string().contains("png"));
-        let err = write_image(&f, &dir.path().join("x.ssxe"), ExportSettings::default()).unwrap_err();
+        let err =
+            write_image(&f, &dir.path().join("x.ssxe"), ExportSettings::default()).unwrap_err();
         assert!(matches!(err, ExportError::UnknownFormat(_)));
     }
 
     #[test]
     fn io_errors_name_the_path() {
         let f = solid_frame(2, 2, [1; 4]);
-        let err = write_image(&f, Path::new("/nonexistent-dir-xyz/a.png"), ExportSettings::default()).unwrap_err();
+        let err =
+            write_image(&f, Path::new("/nonexistent-dir-xyz/a.png"), ExportSettings::default())
+                .unwrap_err();
         assert!(err.to_string().contains("/nonexistent-dir-xyz/a.png"), "{err}");
     }
 

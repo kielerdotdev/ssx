@@ -49,9 +49,10 @@ pub fn label_of(cmd: &Command) -> String {
             let text = before.iter().zip(after).any(|(b, a)| {
                 b.kind.text_content().map(|c| &c.text) != a.kind.text_content().map(|c| &c.text)
             });
-            let visibility = before.iter().zip(after).any(|(b, a)| {
-                b.visible != a.visible || b.locked != a.locked || b.group != a.group
-            });
+            let visibility = before
+                .iter()
+                .zip(after)
+                .any(|(b, a)| b.visible != a.visible || b.locked != a.locked || b.group != a.group);
             if text {
                 "Edit text".into()
             } else if style {

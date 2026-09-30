@@ -131,7 +131,10 @@ mod tests {
 
     #[test]
     fn outcome_json_and_exit_codes() {
-        let o = EditorOutcome { action: OutcomeAction::Upload, path: Some(PathBuf::from("/tmp/a.png")) };
+        let o = EditorOutcome {
+            action: OutcomeAction::Upload,
+            path: Some(PathBuf::from("/tmp/a.png")),
+        };
         assert_eq!(o.to_json(), r#"{"action":"upload","path":"/tmp/a.png"}"#);
         assert_eq!(o.exit_code(), 0);
         let c = EditorOutcome::cancelled();

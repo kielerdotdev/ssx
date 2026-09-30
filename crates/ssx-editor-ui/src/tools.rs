@@ -176,8 +176,12 @@ impl ToolId {
             ToolId::Rectangle | ToolId::Ellipse => {
                 "Drag to draw. Shift = square/circle, Alt = from centre, Ctrl = snap"
             }
-            ToolId::Line | ToolId::Arrow => "Drag to draw. Shift = 45 degree steps, Alt = from centre",
-            ToolId::Freehand | ToolId::FreehandArrow | ToolId::HighlightPen => "Drag to draw freehand",
+            ToolId::Line | ToolId::Arrow => {
+                "Drag to draw. Shift = 45 degree steps, Alt = from centre"
+            }
+            ToolId::Freehand | ToolId::FreehandArrow | ToolId::HighlightPen => {
+                "Drag to draw freehand"
+            }
             ToolId::Text | ToolId::TextBoxed => {
                 "Click and type. Enter commits, Shift+Enter starts a new line, Esc leaves"
             }
@@ -185,7 +189,9 @@ impl ToolId {
             ToolId::Step => "Click to drop the next step number",
             ToolId::Magnify => "Drag the lens, then move its source handle",
             ToolId::Spotlight => "Drag to light up an area and dim the rest",
-            ToolId::Image => "Click to insert the image (use the menu to pick a file or the clipboard)",
+            ToolId::Image => {
+                "Click to insert the image (use the menu to pick a file or the clipboard)"
+            }
             ToolId::Sticker => "Pick a sticker in the properties bar, click to place it",
             ToolId::Cursor => "Click to stamp a mouse cursor",
             ToolId::Eraser => "Drag over annotations to delete them",
@@ -279,11 +285,7 @@ const fn one(v: &'static [ToolId]) -> Slot {
 
 /// Toolbar layout: groups of slots, in the order of the reference screenshot.
 pub const TOOLBAR: &[&[Slot]] = &[
-    &[
-        one(&[ToolId::CropRect]),
-        one(&[ToolId::CropEllipse]),
-        one(&[ToolId::CropFree]),
-    ],
+    &[one(&[ToolId::CropRect]), one(&[ToolId::CropEllipse]), one(&[ToolId::CropFree])],
     &[one(&[ToolId::Select])],
     &[
         one(&[ToolId::Rectangle]),

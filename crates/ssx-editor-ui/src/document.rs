@@ -7,17 +7,15 @@
 //! time (`Document` is `Arc`-based, so the clone shares the pixels) and compare on demand,
 //! caching the answer per revision.
 
-use std::{cell::Cell, path::{Path, PathBuf}};
-
-use ssx_editor::{
-    CursorHint, Document, EditorSession, SessionEvent, Tool, project,
+use std::{
+    cell::Cell,
+    path::{Path, PathBuf},
 };
+
+use ssx_editor::{CursorHint, Document, EditorSession, SessionEvent, Tool, project};
 use ssx_types::{Frame, Rect};
 
-use crate::{
-    history_log::HistoryLog,
-    request::RunError,
-};
+use crate::{history_log::HistoryLog, request::RunError};
 
 /// What happened since the last [`EditorDoc::pump`], reduced to what the window reacts to.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -50,12 +48,15 @@ pub struct EditorDoc {
     pub source: Option<PathBuf>,
     /// The `.ssxe` project this document was last saved to or loaded from.
     pub project_path: Option<PathBuf>,
-    /// The image file this document was last exported to.
+    /// The image file this document was last exported to by the editor (never the file it was
+    /// opened from: saving over the original needs an explicit "Save as").
     pub image_path: Option<PathBuf>,
     /// Labelled undo history.
     pub log: HistoryLog,
     /// Name for the next global operation's history entry.
     pub pending_label: Option<String>,
+    render_dirty: Vec<Rect>,
+    render_canvas_changed: bool,
     revision: u64,
     saved_revision: u64,
     saved_doc: Document,
@@ -82,6 +83,8 @@ impl EditorDoc {
             image_path: None,
             log: HistoryLog::new(),
             pending_label: None,
+            render_dirty: Vec::new(),
+            render_canvas_changed: false,
             revision: 0,
             saved_revision: 0,
             dirty_cache: Cell::new(None),
@@ -100,8 +103,10 @@ impl EditorDoc {
     /// Opens an image file or an `.ssxe` project.
     pub fn open(path: &Path) -> Result<Self, RunError> {
         let open_err = |reason: String| RunError::Open { path: path.to_path_buf(), reason };
-        let is_project =
-            path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("ssxe"));
+        let is_project = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| e.eq_ignore_ascii_case("ssxe"));
         if is_project {
             let doc = project::load(path).map_err(|e| open_err(e.to_string()))?;
             let mut d = Self::new(doc);
@@ -115,7 +120,6 @@ impl EditorDoc {
         // An untouched, just-opened file has nothing to lose.
         d.saved_revision = 0;
         d.source = Some(path.to_path_buf());
-        d.image_path = Some(path.to_path_buf());
         Ok(d)
     }
 
@@ -173,8 +177,14 @@ impl EditorDoc {
         let mut out = Pumped::default();
         for ev in self.session.take_events() {
             match ev {
-                SessionEvent::Dirty(r) => out.dirty.push(r),
-                SessionEvent::CanvasChanged => out.canvas_changed = true,
+                SessionEvent::Dirty(r) => {
+                    out.dirty.push(r);
+                    self.render_dirty.push(r);
+                }
+                SessionEvent::CanvasChanged => {
+                    out.canvas_changed = true;
+                    self.render_canvas_changed = true;
+                }
                 SessionEvent::SelectionChanged => out.selection_changed = true,
                 SessionEvent::ToolChanged(t) => out.tool_changed = Some(t),
                 SessionEvent::CursorChanged(c) => out.cursor = Some(c),
@@ -193,6 +203,13 @@ impl EditorDoc {
             self.log.sync_session(&self.session, label);
         }
         out
+    }
+
+    /// What the canvas must repaint since it last asked: dirty rectangles (image space) and
+    /// whether the canvas size changed. Kept separately from [`Pumped`] because whoever pumps
+    /// first (a menu action, a key press) must not steal the news from the renderer.
+    pub fn take_render_events(&mut self) -> (Vec<Rect>, bool) {
+        (std::mem::take(&mut self.render_dirty), std::mem::take(&mut self.render_canvas_changed))
     }
 
     /// Undoes one step, keeping the labels aligned.

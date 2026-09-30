@@ -102,7 +102,9 @@ impl Controls {
             ObjectKind::Ellipse(_) => {
                 Controls { stroke: true, stroke_width: true, dash: true, fill: true, ..base }
             }
-            ObjectKind::Line(_) => Controls { stroke: true, stroke_width: true, dash: true, ..base },
+            ObjectKind::Line(_) => {
+                Controls { stroke: true, stroke_width: true, dash: true, ..base }
+            }
             ObjectKind::Arrow(_) => {
                 Controls { stroke: true, stroke_width: true, dash: true, arrow: true, ..base }
             }
@@ -124,13 +126,9 @@ impl Controls {
                 balloon: true,
                 ..base
             },
-            ObjectKind::Step(_) => Controls {
-                stroke: true,
-                stroke_width: true,
-                fill: true,
-                step: true,
-                ..base
-            },
+            ObjectKind::Step(_) => {
+                Controls { stroke: true, stroke_width: true, fill: true, step: true, ..base }
+            }
             ObjectKind::Magnify(_) => {
                 Controls { stroke: true, stroke_width: true, magnify: true, ..base }
             }
@@ -146,12 +144,14 @@ impl Controls {
             },
             ObjectKind::Image(_) => Controls { stroke: true, stroke_width: true, ..base },
             ObjectKind::Sticker(_) => Controls { fill: true, sticker: true, ..base },
-            ObjectKind::Cursor(_) => {
-                Controls { stroke: true, fill: true, cursor: true, ..base }
-            }
-            ObjectKind::Grid(_) => {
-                Controls { stroke: true, stroke_width: true, grid: true, opacity: true, ..Controls::default() }
-            }
+            ObjectKind::Cursor(_) => Controls { stroke: true, fill: true, cursor: true, ..base },
+            ObjectKind::Grid(_) => Controls {
+                stroke: true,
+                stroke_width: true,
+                grid: true,
+                opacity: true,
+                ..Controls::default()
+            },
             ObjectKind::Unknown(_) => Controls::default(),
         }
     }
@@ -529,7 +529,14 @@ mod tests {
         let mut s = session();
         s.set_tool(Tool::Arrow);
         apply(&mut s, &PropEdit::Stroke(Color::rgb(0, 200, 0)));
-        apply(&mut s, &PropEdit::Arrow(ArrowHeads { start: HeadStyle::Round, end: HeadStyle::Bar, ..ArrowHeads::default() }));
+        apply(
+            &mut s,
+            &PropEdit::Arrow(ArrowHeads {
+                start: HeadStyle::Round,
+                end: HeadStyle::Bar,
+                ..ArrowHeads::default()
+            }),
+        );
         draw(&mut s, Tool::Arrow, (10.0, 10.0), (200.0, 120.0));
         let o = &s.document().objects()[0];
         assert_eq!(o.style.stroke, Color::rgb(0, 200, 0));
