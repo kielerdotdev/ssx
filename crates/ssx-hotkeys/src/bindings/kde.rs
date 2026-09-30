@@ -15,12 +15,13 @@
 //! the supported way to edit KConfig files without corrupting them. Files/entries owned by
 //! ssx are named `net.local.ssx-<slug>.desktop`.
 //!
-//! **Alternatives rejected.** A bare `X-KDE-Shortcuts=` key in a `.desktop` file only
-//! sets a *default* shortcut for the app's own launch action and is ignored for hidden
-//! entries in current Plasma; `khotkeys` (`khotkeysrc`) was removed from Plasma 6; calling
-//! `org.kde.KGlobalAccel` over D-Bus needs Qt key *integers* and is undocumented, so a
-//! wrong guess is silent. (On Wayland, prefer the GlobalShortcuts portal, which Plasma
-//! implements; this route is the CLI-driven fallback.)
+//! **Alternatives not chosen.** A bare `X-KDE-Shortcuts=` key in a `.desktop` file is
+//! documented as a *default* shortcut for an application's own launch action, not as a way
+//! to register arbitrary commands, so it is not relied on. `khotkeys` (`khotkeysrc`) is the
+//! legacy Plasma 5 mechanism that Plasma 6 dropped. Calling `org.kde.KGlobalAccel` over
+//! D-Bus needs Qt key *integers* and is lightly documented, so a wrong guess would be
+//! silent. (On Wayland, prefer the GlobalShortcuts portal, which Plasma implements; this
+//! route is the CLI-driven fallback.)
 //!
 //! **Caveats.** The running `kglobalacceld` reads `kglobalshortcutsrc` at start-up, so
 //! new shortcuts become active after a reload ([`reload`] restarts
