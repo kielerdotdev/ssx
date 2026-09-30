@@ -243,10 +243,7 @@ mod windows_key {
         }
 
         fn remove(&self) -> io::Result<bool> {
-            let key = match conv(windows_registry::CURRENT_USER.create(RUN_KEY)) {
-                Ok(k) => k,
-                Err(e) => return Err(e),
-            };
+            let key = conv(windows_registry::CURRENT_USER.create(RUN_KEY))?;
             let existed = self.get()?.is_some();
             if existed {
                 conv(key.remove_value(NAME))?;
