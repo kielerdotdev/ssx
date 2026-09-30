@@ -88,6 +88,21 @@ fn clean(s: &str) -> String {
     cut
 }
 
+/// Asks the notification service to identify itself: the cheapest reliable availability check
+/// (`ssx doctor`). `Ok` carries a description of the server.
+pub fn probe_notifications() -> Result<String, String> {
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        notify_rust::get_server_information()
+            .map(|i| format!("{} {}", i.name, i.version).trim().to_owned())
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(all(unix, not(target_os = "macos"))))]
+    {
+        Ok("native notifications".to_owned())
+    }
+}
+
 /// The [`Notifier`] service.
 pub struct DesktopNotifier {
     toaster: Box<dyn Toaster>,
@@ -170,6 +185,15 @@ impl SystemOpener {
     /// An opener over an explicit launcher (tests).
     pub fn new(launcher: Arc<dyn Launcher>) -> Self {
         Self { launcher }
+    }
+}
+
+impl SystemOpener {
+    /// Opens a local file or folder with the default application (`ssx history open --file`).
+    pub fn open_path(&self, path: &Path) -> Result<(), ServiceError> {
+        self.launcher
+            .open_file(path)
+            .map_err(|e| ServiceError::failed(format!("cannot open {} ({e})", path.display())))
     }
 }
 

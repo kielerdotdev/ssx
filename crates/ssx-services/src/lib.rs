@@ -50,9 +50,9 @@ pub use capture::{
     BackendReport, ExplicitTarget, LastRegionStore, RegionSelector, ScreenCapturer,
     map_capture_error,
 };
-pub use clipboard::{ClipboardOptions, FileListFlavor, SystemClipboard};
+pub use clipboard::{ClipboardDiagnosis, ClipboardOptions, FileListFlavor, SystemClipboard};
 pub use command::SystemCommandRunner;
-pub use desktop::{DesktopNotifier, SystemOpener};
+pub use desktop::{DesktopNotifier, SystemOpener, probe_notifications};
 pub use editor::ExternalEditor;
 pub use hdr::tonemap_settings;
 pub use production::{ProductionOptions, ProductionServices};

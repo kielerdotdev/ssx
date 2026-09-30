@@ -202,6 +202,44 @@ impl Clipboard for SystemClipboard {
     }
 }
 
+/// What `ssx doctor` reports about the clipboard.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClipboardDiagnosis {
+    /// Which display server the external tools would talk to.
+    pub session: Session,
+    /// Whether `arboard` can open the clipboard (and why not).
+    pub arboard: Result<(), String>,
+    /// `wl-copy` is installed.
+    pub wl_copy: bool,
+    /// `xclip` is installed.
+    pub xclip: bool,
+    /// How file lists are written on this desktop.
+    pub flavor: FileListFlavor,
+}
+
+impl ClipboardDiagnosis {
+    /// `true` if at least one way of copying works (the external tool must match the session).
+    pub fn usable(&self) -> bool {
+        self.arboard.is_ok()
+            || match self.session {
+                Session::Wayland => self.wl_copy,
+                Session::X11 => self.xclip,
+                Session::None => false,
+            }
+    }
+}
+
+/// Probes the clipboard backends without changing anything.
+pub fn diagnose() -> ClipboardDiagnosis {
+    ClipboardDiagnosis {
+        session: Session::from_env(),
+        arboard: arboard::Clipboard::new().map(drop).map_err(|e| e.to_string()),
+        wl_copy: find_in_path("wl-copy").is_some(),
+        xclip: find_in_path("xclip").is_some(),
+        flavor: FileListFlavor::detect(std::env::var("XDG_CURRENT_DESKTOP").ok().as_deref()),
+    }
+}
+
 // ---- arboard ---------------------------------------------------------------------------
 
 /// The `arboard` backend. The clipboard connection is opened on first use (there may be no
