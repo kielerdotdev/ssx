@@ -473,46 +473,42 @@ mod windows_impl {
     #[derive(Debug, Default, Clone, Copy)]
     pub struct WindowsRunKey;
 
-    fn err(e: &windows_registry::Error) -> AutostartError {
-        AutostartError::Registry(e.message())
-    }
-
-    fn not_found(e: &windows_registry::Error) -> bool {
-        // HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND)
-        let code = e.code().0 as u32;
-        code == 0x8007_0002 || code == 0x8007_0003
+    /// `Ok(None)` for "the key or value does not exist", an error for anything else. (The error
+    /// type is not nameable from outside `windows-registry`, so this works on the `Result`.)
+    fn classify<T>(r: windows_registry::Result<T>) -> Result<Option<T>, AutostartError> {
+        match r {
+            Ok(v) => Ok(Some(v)),
+            Err(e) => {
+                // HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND)
+                let code = e.code().0.cast_unsigned();
+                if code == 0x8007_0002 || code == 0x8007_0003 {
+                    Ok(None)
+                } else {
+                    Err(AutostartError::Registry(e.message()))
+                }
+            }
+        }
     }
 
     impl RunKeyStore for WindowsRunKey {
         fn get(&self) -> Result<Option<String>, AutostartError> {
-            let key = match CURRENT_USER.open(RUN_KEY) {
-                Ok(k) => k,
-                Err(e) if not_found(&e) => return Ok(None),
-                Err(e) => return Err(err(&e)),
+            let Some(key) = classify(CURRENT_USER.open(RUN_KEY))? else {
+                return Ok(None);
             };
-            match key.get_string(RUN_VALUE_NAME) {
-                Ok(v) => Ok(Some(v)),
-                Err(e) if not_found(&e) => Ok(None),
-                Err(e) => Err(err(&e)),
-            }
+            classify(key.get_string(RUN_VALUE_NAME))
         }
 
         fn set(&self, data: &str) -> Result<(), AutostartError> {
-            let key = CURRENT_USER.create(RUN_KEY).map_err(|e| err(&e))?;
-            key.set_string(RUN_VALUE_NAME, data).map_err(|e| err(&e))
+            let key =
+                CURRENT_USER.create(RUN_KEY).map_err(|e| AutostartError::Registry(e.message()))?;
+            key.set_string(RUN_VALUE_NAME, data).map_err(|e| AutostartError::Registry(e.message()))
         }
 
         fn remove(&self) -> Result<(), AutostartError> {
-            let key = match CURRENT_USER.options().read().write().open(RUN_KEY) {
-                Ok(k) => k,
-                Err(e) if not_found(&e) => return Ok(()),
-                Err(e) => return Err(err(&e)),
+            let Some(key) = classify(CURRENT_USER.options().read().write().open(RUN_KEY))? else {
+                return Ok(());
             };
-            match key.remove_value(RUN_VALUE_NAME) {
-                Ok(()) => Ok(()),
-                Err(e) if not_found(&e) => Ok(()),
-                Err(e) => Err(err(&e)),
-            }
+            classify(key.remove_value(RUN_VALUE_NAME)).map(|_| ())
         }
     }
 }

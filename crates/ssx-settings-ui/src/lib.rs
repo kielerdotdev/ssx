@@ -20,8 +20,9 @@
 //!
 //! ```no_run
 //! use ssx_settings_ui::{RunOptions, nav::Page, run};
-//! let outcome = run(RunOptions { page: Page::Hotkeys, ..RunOptions::default() }).unwrap();
-//! println!("{}", outcome.saved);
+//! let (outcome, settings_file) =
+//!     run(RunOptions { page: Page::Hotkeys, ..RunOptions::default() }).unwrap();
+//! println!("{}: saved {}", settings_file.display(), outcome.saved);
 //! ```
 //!
 //! # Rendering backend
