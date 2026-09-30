@@ -516,3 +516,94 @@ pub fn settings_with_mock_uploader(extra: &str) -> String {
         "[destinations]\nimage = \"mock\"\nfile = \"mock\"\nvideo = \"mock\"\ntext = \"mock\"\n\n{extra}\n"
     )
 }
+
+// ---- the standard Xvfb fixture -------------------------------------------------------
+
+/// Everything a test needs.
+pub struct Fixture {
+    pub x: Xvfb,
+    pub _painter: Painter,
+    pub _ids: Vec<u32>,
+    pub env: TestEnv,
+    pub mock: UploadMock,
+    pub save: PathBuf,
+}
+
+pub const WORKFLOWS: &str = r#"
+[[workflows]]
+id = "shot-upload"
+name = "Shot and upload"
+input = "capture_fullscreen"
+after_capture = ["save_to_file", "upload"]
+after_upload = ["copy_url"]
+[workflows.trigger]
+cli_name = "shot"
+
+[[workflows]]
+id = "shot-local"
+name = "Shot only"
+input = "capture_fullscreen"
+after_capture = ["save_to_file"]
+[workflows.trigger]
+cli_name = "local"
+
+[[workflows]]
+id = "region-save"
+name = "Region"
+input = "capture_region"
+after_capture = ["save_to_file"]
+[workflows.trigger]
+cli_name = "region"
+
+[[workflows]]
+id = "upload-files"
+name = "Upload files"
+input = "files"
+after_capture = ["upload"]
+after_upload = ["copy_url"]
+[workflows.trigger]
+cli_name = "upload"
+
+[[workflows]]
+id = "rec"
+name = "Record"
+input = "record_screen"
+after_capture = []
+[workflows.trigger]
+cli_name = "rec"
+"#;
+
+pub fn fixture_sized(screen: &str, workflows: &str) -> Option<Fixture> {
+    if skip_unless(&["Xvfb"]) {
+        return None;
+    }
+    let x = Xvfb::start(screen)?;
+    let painter = Painter::new(&x.display);
+    let ids: Vec<u32> = x11::SCENE
+        .iter()
+        .map(|&(sx, sy, w, h, c)| {
+            painter.window(
+                i16::try_from(sx).unwrap(),
+                i16::try_from(sy).unwrap(),
+                u16::try_from(w).unwrap(),
+                u16::try_from(h).unwrap(),
+                c,
+            )
+        })
+        .collect();
+    painter.publish_windows(&ids, *ids.last().unwrap());
+    let env = TestEnv::new().with_x11(&x.display);
+    let mock = UploadMock::start();
+    env.write_uploader(&mock.url());
+    let save = env.path("shots");
+    env.write_settings(&settings_with_mock_uploader(&format!(
+        "[general]\nsave_dir = {save:?}\nuse_type_subfolders = false\nfolder_pattern = \"\"\n\
+         file_name_pattern = \"shot_%i\"\nshow_notifications = false\n\n{workflows}"
+    )));
+    Some(Fixture { x, _painter: painter, _ids: ids, env, mock, save })
+}
+
+pub fn fixture() -> Option<Fixture> {
+    fixture_sized("800x600x24", WORKFLOWS)
+}
+
