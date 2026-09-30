@@ -38,7 +38,29 @@ StartupNotify=false
 Terminal=false
 X-KDE-GlobalAccel-CommandShortcut=true
 
+# net.local.ssx-run-record.desktop (Shift+Print)
+[Desktop Entry]
+Type=Application
+Name=ssx: Record screen and upload
+Exec=ssx run record
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
+# net.local.ssx-run-record-gif.desktop (Ctrl+Alt+Shift+Print)
+[Desktop Entry]
+Type=Application
+Name=ssx: Record GIF and upload
+Exec=ssx run record-gif
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
 kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-run-region.desktop --key _launch Ctrl+Print
 kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-run-region-edit.desktop --key _launch Ctrl+Shift+Print
 kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-run-screen.desktop --key _launch Print
 kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-run-window.desktop --key _launch Alt+Print
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-run-record.desktop --key _launch Shift+Print
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-run-record-gif.desktop --key _launch Ctrl+Alt+Shift+Print

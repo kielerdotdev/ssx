@@ -155,6 +155,37 @@ impl RunResult {
         }
     }
 
+    /// Builds the result from what the running ssx app reported (`ssx run`, `capture region`
+    /// forwarded to it). The summary carries less than a full report (no warnings, no
+    /// thumbnail or deletion URLs), which is all a terminal needs.
+    pub fn from_summary(workflow: &str, summary: &ssx_core::ipc::RunSummary) -> Self {
+        let items: Vec<ItemResult> = summary
+            .items
+            .iter()
+            .map(|i| ItemResult {
+                input: None,
+                path: i.path.clone(),
+                url: i.url.clone(),
+                short_url: None,
+                thumbnail_url: None,
+                deletion_url: None,
+                uploader: None,
+                history_id: None,
+                outcome: if i.error.is_some() { Outcome::Failed } else { summary.outcome },
+                created: true,
+                error: i.error.clone(),
+            })
+            .collect();
+        Self {
+            workflow: workflow.to_owned(),
+            outcome: summary.outcome,
+            message: summary.message.clone(),
+            items,
+            errors: Vec::new(),
+            warnings: Vec::new(),
+        }
+    }
+
     /// The result of a plain "saved this file" command with no engine run.
     pub fn saved(workflow: &str, path: PathBuf) -> Self {
         Self {

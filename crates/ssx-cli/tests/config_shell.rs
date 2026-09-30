@@ -569,8 +569,10 @@ fn run_explains_workflows_that_cannot_run() {
     );
     let r = env.ssx(&["run", "upload"]).code(2);
     assert!(r.stderr.contains("takes files") && r.stderr.contains("post-file"), "{}", r.stderr);
+    // Recording workflows run now; without a display the capture path cannot start, and the
+    // message says so.
     let r = env.ssx(&["run", "record"]).code(1);
-    assert!(r.stderr.contains("not available yet"), "{}", r.stderr);
+    assert!(r.stderr.contains("error:") && r.stderr.contains("capture"), "{}", r.stderr);
     // Interactive region without an overlay: a clear message, not a crash (no display here, so
     // the selector check comes first).
     let r = env.ssx(&["run", "region"]).code(1);

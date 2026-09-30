@@ -6,7 +6,12 @@ is done by `ssx-core` (workflow engine, settings, history) and `ssx-services` (r
 ```text
 ssx capture fullscreen -o shot.png          # pixel-exact PNG of all monitors
 ssx capture region --rect 100,100,800,600 --upload --copy-url
+ssx capture region [--mode rect|ellipse|freeform|window|monitor]   # interactive, on the selection overlay
 ssx capture window --active | monitor [--id ID] | last-region
+ssx record [--rect X,Y,W,H | --monitor ID | --region] [--gif] [--audio ...] [--seconds N] [-o FILE]
+ssx record start | stop | toggle | status    # control a recording in the background app
+ssx daemon start | stop | restart | status   # the background app (tray, hotkeys, IPC)
+ssx daemon autostart enable | disable | status
 ssx upload --to my-host a.png b.png          # one URL per line on stdout
 ssx post-file --coalesce -- FILES...         # what "Upload with ssx" in a file manager runs
 ssx run capture-region-edit                  # any workflow from settings.toml
@@ -35,12 +40,26 @@ ssx completions bash|zsh|fish|elvish|powershell
 * `config set` edits the TOML text in place (comments and unknown keys survive) and refuses
   anything that would not validate; nothing is written in that case.
 
-## Not available yet
+## The background app and helpers
 
-Interactive region selection (`capture region` without `--rect`) needs the overlay crate, which
-plugs into `ssx_services::RegionSelector`; until then it fails with an explanation. Recording,
-pin-to-screen and OCR are stubs in `ssx-services`. `edit` / `--edit` need the `ssx-editor-ui`
-helper (protocol in the `ssx-services` README).
+`ssx daemon start` launches `ssx-app` (see `crates/ssx-app/README.md`). While it runs, `ssx run`,
+interactive `ssx capture region` (without output flags) and `ssx post-file --coalesce` are
+handed to it, so hotkeys, the tray and the command line share one supervisor (one interactive
+capture at a time, one recording at a time, file batches merged). Without it everything runs in
+the `ssx` process. `ssx doctor` reports the daemon, tray, hotkey mechanism, helpers and recorder
+encoders.
+
+| Variable | Meaning |
+|---|---|
+| `SSX_APP` | path of `ssx-app`, or `none` (default: next to `ssx`, then `PATH`) |
+| `SSX_OVERLAY` | path of the `ssx-overlay` helper, or `none` |
+| `SSX_NO_DAEMON=1` | never hand work to a running daemon |
+| `SSX_CONFIG_DIR` | relocate settings and data |
+| `SSX_BACKEND` | force the capture backend |
+
+Standalone `ssx record` needs the `record` feature (default) and FFmpeg for MP4; GIF needs
+nothing. Pin-to-screen and OCR are still stubs in `ssx-services`. `edit` / `--edit` need the
+`ssx-editor-ui` helper (protocol in the `ssx-services` README).
 
 ## Tests
 

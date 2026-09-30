@@ -25,6 +25,7 @@
 #![forbid(unsafe_code)]
 
 pub mod app;
+pub mod autostart;
 pub mod cli;
 pub mod commands;
 pub mod error;
@@ -58,7 +59,8 @@ pub fn log_directive(quiet: bool, verbose: u8) -> String {
     format!(
         "{deps},ssx={ours},ssx_cli={ours},ssx_core={ours},ssx_services={ours},ssx_upload={ours},\
          ssx_platform={ours},ssx_capture={ours},ssx_capture_x11={ours},ssx_capture_wayland={ours},\
-         ssx_capture_portal={ours},ssx_hdr={ours},ssx_shell={ours},ssx_hotkeys={ours},ssx_ipc={ours}"
+         ssx_capture_portal={ours},ssx_hdr={ours},ssx_shell={ours},ssx_hotkeys={ours},ssx_ipc={ours},\
+         ssx_overlay={ours},ssx_record={ours}"
     )
 }
 
@@ -83,19 +85,30 @@ fn init_logging(global: &GlobalArgs) {
 pub fn run(cli: Cli) -> i32 {
     init_logging(&cli.global);
     let cancel = CancelToken::new();
+    let first_interrupt: std::sync::Arc<std::sync::Mutex<Option<CancelToken>>> =
+        std::sync::Arc::default();
     {
         let c = cancel.clone();
-        // A second Ctrl-C while cancelling forces the exit (some steps cannot be interrupted).
+        let first = std::sync::Arc::clone(&first_interrupt);
+        // The first Ctrl-C cancels the command (or, while a recording runs, stops it and keeps
+        // the file: the command registers that token in `first_interrupt`). A further Ctrl-C
+        // while cancelling forces the exit (some steps cannot be interrupted).
         let hits = std::sync::atomic::AtomicU32::new(0);
         let _ = ctrlc::set_handler(move || {
-            if hits.fetch_add(1, std::sync::atomic::Ordering::SeqCst) >= 1 {
-                std::process::exit(ExitCode::Cancelled.code());
+            let n = hits.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let stop = first.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+            match (n, stop) {
+                (0, Some(t)) => t.cancel(),
+                (0, None) | (1, Some(_)) => c.cancel(),
+                _ => std::process::exit(ExitCode::Cancelled.code()),
             }
-            c.cancel();
         });
     }
     let style = Style::for_stream(cli.global.color, true);
-    let result = App::new(cli.global, cancel).and_then(|app| commands::dispatch(&app, cli.command));
+    let result = App::new(cli.global, cancel).and_then(|mut app| {
+        app.first_interrupt = first_interrupt;
+        commands::dispatch(&app, cli.command)
+    });
     match result {
         Ok(()) => ExitCode::Ok.code(),
         Err(e) => {

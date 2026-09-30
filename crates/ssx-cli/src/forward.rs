@@ -1,4 +1,5 @@
-//! Handing work to a running ssx instance over `ssx-ipc` (`post-file --coalesce`).
+//! Handing work to a running ssx instance over `ssx-ipc`: `post-file --coalesce`, `run`,
+//! interactive `capture region`, `record start|stop|toggle|status`, `daemon status|stop`.
 //!
 //! File managers may start one `ssx post-file` process *per selected file* (Explorer does for
 //! classic verbs). Each of those forwards its path here and exits at once; the running app
@@ -9,12 +10,18 @@
 //! When no instance is listening (or forwarding fails for any reason) the caller runs the
 //! request in-process instead, so a right-click never silently does nothing.
 
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
-use ssx_core::ipc::{
-    PostAction, Request, RequestEnvelope, Response, ResponseEnvelope, decode_line, encode_line,
+use ssx_core::{
+    ipc::{
+        ErrorCode, PostAction, Request, RequestEnvelope, Response, ResponseEnvelope, RunSummary,
+        decode_line, encode_line,
+    },
+    workflow::CancelToken,
 };
-use ssx_ipc::Client;
+use ssx_ipc::{Client, ClientConfig};
+
+use crate::error::{CliError, CliResult};
 
 /// The application id of the tray/daemon instance.
 pub const APP_ID: &str = "ssx";
@@ -77,6 +84,9 @@ pub fn interpret_reply(line: &str) -> Forward {
 
 /// Sends `paths` to the running instance, if there is one.
 pub fn forward_post_files(paths: &[PathBuf], action: PostAction) -> Forward {
+    if !enabled() {
+        return Forward::NotRunning;
+    }
     let line = match request_line(paths, action) {
         Ok(l) => l,
         Err(e) => return Forward::Failed(e),
@@ -97,10 +107,143 @@ pub fn forward_post_files(paths: &[PathBuf], action: PostAction) -> Forward {
     }
 }
 
+/// Handing work to the running instance can be switched off with `SSX_NO_DAEMON=1`
+/// (debugging, and tests that must exercise the in-process path).
+pub fn enabled() -> bool {
+    std::env::var_os("SSX_NO_DAEMON").is_none_or(|v| v.is_empty() || v == "0")
+}
+
+/// A running ssx-app instance.
+#[derive(Debug, Clone)]
+pub struct Daemon {
+    client: Client,
+}
+
+/// How long a request that waits for a whole workflow run may take (a recording can be as
+/// long as the user likes, an editor session open for hours).
+const LONG_REQUEST: Duration = Duration::from_secs(24 * 60 * 60);
+
+fn line_of(request: Request) -> Result<String, String> {
+    encode_line(&RequestEnvelope::new(1, request))
+        .map(|l| l.trim_end_matches(['\r', '\n']).to_owned())
+        .map_err(|e| e.to_string())
+}
+
+impl Daemon {
+    /// The running instance, if one is listening (and hand-off is not disabled).
+    pub fn connect() -> Option<Self> {
+        if !enabled() {
+            return None;
+        }
+        let client = Client::for_app(APP_ID).ok()?;
+        matches!(client.is_listening(), Ok(true)).then_some(Self { client })
+    }
+
+    /// A handle for `client` without checking that anything listens (tests).
+    pub fn with_client(client: Client) -> Self {
+        Self { client }
+    }
+
+    /// Like [`connect`](Self::connect) but ignores `SSX_NO_DAEMON` (`ssx daemon status`).
+    pub fn connect_always() -> Option<Self> {
+        let client = Client::for_app(APP_ID).ok()?;
+        matches!(client.is_listening(), Ok(true)).then_some(Self { client })
+    }
+
+    fn exchange(client: &Client, request: Request) -> Result<Response, String> {
+        let line = line_of(request)?;
+        let reply =
+            client.request(&line).map_err(|e| format!("the ssx app did not answer: {e}"))?;
+        decode_line::<ResponseEnvelope>(&reply)
+            .map(|env| env.response)
+            .map_err(|e| format!("unreadable reply from the ssx app: {e}"))
+    }
+
+    /// Sends one request and returns the answer (10 s limit).
+    pub fn call(&self, request: Request) -> Result<Response, String> {
+        Self::exchange(&self.client, request)
+    }
+
+    /// Like [`call`](Self::call) for requests that wait for a run to finish.
+    pub fn call_long(&self, request: Request) -> Result<Response, String> {
+        let config = ClientConfig { request_timeout: LONG_REQUEST, ..self.client.config().clone() };
+        Self::exchange(&self.client.clone().with_config(config), request)
+    }
+
+    /// The application version, if it answers a ping.
+    pub fn ping(&self) -> Option<String> {
+        match self.call(Request::Ping) {
+            Ok(Response::Pong { app_version }) => Some(app_version),
+            _ => None,
+        }
+    }
+}
+
+/// Maps an error response to a CLI error with a hint that says what to do.
+pub fn error_from_response(code: ErrorCode, message: &str) -> CliError {
+    let e = CliError::new(message.to_owned());
+    match code {
+        ErrorCode::Busy => e.hint(
+            "finish the capture or recording that is open first, or cancel it from the tray menu",
+        ),
+        ErrorCode::UnknownWorkflow => e.hint("`ssx config show` lists the workflows"),
+        ErrorCode::NotRunning => e,
+        ErrorCode::VersionMismatch | ErrorCode::InvalidRequest => e.hint(
+            "the running ssx-app may be older than this `ssx`: restart it with `ssx daemon restart`",
+        ),
+        ErrorCode::Internal => e.hint("the ssx-app log file has the details"),
+    }
+}
+
+/// Runs a request that starts a run in the app and waits for the result. The request must
+/// have `wait: false`; this function then follows the run with `WaitRun`, and forwards a
+/// Ctrl-C (`cancel`) to the app as `CancelRun`, so cancelling the CLI cancels the overlay or
+/// upload in the app.
+pub fn run_remote(
+    daemon: &Daemon,
+    request: Request,
+    cancel: &CancelToken,
+) -> CliResult<RunSummary> {
+    let run_id = match daemon.call(request).map_err(CliError::new)? {
+        Response::Accepted { run_id } => run_id,
+        Response::Recording(status) => status
+            .run_id
+            .ok_or_else(|| CliError::new("the ssx app accepted the request but started no run"))?,
+        Response::Error { code, message } => return Err(error_from_response(code, &message)),
+        other => {
+            return Err(CliError::new(format!("unexpected answer from the ssx app: {other:?}")));
+        }
+    };
+    let done = CancelToken::new();
+    let canceller = {
+        let (cancel, done) = (cancel.clone(), done.clone());
+        let daemon = daemon.clone();
+        std::thread::Builder::new().name("ssx-forward-cancel".into()).spawn(move || {
+            loop {
+                if cancel.wait_timeout(Duration::from_millis(100)) {
+                    let _ = daemon.call(Request::CancelRun { run_id });
+                    return;
+                }
+                if done.is_cancelled() {
+                    return;
+                }
+            }
+        })
+    };
+    let answer = daemon.call_long(Request::WaitRun { run_id });
+    done.cancel();
+    if let Ok(t) = canceller {
+        let _ = t.join();
+    }
+    match answer.map_err(CliError::new)? {
+        Response::Finished(summary) => Ok(summary),
+        Response::Error { code, message } => Err(error_from_response(code, &message)),
+        other => Err(CliError::new(format!("unexpected answer from the ssx app: {other:?}"))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use ssx_core::ipc::ErrorCode;
-
     use super::*;
 
     #[test]

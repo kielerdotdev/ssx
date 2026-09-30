@@ -4,11 +4,13 @@
 
 pub mod capture;
 pub mod config;
+pub mod daemon;
 pub mod doctor;
 pub mod files;
 pub mod history;
 pub mod hotkeys;
 pub mod list;
+pub mod record;
 pub mod run;
 pub mod shell;
 pub mod uploaders;
@@ -33,6 +35,8 @@ pub fn dispatch(app: &App, command: Command) -> CliResult<()> {
         Command::Upload(a) => files::upload(app, a),
         Command::Uploaders { cmd } => uploaders::run(app, cmd),
         Command::Run(a) => run::run(app, a),
+        Command::Record(a) => record::run(app, a),
+        Command::Daemon { cmd } => daemon::run(app, cmd),
         Command::History { cmd } => history::run(app, cmd),
         Command::Config { cmd } => config::run(app, cmd),
         Command::Hotkeys { cmd } => hotkeys::run(app, cmd),

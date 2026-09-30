@@ -13,6 +13,11 @@ default = []
 # Native "save as" dialog (`rfd`, through the XDG portal on Linux). Off by default so headless
 # builds stay small; the CLI never needs it.
 save-dialog = ["dep:rfd"]
+# The real screen recorder (`ssx-record`): region selection on the overlay, audio choice.
+# Without `ffmpeg` only GIF recordings work.
+record = ["dep:ssx-record", "ssx-record/gif", "ssx-record/audio", "ssx-record/gpu"]
+# MP4/WebM/MKV encoding through the system FFmpeg (see ssx-record for the static builds).
+ffmpeg = ["record", "ssx-record/system", "ssx-record/gpl", "ssx-record/portal"]
 
 [dependencies]
 ssx-types.workspace = true
@@ -21,6 +26,8 @@ ssx-capture.workspace = true
 ssx-hdr.workspace = true
 ssx-platform.workspace = true
 ssx-upload.workspace = true
+ssx-overlay = { path = "../ssx-overlay" }
+ssx-record = { path = "../ssx-record", default-features = false, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

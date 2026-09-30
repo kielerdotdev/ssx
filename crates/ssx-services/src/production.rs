@@ -17,7 +17,7 @@ use std::sync::Arc;
 use ssx_core::{
     history::History,
     settings::{Paths, Settings},
-    workflow::{QrCodeRenderer, Services, StdFileSystem},
+    workflow::{QrCodeRenderer, Recorder, Services, StdFileSystem},
 };
 use ssx_platform::BackendKind;
 use ssx_upload::{RetryPolicy, SecretStore};
@@ -48,6 +48,9 @@ pub struct ProductionOptions {
     pub secrets: Option<Arc<dyn SecretStore>>,
     /// Interactive region selector (the overlay), if the caller has one.
     pub selector: Option<Arc<dyn RegionSelector>>,
+    /// The screen recorder (`ssx-record`), if the caller has one; recording workflows fail
+    /// with an explanation otherwise.
+    pub recorder: Option<Arc<dyn Recorder>>,
 }
 
 impl std::fmt::Debug for ProductionOptions {
@@ -56,6 +59,7 @@ impl std::fmt::Debug for ProductionOptions {
             .field("backend", &self.backend)
             .field("prefer_external_clipboard", &self.prefer_external_clipboard)
             .field("selector", &self.selector.is_some())
+            .field("recorder", &self.recorder.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -83,8 +87,8 @@ pub struct ProductionServices {
     pub zipper: FolderZipper,
     /// Image editor (external helper).
     pub editor: ExternalEditor,
-    /// Recording (stub).
-    pub recorder: StubRecorder,
+    /// Recording (the stub unless [`ProductionOptions::recorder`] was given).
+    pub recorder: Arc<dyn Recorder>,
     /// Pinning (stub).
     pub pinner: StubPinner,
     /// OCR (stub).
@@ -133,7 +137,7 @@ impl ProductionServices {
             commands: SystemCommandRunner,
             zipper: FolderZipper::default(),
             editor: ExternalEditor::discover(),
-            recorder: StubRecorder,
+            recorder: options.recorder.unwrap_or_else(|| Arc::new(StubRecorder)),
             pinner: StubPinner,
             ocr: StubOcr,
             save_dialog: SaveDialogImpl::default(),
@@ -157,7 +161,7 @@ impl ProductionServices {
     pub fn services<'a>(&'a self, history: Option<&'a History>) -> Services<'a> {
         Services {
             capturer: &self.capturer,
-            recorder: &self.recorder,
+            recorder: &*self.recorder,
             editor: &self.editor,
             uploaders: &self.uploads,
             shortener: &self.uploads,

@@ -1,12 +1,26 @@
-//! `ssx run WORKFLOW`: executes a workflow from `settings.toml` with the same engine the
-//! tray app uses, printing engine events as progress lines.
+//! `ssx run WORKFLOW`: executes a workflow from `settings.toml`.
+//!
+//! When the ssx app is running the workflow is *handed to it* (`RunWorkflow` over IPC): that is
+//! what a compositor keybinding running `ssx run region` wants, because the app owns the
+//! "one interactive capture at a time" rule, the tray state and the notifications; Ctrl-C here
+//! cancels the run there. Without the app (or with `SSX_NO_DAEMON=1`, or a `--delay`, which the
+//! IPC request cannot carry) the same engine runs in this process and prints its events as
+//! progress lines.
+//!
+//! Recording workflows run in-process too: Ctrl-C *stops* the recording (the file is kept and
+//! the workflow carries on with the upload), a second Ctrl-C cancels it.
 
-use ssx_core::settings::{InputKind, Settings, Workflow};
+use ssx_core::{
+    ipc::Request,
+    settings::{InputKind, Settings, Workflow},
+    workflow::{CancelToken, VideoSource},
+};
 
 use crate::{
     app::{App, Session},
     cli::RunArgs,
     error::{CliError, CliResult},
+    forward::{Daemon, run_remote},
     progress::{ProgressLines, Verbosity},
     report::{RunResult, print_result},
 };
@@ -34,15 +48,16 @@ pub fn run_blocker(wf: &Workflow) -> Option<CliError> {
             CliError::usage(format!("workflow {:?} takes files", wf.id))
                 .hint(format!("run it with `ssx post-file --workflow {} PATH...`", wf.id)),
         ),
-        InputKind::RecordScreen | InputKind::RecordGif => Some(
-            CliError::new(format!(
-                "workflow {:?} records the screen, which is not available yet",
-                wf.id
-            ))
-            .hint("recording arrives with the ssx-record crate"),
-        ),
         _ => None,
     }
+}
+
+/// Hands the workflow to the running ssx app and prints its result.
+fn run_via_app(app: &App, daemon: &Daemon, wf: &Workflow, json: bool) -> CliResult<()> {
+    let request = Request::RunWorkflow { id: Some(wf.id.clone()), name: None, wait: false };
+    let summary = run_remote(daemon, request, &app.cancel)?;
+    let result = RunResult::from_summary(&wf.id, &summary);
+    print_result(&result, json, app.global.quiet, app.err)
 }
 
 /// `ssx run`.
@@ -52,13 +67,35 @@ pub fn run(app: &App, args: RunArgs) -> CliResult<()> {
     if let Some(blocker) = run_blocker(&wf) {
         return Err(blocker);
     }
+    if args.delay.is_none()
+        && let Some(daemon) = Daemon::connect()
+    {
+        tracing::info!("handing the workflow to the running ssx app");
+        return run_via_app(app, &daemon, &wf, args.json);
+    }
     if let Some(delay) = args.delay {
         settings.capture.delay_ms = delay;
     }
     let session = Session::new(app, settings)?;
     let sink =
         ProgressLines::new(Verbosity::from_flags(app.global.quiet, app.global.verbose), app.err, 1);
-    let report = session.engine.post_screenshot(&wf, &session.bundle(), &sink, &app.cancel);
+    let report = if wf.input.is_recording() {
+        // Ctrl-C ends the recording gracefully; the run then continues (upload, ...).
+        let stop = CancelToken::new();
+        app.stop_on_first_interrupt(stop.clone());
+        if !app.global.quiet {
+            crate::output::err_line("recording: press Ctrl-C to stop (a second Ctrl-C cancels)");
+        }
+        session.engine.post_video(
+            &wf,
+            VideoSource::Record { stop },
+            &session.bundle(),
+            &sink,
+            &app.cancel,
+        )
+    } else {
+        session.engine.post_screenshot(&wf, &session.bundle(), &sink, &app.cancel)
+    };
     print_result(&RunResult::from_report(&report, &[]), args.json, app.global.quiet, app.err)
 }
 
@@ -86,8 +123,10 @@ mod tests {
         let e = run_blocker(s.workflow_by_id("upload-files").unwrap()).unwrap();
         assert_eq!(e.code, crate::error::ExitCode::Usage);
         assert!(e.hint.unwrap().contains("ssx post-file --workflow upload-files"));
-        let e = run_blocker(s.workflow_by_id("record-screen").unwrap()).unwrap();
-        assert!(e.message.contains("not available yet"));
+        assert!(
+            run_blocker(s.workflow_by_id("record-screen").unwrap()).is_none(),
+            "recording workflows run now"
+        );
         assert!(run_blocker(s.workflow_by_id("capture-region").unwrap()).is_none());
         assert!(run_blocker(s.workflow_by_id("upload-clipboard").unwrap()).is_none());
     }

@@ -112,6 +112,17 @@ impl TestEnv {
         // Hermetic: never pick up an `ssx-editor-ui` that happens to be built next to `ssx`.
         // Tests that exercise the editor override this with a fake helper.
         e.set("SSX_EDITOR_UI", "none");
+        // Same for the selection overlay, and the instance socket lives in the test's own
+        // runtime directory so a real (or another test's) ssx-app is never reached.
+        e.set("SSX_OVERLAY", "none");
+        let run = e.dir.path().join("run");
+        std::fs::create_dir_all(&run).expect("runtime dir");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&run, std::fs::Permissions::from_mode(0o700)).expect("chmod");
+        }
+        e.set("XDG_RUNTIME_DIR", run.display().to_string());
         e.set("HOME", e.home.display().to_string());
         e.set("XDG_CONFIG_HOME", e.home.join(".config").display().to_string());
         e.set("XDG_DATA_HOME", e.home.join(".local/share").display().to_string());

@@ -12,6 +12,7 @@
 use std::path::{Path, PathBuf};
 
 use ssx_core::{
+    ipc::{CaptureKind, Request},
     settings::{AfterCapture, InputKind, Settings},
     workflow::{
         CaptureRequest, CaptureTarget as CoreTarget, Captured, Capturer as _, Clipboard as _,
@@ -28,6 +29,7 @@ use crate::{
     flows::{
         Wanted, adhoc_workflow, apply_destination_flags, choose_format, with_default_extension,
     },
+    forward::{Daemon, run_remote},
     progress::{ProgressLines, Verbosity},
     report::{RunResult, print_result},
 };
@@ -53,15 +55,59 @@ pub struct FinishOpts {
     pub workflow_id: &'static str,
 }
 
+/// `true` when no option changes what happens to the image, so the running ssx app can do the
+/// whole job with the workflow the user configured for region captures.
+fn hands_over_to_the_app(opts: &CaptureOpts) -> bool {
+    opts.output.is_none()
+        && opts.format.is_none()
+        && !opts.cursor
+        && !opts.copy
+        && !opts.upload
+        && opts.to.is_none()
+        && !opts.copy_url
+        && !opts.edit
+}
+
+/// An interactive region capture done by the running ssx app: one overlay at a time, its
+/// notifications, its tray state. Ctrl-C here cancels the overlay there.
+fn capture_via_app(
+    app: &App,
+    daemon: &Daemon,
+    mode: Option<crate::cli::ModeArg>,
+    opts: &CaptureOpts,
+) -> CliResult<()> {
+    let request = Request::Capture {
+        target: CaptureKind::Region,
+        workflow: None,
+        delay_ms: opts.delay,
+        wait: false,
+        mode: mode.map(crate::cli::ModeArg::region_mode),
+    };
+    let summary = run_remote(daemon, request, &app.cancel)?;
+    let result = RunResult::from_summary("capture-region", &summary);
+    print_result(&result, opts.json, app.global.quiet, app.err)
+}
+
 /// Runs `ssx capture`.
 pub fn run(app: &App, args: CaptureArgs) -> CliResult<()> {
     let CaptureArgs { target, opts } = args;
+    if let CaptureTarget::Region { rect: None, mode } = &target
+        && hands_over_to_the_app(&opts)
+        && let Some(daemon) = Daemon::connect()
+    {
+        tracing::info!("handing the region capture to the running ssx app");
+        return capture_via_app(app, &daemon, *mode, &opts);
+    }
     let settings = app.load_settings()?;
     let upload = opts.upload || opts.to.is_some();
     if opts.copy_url && !upload {
         return Err(CliError::usage("--copy-url needs --upload (or --to)"));
     }
-    let session = Session::new(app, settings.clone())?;
+    let mode = match &target {
+        CaptureTarget::Region { mode: Some(m), .. } => m.pick_mode(),
+        _ => ssx_services::PickMode::Rect,
+    };
+    let session = Session::with_mode(app, settings.clone(), mode)?;
     let captured = take_screenshot(app, &session, &target, &opts, &settings)?;
     finish_image(
         app,
@@ -106,8 +152,8 @@ fn take_screenshot(
         CaptureTarget::Monitor { id: Some(id) } => explicit(ExplicitTarget::Monitor(id.clone())),
         CaptureTarget::Window { id: None, .. } => by_trait(CoreTarget::Window),
         CaptureTarget::Window { id: Some(id), .. } => explicit(ExplicitTarget::Window(id.clone())),
-        CaptureTarget::Region { rect: Some(r) } => explicit(ExplicitTarget::Rect(*r)),
-        CaptureTarget::Region { rect: None } => by_trait(CoreTarget::Region),
+        CaptureTarget::Region { rect: Some(r), .. } => explicit(ExplicitTarget::Rect(*r)),
+        CaptureTarget::Region { rect: None, .. } => by_trait(CoreTarget::Region),
         CaptureTarget::LastRegion => by_trait(CoreTarget::LastRegion),
     };
     Ok(captured?)

@@ -1,0 +1,78 @@
+[package]
+name = "ssx-app"
+description = "The ssx background daemon: tray icon, global hotkeys, IPC server, workflow supervisor, recording control."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "ssx_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ssx-app"
+path = "src/main.rs"
+
+[features]
+default = ["record", "ffmpeg", "file-dialog"]
+# Screen recording (GIF only without `ffmpeg`).
+record = ["ssx-services/record"]
+# MP4 encoding through the system FFmpeg.
+ffmpeg = ["record", "ssx-services/ffmpeg"]
+# "Upload files..." in the tray opens a native file chooser (`rfd`; XDG portal on Linux).
+file-dialog = ["dep:rfd"]
+
+[dependencies]
+ssx-types.workspace = true
+ssx-core.workspace = true
+ssx-platform.workspace = true
+ssx-ipc.workspace = true
+ssx-hotkeys.workspace = true
+ssx-services = { path = "../ssx-services" }
+clap = { version = "4", features = ["derive", "wrap_help"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi", "registry"] }
+tracing-appender = "0.2"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+ctrlc = { version = "3", features = ["termination"] }
+notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
+notify-rust = "4"
+opener = "0.8"
+rfd = { version = "0.17", optional = true, default-features = false, features = ["xdg-portal"] }
+
+# Linux: StatusNotifierItem over D-Bus without GTK. The blocking API runs its own thread and
+# `async-io` keeps tokio out of the tree (the same choice as ssx-hotkeys).
+[target.'cfg(target_os = "linux")'.dependencies]
+ksni = { version = "0.3", default-features = false, features = ["async-io", "blocking"] }
+
+# Windows and macOS: the tray icon needs a native event loop on the main thread.
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+tray-icon = { version = "0.24", default-features = false }
+tao = { version = "0.37", default-features = false }
+
+[dev-dependencies]
+tempfile = "3"
+wiremock = "0.6"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+x11rb = "0.14"
+image.workspace = true
+zbus = { version = "5", default-features = false, features = ["async-io"] }
+async-io = "2"
+futures-lite = "2"
+
+# Headless sway tests drive the overlay with virtual pointer/keyboard protocols (the harness is
+# shared with ssx-overlay's tests through `#[path]`).
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+rustix = { version = "1", features = ["fs", "event", "time"] }
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+wayland-protocols-misc = { version = "0.3", features = ["client"] }
+
+[lints]
+workspace = true
