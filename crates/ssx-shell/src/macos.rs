@@ -20,7 +20,7 @@ use crate::context::{Context, Platform};
 use crate::error::{Result, ShellError};
 use crate::fsutil::{MARKER, ManagedFile, files_current, install_files, uninstall_files};
 use crate::integration::{Description, Detection, InstallOutcome, Integration, UninstallOutcome};
-use crate::quote::{sh_single_quote, xml_escape};
+use crate::quote::{sh_word, xml_escape};
 use crate::windows::manifest::guid_for;
 
 const PBS: &str = "/System/Library/CoreServices/pbs";
@@ -162,8 +162,8 @@ pub(crate) fn info_plist(a: &Action) -> String {
 
 /// The shell script Automator runs; the selected files arrive as `"$@"`.
 pub(crate) fn shell_script(ctx: &Context, a: &Action) -> Result<String> {
-    let exe = sh_single_quote(ctx.exe_str()?);
-    let args: Vec<String> = a.exec_args.iter().map(|x| sh_single_quote(x)).collect();
+    let exe = sh_word(ctx.exe_str()?);
+    let args: Vec<String> = a.exec_args.iter().map(|x| sh_word(x)).collect();
     let args = args.join(" ");
     Ok(if a.multi_select {
         format!("exec {exe} {args} -- \"$@\"\n")
