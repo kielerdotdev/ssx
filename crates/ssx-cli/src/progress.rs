@@ -44,6 +44,8 @@ impl Verbosity {
 pub struct ProgressLines {
     verbosity: Verbosity,
     style: Style,
+    /// More than one item: lines carry the item number.
+    multi: bool,
     last_pct: Mutex<HashMap<(Option<usize>, StepKind), u64>>,
 }
 
@@ -61,10 +63,10 @@ fn is_slow(step: StepKind) -> bool {
     )
 }
 
-fn label(item: Option<usize>, step: StepKind) -> String {
+fn label(item: Option<usize>, step: StepKind, multi: bool) -> String {
     match item {
-        Some(i) => format!("[{}] {}", i + 1, step.name()),
-        None => step.name().to_owned(),
+        Some(i) if multi => format!("[{}] {}", i + 1, step.name()),
+        _ => step.name().to_owned(),
     }
 }
 
@@ -76,8 +78,9 @@ pub fn finished_line(
     duration: Duration,
     verbosity: Verbosity,
     style: Style,
+    multi: bool,
 ) -> Option<String> {
-    let what = label(item, step);
+    let what = label(item, step, multi);
     let secs = duration.as_secs_f64();
     match status {
         StepStatus::Succeeded if is_slow(step) || verbosity == Verbosity::Verbose => {
@@ -94,9 +97,10 @@ pub fn finished_line(
 }
 
 impl ProgressLines {
-    /// A sink printing at `verbosity` with `style` (stderr styling).
-    pub fn new(verbosity: Verbosity, style: Style) -> Self {
-        Self { verbosity, style, last_pct: Mutex::default() }
+    /// A sink printing at `verbosity` with `style` (stderr styling), for a run over `items`
+    /// items (lines are numbered only when there are several).
+    pub fn new(verbosity: Verbosity, style: Style, items: usize) -> Self {
+        Self { verbosity, style, multi: items > 1, last_pct: Mutex::default() }
     }
 }
 
@@ -110,7 +114,7 @@ impl EventSink for ProgressLines {
                 err_line(&format!("running workflow {workflow_name:?}"));
             }
             Event::StepStarted { item, step } if is_slow(step) => {
-                err_line(&format!("  {}...", label(item, step)));
+                err_line(&format!("  {}...", label(item, step, self.multi)));
             }
             Event::StepProgress { item, step, done, total } => {
                 let Some(total) = total.filter(|t| *t > 0) else { return };
@@ -121,7 +125,7 @@ impl EventSink for ProgressLines {
                     *last = pct;
                     err_line(&format!(
                         "  {} {pct}% ({} of {})",
-                        label(item, step),
+                        label(item, step, self.multi),
                         human_bytes(done),
                         human_bytes(total)
                     ));
@@ -129,7 +133,7 @@ impl EventSink for ProgressLines {
             }
             Event::StepFinished { item, step, status, duration } => {
                 if let Some(line) =
-                    finished_line(item, step, &status, duration, self.verbosity, self.style)
+                    finished_line(item, step, &status, duration, self.verbosity, self.style, self.multi)
                 {
                     err_line(&line);
                 }
@@ -161,15 +165,20 @@ mod tests {
     fn slow_steps_and_failures_get_lines_quick_ones_do_not() {
         let ok = StepStatus::Succeeded;
         assert_eq!(
-            finished_line(None, StepKind::Capture, &ok, D, Verbosity::Normal, S).unwrap(),
+            finished_line(None, StepKind::Capture, &ok, D, Verbosity::Normal, S, true).unwrap(),
             "  ok capture (0.31s)"
         );
         assert_eq!(
-            finished_line(Some(1), StepKind::Upload, &ok, D, Verbosity::Normal, S).unwrap(),
+            finished_line(Some(1), StepKind::Upload, &ok, D, Verbosity::Normal, S, true).unwrap(),
             "  ok [2] upload (0.31s)"
         );
-        assert!(finished_line(None, StepKind::CopyImage, &ok, D, Verbosity::Normal, S).is_none());
-        assert!(finished_line(None, StepKind::CopyImage, &ok, D, Verbosity::Verbose, S).is_some());
+        assert_eq!(
+            finished_line(Some(0), StepKind::Upload, &ok, D, Verbosity::Normal, S, false).unwrap(),
+            "  ok upload (0.31s)",
+            "a single item needs no number"
+        );
+        assert!(finished_line(None, StepKind::CopyImage, &ok, D, Verbosity::Normal, S, true).is_none());
+        assert!(finished_line(None, StepKind::CopyImage, &ok, D, Verbosity::Verbose, S, true).is_some());
 
         let failed = StepStatus::Failed(StepFailure {
             kind: FailureKind::Service,
@@ -177,7 +186,7 @@ mod tests {
             retryable: true,
         });
         assert_eq!(
-            finished_line(None, StepKind::CopyImage, &failed, D, Verbosity::Normal, S).unwrap(),
+            finished_line(None, StepKind::CopyImage, &failed, D, Verbosity::Normal, S, true).unwrap(),
             "  failed copy_image_to_clipboard: HTTP 500",
             "failures are always shown"
         );
@@ -186,8 +195,8 @@ mod tests {
     #[test]
     fn skipped_steps_only_in_verbose() {
         let skipped = StepStatus::Skipped(SkipReason::NoUrl);
-        assert!(finished_line(None, StepKind::CopyUrl, &skipped, D, Verbosity::Normal, S).is_none());
-        let l = finished_line(None, StepKind::CopyUrl, &skipped, D, Verbosity::Verbose, S).unwrap();
+        assert!(finished_line(None, StepKind::CopyUrl, &skipped, D, Verbosity::Normal, S, true).is_none());
+        let l = finished_line(None, StepKind::CopyUrl, &skipped, D, Verbosity::Verbose, S, true).unwrap();
         assert!(l.contains("skipped") && l.contains("copy_url"), "{l}");
     }
 

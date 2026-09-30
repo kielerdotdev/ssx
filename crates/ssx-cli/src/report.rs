@@ -49,6 +49,9 @@ pub struct ItemResult {
     pub history_id: Option<i64>,
     /// `success`, `partial_success`, `failed` or `cancelled`.
     pub outcome: Outcome,
+    /// `true` if [`path`](Self::path) was created by this run (not a file the caller passed in).
+    #[serde(skip)]
+    pub created: bool,
     /// What went wrong for this item, if anything.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -118,6 +121,7 @@ impl RunResult {
                     uploader: i.uploader.clone(),
                     history_id: i.history_id,
                     outcome: i.outcome,
+                    created: i.created_by_workflow,
                     error,
                 }
             })
@@ -166,6 +170,7 @@ impl RunResult {
                 uploader: None,
                 history_id: None,
                 outcome: Outcome::Success,
+                created: true,
                 error: None,
             }],
             errors: Vec::new(),
@@ -187,9 +192,9 @@ impl RunResult {
         self.items.iter().filter_map(|i| i.short_url.as_deref().or(i.url.as_deref())).collect()
     }
 
-    /// Local paths to print.
+    /// Local files this run created (never the files the caller passed in).
     pub fn paths(&self) -> Vec<&std::path::Path> {
-        self.items.iter().filter_map(|i| i.path.as_deref()).collect()
+        self.items.iter().filter(|i| i.created).filter_map(|i| i.path.as_deref()).collect()
     }
 
     /// Exit code for this result.
@@ -214,9 +219,17 @@ pub fn print_result(result: &RunResult, json: bool, quiet: bool, err_style: Styl
         out_line(&serde_json::to_string_pretty(result)?);
     } else {
         let urls = result.urls();
-        if urls.is_empty() {
+        if urls.is_empty() && result.outcome == Outcome::Success {
             for p in result.paths() {
                 out_line(&p.display().to_string());
+            }
+        } else if urls.is_empty() {
+            // Something went wrong: stdout stays empty so a script cannot mistake a path for
+            // the result; the file is still reported for the human.
+            if !quiet {
+                for p in result.paths() {
+                    err_line(&format!("saved: {}", p.display()));
+                }
             }
         } else {
             for u in urls {

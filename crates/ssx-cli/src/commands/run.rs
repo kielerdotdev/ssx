@@ -53,7 +53,7 @@ pub fn run(app: &App, args: RunArgs) -> CliResult<()> {
         settings.capture.delay_ms = delay;
     }
     let session = Session::new(app, settings)?;
-    let sink = ProgressLines::new(Verbosity::from_flags(app.global.quiet, app.global.verbose), app.err);
+    let sink = ProgressLines::new(Verbosity::from_flags(app.global.quiet, app.global.verbose), app.err, 1);
     let report = session.engine.post_screenshot(&wf, &session.bundle(), &sink, &app.cancel);
     print_result(&RunResult::from_report(&report, &[]), args.json, app.global.quiet, app.err)
 }

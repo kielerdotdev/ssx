@@ -514,7 +514,7 @@ pub fn gather(app: &App) -> CliResult<Report> {
         Ok(server) => NotificationInfo { ok: true, server: Some(server), error: None },
         Err(e) => NotificationInfo { ok: false, server: None, error: Some(e) },
     };
-    let st = ssx_services::LazySecrets::new().status();
+    let st = ssx_services::LayeredSecretStore::probe_status();
     let keyring = KeyringInfo {
         persistent: st.persistent,
         backend: st.backend.map(str::to_owned),

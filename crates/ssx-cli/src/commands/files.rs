@@ -58,7 +58,11 @@ fn run_files(
     explicit: &[ssx_core::workflow::StepKind],
     json: bool,
 ) -> CliResult<()> {
-    let sink = ProgressLines::new(Verbosity::from_flags(app.global.quiet, app.global.verbose), app.err);
+    let sink = ProgressLines::new(
+        Verbosity::from_flags(app.global.quiet, app.global.verbose),
+        app.err,
+        paths.len(),
+    );
     let report = session.engine.post_file(wf, paths, &session.bundle(), &sink, &app.cancel);
     print_result(&RunResult::from_report(&report, explicit), json, app.global.quiet, app.err)
 }

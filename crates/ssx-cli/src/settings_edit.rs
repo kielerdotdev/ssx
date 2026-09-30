@@ -238,6 +238,14 @@ pub fn remove_key(doc: &mut DocumentMut, key: &str) -> Result<bool, String> {
     Ok(table.remove(last).is_some())
 }
 
+/// The core validator hints that an uploader has no `[uploaders.NAME]` table; that is only
+/// interesting for names ssx does not provide itself.
+pub fn is_builtin_uploader_hint(message: &str) -> bool {
+    ssx_services::upload::BUILTIN_NAMES
+        .iter()
+        .any(|n| message.contains(&format!("uploader {n:?} has no [uploaders.")))
+}
+
 /// Parses `text` as settings and validates it; error-severity issues are returned as an
 /// error listing all of them, warnings are returned alongside the parsed settings.
 pub fn check_text(text: &str) -> CliResult<(Loaded, Vec<String>)> {
@@ -249,16 +257,19 @@ pub fn check_text(text: &str) -> CliResult<(Loaded, Vec<String>)> {
         other => CliError::from(other),
     })?;
     let issues = loaded.settings.validate();
-    let errors: Vec<String> =
-        issues.iter().filter(|i| i.severity == Severity::Error).map(ToString::to_string).collect();
+    let errors: Vec<String> = issues
+        .iter()
+        .filter(|i| i.severity == Severity::Error)
+        .map(|i| format!("{}: {}", i.path, i.message))
+        .collect();
     if !errors.is_empty() {
         return Err(CliError::new(format!("the result would be invalid:\n  {}", errors.join("\n  ")))
             .hint("nothing was written; correct the value and try again"));
     }
     let warnings = issues
         .iter()
-        .filter(|i| i.severity == Severity::Warning)
-        .map(ToString::to_string)
+        .filter(|i| i.severity == Severity::Warning && !is_builtin_uploader_hint(&i.message))
+        .map(|i| format!("{}: {}", i.path, i.message))
         .chain(loaded.warnings.iter().cloned())
         .collect();
     Ok((loaded, warnings))
@@ -281,15 +292,48 @@ pub fn write_checked(path: &Path, text: &str) -> CliResult<Vec<String>> {
     Ok(warnings)
 }
 
-/// Sets `key` in the file at `path` (creating it from the defaults if missing).
+/// Names of the keys in the table that holds `key` in the defaults, for "did you mean" hints.
+fn sibling_keys(defaults: &DocumentMut, key: &str) -> Vec<String> {
+    let Ok(mut segs) = parse_key(key) else { return Vec::new() };
+    segs.pop();
+    let mut item = defaults.as_item();
+    for s in &segs {
+        item = match (s, item) {
+            (Seg::Key(k), Item::Table(t)) => match t.get(k) {
+                Some(i) => i,
+                None => return Vec::new(),
+            },
+            _ => return Vec::new(),
+        };
+    }
+    item.as_table().map(|t| t.iter().map(|(k, _)| k.to_owned()).collect()).unwrap_or_default()
+}
+
+/// Sets `key` in the file at `path` (creating it from the defaults if missing). Keys that
+/// ssx does not know are refused: the settings loader only warns about them, which would
+/// turn a typo into a silently ignored setting.
 pub fn set_in_file(path: &Path, key: &str, value: &str) -> CliResult<Vec<String>> {
     let text = read_text_or_default(path)?;
+    let known_before: std::collections::HashSet<String> = Settings::from_toml_str(&text)
+        .map(|l| l.warnings.into_iter().collect())
+        .unwrap_or_default();
     let mut doc: DocumentMut = text
         .parse()
         .map_err(|e| CliError::new(format!("{} is not valid TOML: {e}", path.display())).hint("fix it with `ssx config edit`"))?;
     let defaults: DocumentMut = Settings::default().to_toml_string()?.parse().map_err(|e| CliError::new(format!("internal error: {e}")))?;
     set_key(&mut doc, &defaults, key, value).map_err(|e| CliError::new(e).hint("`ssx config show` lists all keys"))?;
-    write_checked(path, &doc.to_string())
+    let new_text = doc.to_string();
+    let (_, warnings) = check_text(&new_text)?;
+    if warnings.iter().any(|w| w.starts_with("unknown setting") && !known_before.contains(w)) {
+        let siblings = sibling_keys(&defaults, key);
+        let hint = if siblings.is_empty() {
+            "`ssx config show` lists all keys".to_owned()
+        } else {
+            format!("valid keys next to it: {}", siblings.join(", "))
+        };
+        return Err(CliError::new(format!("{key:?} is not a setting ssx knows (a typo?)")).hint(hint));
+    }
+    write_checked(path, &new_text)
 }
 
 #[cfg(test)]
@@ -410,6 +454,22 @@ mod tests {
         std::fs::write(&p, "not [valid").unwrap();
         let e = set_in_file(&p, "general.image_quality", "5").unwrap_err();
         assert!(e.message.contains("not valid TOML") && e.hint.unwrap().contains("config edit"));
+    }
+
+    #[test]
+    fn unknown_keys_are_refused_with_the_valid_neighbours() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.toml");
+        let e = set_in_file(&p, "general.imag_quality", "5").unwrap_err();
+        assert!(e.message.contains("general.imag_quality") && e.message.contains("typo"), "{}", e.message);
+        let hint = e.hint.unwrap();
+        assert!(hint.contains("image_quality") && hint.contains("image_format"), "{hint}");
+        assert!(!p.exists(), "nothing was written");
+        let e = set_in_file(&p, "nonsense", "1").unwrap_err();
+        assert!(e.message.contains("nonsense"));
+        // Keys of opaque uploader tables are the uploader's business.
+        set_in_file(&p, "uploaders.x.type", "local").unwrap();
+        set_in_file(&p, "uploaders.x.anything", "1").unwrap();
     }
 
     #[test]

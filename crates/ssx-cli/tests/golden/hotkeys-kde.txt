@@ -1,0 +1,44 @@
+# net.local.ssx-run-region.desktop (Ctrl+Print)
+[Desktop Entry]
+Type=Application
+Name=ssx: Capture region, save, copy and upload
+Exec=ssx run region
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
+# net.local.ssx-run-region-edit.desktop (Ctrl+Shift+Print)
+[Desktop Entry]
+Type=Application
+Name=ssx: Capture region, edit, save and upload
+Exec=ssx run region-edit
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
+# net.local.ssx-run-screen.desktop (Print)
+[Desktop Entry]
+Type=Application
+Name=ssx: Capture screen, save and copy
+Exec=ssx run screen
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
+# net.local.ssx-run-window.desktop (Alt+Print)
+[Desktop Entry]
+Type=Application
+Name=ssx: Capture active window, save and upload
+Exec=ssx run window
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-run-region.desktop --key _launch Ctrl+Print
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-run-region-edit.desktop --key _launch Ctrl+Shift+Print
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-run-screen.desktop --key _launch Print
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-run-window.desktop --key _launch Alt+Print

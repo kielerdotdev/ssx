@@ -37,6 +37,7 @@ pub fn findings_for(text: &str, base_dir: &Path) -> Result<Vec<Finding>, String>
         .settings
         .validate()
         .into_iter()
+        .filter(|i| !settings_edit::is_builtin_uploader_hint(&i.message))
         .map(|i| Finding {
             severity: if i.severity == Severity::Error { "error" } else { "warning" },
             path: i.path,

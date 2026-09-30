@@ -151,6 +151,15 @@ impl LayeredSecretStore {
         }
     }
 
+    /// Where secrets would go, found by probing the OS credential store *without* creating a
+    /// store or logging anything (for diagnostics such as `ssx doctor`).
+    pub fn probe_status() -> SecretStatus {
+        match OsKeyring::probe() {
+            Ok(k) => SecretStatus { backend: Some(k.name()), persistent: true, unavailable_reason: None },
+            Err(reason) => SecretStatus { backend: None, persistent: false, unavailable_reason: Some(reason) },
+        }
+    }
+
     /// Uses `backend` as the persistent store.
     pub fn with_backend(backend: Box<dyn SecretBackend>) -> Self {
         Self::new(Some(backend), None)

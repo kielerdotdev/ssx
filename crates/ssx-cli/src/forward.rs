@@ -51,7 +51,9 @@ pub fn wire_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
 pub fn request_line(paths: &[PathBuf], action: PostAction) -> Result<String, String> {
     let paths = wire_paths(paths)?;
     let env = RequestEnvelope::new(1, Request::PostFiles { paths, action, wait: false });
-    encode_line(&env).map_err(|e| e.to_string())
+    // `encode_line` ends the line with `\n`; the transport adds its own terminator and refuses
+    // a line that already contains one.
+    encode_line(&env).map(|l| l.trim_end_matches(['\r', '\n']).to_owned()).map_err(|e| e.to_string())
 }
 
 /// Interprets the instance's reply line.
@@ -100,7 +102,7 @@ mod tests {
     fn request_lines_carry_absolute_paths_verbatim() {
         let hostile = PathBuf::from("rel/a b \"quoted\" $(x) \n newline.png");
         let line = request_line(&[hostile.clone(), PathBuf::from("/abs/é.png")], PostAction::Upload).unwrap();
-        assert!(!line.trim_end().contains('\n'), "one line, newlines are JSON-escaped: {line:?}");
+        assert!(!line.contains('\n'), "no terminator: the transport adds it: {line:?}");
         let env: RequestEnvelope = decode_line(&line).unwrap();
         let Request::PostFiles { paths, action, wait } = env.request else { panic!("wrong request") };
         assert_eq!(action, PostAction::Upload);

@@ -240,7 +240,7 @@ fn secret(app: &App, cmd: SecretCmd) -> CliResult<()> {
             out_line(&format!("deleted {name:?}"));
         }
         SecretCmd::Status { names } => {
-            let st = secrets.status();
+            let st = ssx_services::LayeredSecretStore::probe_status();
             match (st.backend, &st.unavailable_reason) {
                 (Some(b), _) => out_line(&format!("secret store: {b}")),
                 (None, why) => out_line(&format!(

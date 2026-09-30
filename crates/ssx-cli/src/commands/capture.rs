@@ -132,7 +132,7 @@ pub fn finish_image(
         opts.output.as_deref().and_then(Path::extension).and_then(|e| e.to_str()),
         settings.general.image_format,
     )?;
-    let sink = ProgressLines::new(Verbosity::from_flags(app.global.quiet, app.global.verbose), app.err);
+    let sink = ProgressLines::new(Verbosity::from_flags(app.global.quiet, app.global.verbose), app.err, 1);
     let wanted = Wanted {
         save: opts.output.is_none(),
         copy_image: opts.copy,
