@@ -9,8 +9,12 @@ name: Release
 #     workflow artifacts only; nothing is published.
 #
 # Variants
-#   linux   dynamic  FFmpeg from the distribution, linked dynamically. Needs libavcodec 60+ at
-#                    run time (Ubuntu 24.04, Debian 13, Fedora 40 or newer). Verified recipe.
+#   linux   dynamic  FFmpeg from the distribution, linked dynamically. Verified recipe (built,
+#                    packaged and smoke-tested locally). The binaries need exactly the FFmpeg 6.x
+#                    shared libraries (libavcodec.so.60, libavformat.so.60, ...): Ubuntu 24.04 and
+#                    its derivatives. It will NOT start on distributions with another FFmpeg major
+#                    version (Debian 12 has 5.1, Debian 13 and Ubuntu 25.04 have 7.1); those need
+#                    the static variant.
 #   linux   static   FFmpeg built from source and embedded (crates/ssx-record/build). EXPERIMENTAL:
 #                    this recipe has never run; the job is allowed to fail and the release simply
 #                    omits the archive. The job proves the embedding by failing if any binary still
