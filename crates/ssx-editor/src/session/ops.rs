@@ -92,6 +92,9 @@ impl EditorSession {
     /// Moves the selection by `(dx, dy)` image pixels. Repeated nudges merge into one undo
     /// step until something else happens.
     pub fn nudge(&mut self, dx: f32, dy: f32) {
+        if !(dx.is_finite() && dy.is_finite()) {
+            return;
+        }
         let before: Vec<Object> =
             self.selection.iter().filter_map(|i| self.doc.object(*i).cloned()).filter(|o| !o.locked).collect();
         if before.is_empty() {

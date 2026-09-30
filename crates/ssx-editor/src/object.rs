@@ -982,6 +982,83 @@ impl Object {
         r
     }
 
+    /// Repairs non-finite or out-of-range numbers (from a buggy caller or hostile input) so an
+    /// object can never poison serialisation or rendering. Returns `false` when the geometry
+    /// itself is non-finite and cannot be repaired (the caller should reject the change).
+    pub fn sanitize(&mut self) -> bool {
+        let d = Style::default();
+        let fix = |v: &mut f32, default: f32| {
+            if !v.is_finite() {
+                *v = default;
+            }
+        };
+        let st = &mut self.style;
+        fix(&mut st.stroke_width, d.stroke_width);
+        st.stroke_width = st.stroke_width.clamp(0.0, 1000.0);
+        fix(&mut st.opacity, 1.0);
+        st.opacity = st.opacity.clamp(0.0, 1.0);
+        fix(&mut st.corner_radius, 0.0);
+        st.corner_radius = st.corner_radius.clamp(0.0, 10_000.0);
+        if st.shadow.is_some_and(|s| !(s.dx.is_finite() && s.dy.is_finite() && s.blur.is_finite())) {
+            st.shadow = None;
+        }
+        if let Some(s) = &mut st.shadow {
+            s.blur = s.blur.clamp(0.0, 200.0);
+        }
+        let text = |c: &mut TextContent| {
+            fix(&mut c.font.size, 24.0);
+            c.font.size = c.font.size.clamp(1.0, 4096.0);
+            fix(&mut c.line_spacing, 1.2);
+            c.line_spacing = c.line_spacing.clamp(0.5, 5.0);
+            fix(&mut c.padding, 4.0);
+            c.padding = c.padding.clamp(0.0, 1000.0);
+            if let Some(o) = &mut c.outline {
+                fix(&mut o.width, 0.0);
+                o.width = o.width.clamp(0.0, 200.0);
+            }
+        };
+        match &mut self.kind {
+            ObjectKind::Text(t) => {
+                fix(&mut t.rotation, 0.0);
+                text(&mut t.content);
+            }
+            ObjectKind::Balloon(b) => {
+                fix(&mut b.tail_width, 24.0);
+                text(&mut b.content);
+            }
+            ObjectKind::Step(s) => {
+                fix(&mut s.diameter, 36.0);
+                s.diameter = s.diameter.clamp(1.0, 10_000.0);
+            }
+            ObjectKind::Magnify(m) => {
+                fix(&mut m.zoom, 2.0);
+                m.zoom = m.zoom.clamp(0.05, 100.0);
+            }
+            ObjectKind::Spotlight(s) => {
+                fix(&mut s.feather, 0.0);
+                s.feather = s.feather.clamp(0.0, 500.0);
+            }
+            ObjectKind::Blur(e) | ObjectKind::Pixelate(e) => {
+                fix(&mut e.amount, 10.0);
+                e.amount = e.amount.clamp(0.0, 500.0);
+            }
+            ObjectKind::Grid(g) => {
+                fix(&mut g.spacing, 16.0);
+                g.spacing = g.spacing.clamp(2.0, 10_000.0);
+            }
+            ObjectKind::Cursor(c) => {
+                fix(&mut c.scale, 1.0);
+                c.scale = c.scale.clamp(0.05, 50.0);
+            }
+            ObjectKind::Rectangle(b) | ObjectKind::Ellipse(b) => fix(&mut b.rotation, 0.0),
+            ObjectKind::Image(i) => fix(&mut i.rotation, 0.0),
+            ObjectKind::Sticker(s) => fix(&mut s.rotation, 0.0),
+            _ => {}
+        }
+        let b = self.bounds();
+        b.is_finite() && b.x.abs() < 1.0e9 && b.y.abs() < 1.0e9 && b.w < 1.0e9 && b.h < 1.0e9
+    }
+
     /// Moves the object.
     pub fn translate(&mut self, dx: f32, dy: f32) {
         let d = PointF::new(dx, dy);

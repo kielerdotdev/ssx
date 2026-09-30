@@ -45,6 +45,10 @@ pub enum BlurMethod {
 /// Largest σ (in pixels) `Auto` still runs as the exact kernel.
 const AUTO_EXACT_MAX_SIGMA: f32 = 4.0;
 
+/// σ is clamped to this: beyond it a blur is a flat average anyway, and unbounded kernels
+/// would exhaust memory and time on absurd input.
+const MAX_SIGMA: f32 = 1000.0;
+
 /// Blurs `region` (frame-local; `None` = whole frame) with a Gaussian of standard
 /// deviation `sigma` pixels. Edge pixels clamp to the region border. `sigma <= 0` is a
 /// no-op.
@@ -55,7 +59,7 @@ pub fn gaussian_blur(
     method: BlurMethod,
 ) -> Result<()> {
     check(frame)?;
-    let sigma = finite(sigma, "sigma")?;
+    let sigma = finite(sigma, "sigma")?.min(MAX_SIGMA);
     let Some(r) = clip_region(frame.width(), frame.height(), region) else { return Ok(()) };
     if sigma <= 0.0 {
         return Ok(());
@@ -87,7 +91,7 @@ pub fn gaussian_blur_premultiplied(
     if !sigma.is_finite() {
         return;
     }
-    blur_u8(&mut data[..width * height * 4], width, height, sigma, method, true);
+    blur_u8(&mut data[..width * height * 4], width, height, sigma.min(MAX_SIGMA), method, true);
 }
 
 fn blur_u8(
@@ -113,7 +117,7 @@ pub fn unsharp_mask(
     threshold: u8,
 ) -> Result<()> {
     check(frame)?;
-    let sigma = finite(sigma, "sigma")?;
+    let sigma = finite(sigma, "sigma")?.min(MAX_SIGMA);
     let amount = finite(amount, "amount")?;
     let Some(r) = clip_region(frame.width(), frame.height(), region) else { return Ok(()) };
     if sigma <= 0.0 || amount == 0.0 {

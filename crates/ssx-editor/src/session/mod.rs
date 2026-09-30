@@ -351,6 +351,8 @@ impl EditorSession {
     }
 
     pub(crate) fn set_selection(&mut self, ids: Vec<ObjectId>) {
+        let mut ids = ids;
+        ids.retain(|id| self.doc.object(*id).is_some());
         let ids = self.expand_groups(ids);
         if ids != self.selection {
             self.selection = ids;
@@ -372,7 +374,11 @@ impl EditorSession {
     }
 
     /// Replaces `before` objects with `after` versions (skipped when identical).
-    pub(crate) fn modify(&mut self, before: Vec<Object>, after: Vec<Object>, key: Option<CoalesceKey>) {
+    pub(crate) fn modify(&mut self, before: Vec<Object>, mut after: Vec<Object>, key: Option<CoalesceKey>) {
+        // Never let non-finite numbers into the document; an unusable edit is dropped.
+        if !after.iter_mut().all(Object::sanitize) {
+            return;
+        }
         if before == after {
             return;
         }
@@ -578,9 +584,7 @@ impl EditorSession {
     /// Primary button pressed at `pos` (image space). `pressure` (pen/tablet, 0–1) is accepted
     /// for API completeness; strokes are deliberately pressure-less.
     pub fn pointer_down(&mut self, pos: PointF, mods: Modifiers, _pressure: Option<f32>) {
-        if !pos.is_finite() {
-            return;
-        }
+        let Some(pos) = sane(pos) else { return };
         if self.drag.is_some() {
             self.pointer_up(pos, mods);
         }
@@ -617,9 +621,7 @@ impl EditorSession {
 
     /// Pointer moved (with or without the button held).
     pub fn pointer_move(&mut self, pos: PointF, mods: Modifiers, _pressure: Option<f32>) {
-        if !pos.is_finite() {
-            return;
-        }
+        let Some(pos) = sane(pos) else { return };
         let prev = self.hover;
         self.hover = pos;
         if let Some(d) = self.drag.take() {
@@ -632,7 +634,7 @@ impl EditorSession {
 
     /// Primary button released.
     pub fn pointer_up(&mut self, pos: PointF, mods: Modifiers) {
-        if pos.is_finite() && self.drag.is_some() {
+        if let (Some(pos), true) = (sane(pos), self.drag.is_some()) {
             self.pointer_move(pos, mods, None);
         }
         let Some(d) = self.drag.take() else { return };
@@ -681,9 +683,10 @@ impl EditorSession {
 
     /// Double click: enters text editing on a text/balloon under the pointer.
     pub fn double_click(&mut self, pos: PointF, _mods: Modifiers) {
+        let Some(pos) = sane(pos) else { return };
+        self.cancel_drag();
         if let Some(id) = self.hit_test(pos) {
             if self.obj(id).is_some_and(|o| o.kind.text_content().is_some()) {
-                self.cancel_drag();
                 self.set_selection(vec![id]);
                 self.begin_text_edit(id);
             }
@@ -985,6 +988,7 @@ impl EditorSession {
         let start = self.maybe_snap(pos, mods, &[]);
         let id = self.doc.peek_next_id();
         let mut obj = Object::new(id, style, kind);
+        obj.sanitize();
         let mut points = vec![start];
         self.set_create_geometry(&mut obj, tool, start, start, &mut points, mods);
         self.sync_text(&mut obj);
@@ -1111,7 +1115,8 @@ impl EditorSession {
         let tiny = b.w < min && b.h < min;
         match tool {
             Tool::Text => {
-                self.begin_text_edit(id);
+                // Keep the creation entry open so creating + typing is a single undo step.
+                self.begin_text_edit_inner(id, false);
                 return;
             }
             Tool::Balloon | Tool::Magnify if tiny => {
@@ -1366,6 +1371,7 @@ impl EditorSession {
             if let Some(mut preset) = self.styles.get(self.tool) {
                 let mut probe = Object::new(ObjectId(0), preset.style.clone(), preset.kind.clone());
                 f(&mut probe);
+                probe.sanitize();
                 preset.style = probe.style;
                 preset.kind = probe.kind.template();
                 self.styles.remember(self.tool, preset);
@@ -1420,6 +1426,7 @@ impl EditorSession {
     pub fn add_object(&mut self, mut obj: Object) -> ObjectId {
         obj.id = self.doc.peek_next_id();
         let id = obj.id;
+        obj.sanitize();
         self.sync_text(&mut obj);
         let cmd = Command::Add {
             items: vec![(self.doc.objects().len(), obj)],
@@ -1429,6 +1436,13 @@ impl EditorSession {
         self.set_selection(vec![id]);
         id
     }
+}
+
+/// Rejects non-finite pointer positions and clamps absurd ones (a runaway pointer must not be
+/// able to create objects whose size overflows `f32` arithmetic).
+fn sane(p: PointF) -> Option<PointF> {
+    const LIMIT: f32 = 1.0e6;
+    p.is_finite().then(|| PointF::new(p.x.clamp(-LIMIT, LIMIT), p.y.clamp(-LIMIT, LIMIT)))
 }
 
 fn line_ends(start: PointF, end: PointF, mods: Modifiers) -> (PointF, PointF) {

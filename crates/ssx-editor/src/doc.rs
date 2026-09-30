@@ -297,7 +297,12 @@ impl Document {
     /// for spotlights, the whole canvas. Iterates to a fixed point.
     pub fn dirty_region(&self, changed: RectF) -> RectF {
         let mut dirty = changed;
-        loop {
+        if !dirty.is_finite() {
+            return RectF::from(self.canvas_rect());
+        }
+        // Each pass can only grow `dirty` by the (finitely many) effect objects, so this
+        // converges quickly; the cap is a belt-and-braces guard against pathological input.
+        for _ in 0..(self.objects.len() + 2) {
             let before = dirty;
             for o in &self.objects {
                 if !o.visible {
@@ -320,10 +325,14 @@ impl Document {
                     _ => {}
                 }
             }
+            if !dirty.is_finite() {
+                return RectF::from(self.canvas_rect());
+            }
             if dirty == before {
-                return dirty;
+                break;
             }
         }
+        dirty
     }
 
     // -----------------------------------------------------------------------------------
@@ -523,6 +532,14 @@ impl Document {
 
 /// Joins two frames along `axis` (they share the other dimension).
 fn join(a: &Frame, b: &Frame, axis: Axis) -> Result<Frame, DocError> {
+    // A strip flush with an image edge leaves one side empty (and `crop` reports empty
+    // results as 0x0), so joining would wrongly collapse the other dimension.
+    if a.width() == 0 || a.height() == 0 {
+        return Ok(b.clone());
+    }
+    if b.width() == 0 || b.height() == 0 {
+        return Ok(a.clone());
+    }
     let out = match axis {
         Axis::X => {
             let mut canvas = ssx_imgfx::solid_frame(a.width() + b.width(), a.height(), [0; 4]);
@@ -644,6 +661,19 @@ mod tests {
         d.cut_out(Axis::Y, 1, 3).unwrap();
         assert_eq!(d.image_size(), (15, 2));
         assert_eq!(ssx_imgfx::get_pixel(d.base(), 0, 1)[1], 3);
+    }
+
+    #[test]
+    fn cut_out_flush_with_an_edge_keeps_the_other_dimension() {
+        let mut d = doc(10, 8);
+        d.cut_out(Axis::Y, 0, 1).unwrap();
+        assert_eq!(d.image_size(), (10, 7));
+        assert_eq!(ssx_imgfx::get_pixel(d.base(), 0, 0)[1], 1);
+        d.cut_out(Axis::X, 8, 10).unwrap();
+        assert_eq!(d.image_size(), (8, 7));
+        d.cut_out(Axis::X, 0, 3).unwrap();
+        assert_eq!(d.image_size(), (5, 7));
+        assert_eq!(ssx_imgfx::get_pixel(d.base(), 0, 0)[0], 3);
     }
 
     #[test]
