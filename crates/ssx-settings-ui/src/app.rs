@@ -121,6 +121,12 @@ pub struct SettingsApp {
     pub workflows: pages::workflows::State,
     /// Hotkeys page.
     pub hotkeys: pages::hotkeys::State,
+    /// Uploaders page.
+    pub uploaders: pages::uploaders::State,
+    /// History page.
+    pub history: pages::history::State,
+    /// Integration page.
+    pub integration: pages::integration::State,
     registry: RegistryCache,
     /// How the window ended so far.
     pub outcome: Outcome,
@@ -153,6 +159,9 @@ impl SettingsApp {
             capture: pages::capture::State::new(&wake),
             workflows: pages::workflows::State::default(),
             hotkeys: pages::hotkeys::State::default(),
+            uploaders: pages::uploaders::State::default(),
+            history: pages::history::State::default(),
+            integration: pages::integration::State::default(),
             registry: RegistryCache::default(),
             outcome: Outcome::default(),
             wake,
@@ -172,6 +181,11 @@ impl SettingsApp {
 
     fn now(&self) -> DateTime<FixedOffset> {
         self.now_override.unwrap_or_else(|| Local::now().fixed_offset())
+    }
+
+    /// Whether any page has background work running (tests wait for this to become `false`).
+    pub fn busy(&self) -> bool {
+        self.uploaders.busy() || self.history.busy() || self.integration.busy()
     }
 
     /// Whether the window has asked to close.
@@ -303,7 +317,8 @@ impl SettingsApp {
     /// Draws the whole window.
     pub fn show(&mut self, ui: &mut Ui) {
         let ctx = ui.ctx().clone();
-        let issues = self.model.issues().clone();
+        let registry = self.registry.get(self.model.working(), &self.host.paths.config_dir, &self.host.vault.store());
+        let issues = self.model.issues().clone().without_known_uploader_hints(|n| registry.get(n).is_some());
         let dirty_pages = self.model.dirty_pages();
 
         egui::Panel::left("nav")
@@ -349,8 +364,17 @@ impl SettingsApp {
                 go_to: &mut go_to,
             };
             if self.entered != Some(self.page) {
-                if self.page == Page::General {
-                    self.general.refresh(&cx);
+                match self.page {
+                    Page::General => self.general.refresh(&cx),
+                    Page::Integration => {
+                        self.integration.refresh_states();
+                        self.integration.rerun_doctor();
+                    }
+                    Page::History => self.history.reset_source(),
+                    _ => {}
+                }
+                if self.entered == Some(Page::History) {
+                    self.history.reset_source();
                 }
                 self.entered = Some(self.page);
             }
@@ -359,10 +383,10 @@ impl SettingsApp {
                 Page::Capture => pages::capture::ui(ui, &mut self.capture, &mut cx),
                 Page::Workflows => pages::workflows::ui(ui, &mut self.workflows, &mut cx),
                 Page::Hotkeys => pages::hotkeys::ui(ui, &mut self.hotkeys, &mut cx),
+                Page::Uploaders => pages::uploaders::ui(ui, &mut self.uploaders, &mut cx),
+                Page::History => pages::history::ui(ui, &mut self.history, &mut cx),
+                Page::Integration => pages::integration::ui(ui, &mut self.integration, &mut cx),
                 Page::About => pages::about::ui(ui, &mut cx),
-                _ => {
-                    ui.label("Coming up.");
-                }
             }
         }
         if let Some(p) = go_to {

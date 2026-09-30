@@ -16,6 +16,7 @@ fn tall(page: Page) -> f32 {
         Page::Workflows => 1300.0,
         Page::Hotkeys => 1500.0,
         Page::Uploaders => 1100.0,
+        Page::Integration => 1500.0,
         _ => 900.0,
     }
 }
@@ -23,12 +24,13 @@ fn tall(page: Page) -> f32 {
 #[test]
 fn every_page_renders_at_the_default_size() {
     for page in Page::ALL {
-        let (app, _fx) = app(page);
+        let (app, _fx) = demo_app(page);
         let mut h = window(app, vec2(1120.0, 760.0));
         settle(&mut h);
         if page == Page::Capture {
             wait_preview(&mut h);
         }
+        wait_busy(&mut h, 30);
         h.remove_cursor();
         settle(&mut h);
         dump(&mut h, &format!("page-{}", page.slug()));
@@ -38,12 +40,13 @@ fn every_page_renders_at_the_default_size() {
 #[test]
 fn every_page_renders_completely_in_a_tall_window() {
     for page in Page::ALL {
-        let (app, _fx) = app(page);
+        let (app, _fx) = demo_app(page);
         let mut h = window(app, vec2(1120.0, tall(page)));
         settle(&mut h);
         if page == Page::Capture {
             wait_preview(&mut h);
         }
+        wait_busy(&mut h, 30);
         h.remove_cursor();
         settle(&mut h);
         dump(&mut h, &format!("tall-{}", page.slug()));

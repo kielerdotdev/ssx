@@ -47,18 +47,59 @@ pub const fn severity_color(s: Severity) -> Color32 {
     }
 }
 
-/// Draws a small round severity marker (a filled circle with `!`), without any font glyph.
-pub fn severity_icon(ui: &mut Ui, s: Severity) {
-    let (rect, _) = ui.allocate_exact_size(vec2(14.0, 16.0), Sense::hover());
+/// Paints the severity marker (a filled circle with `!`) at `centre`, without any font glyph.
+pub fn paint_severity(painter: &egui::Painter, centre: egui::Pos2, s: Severity) {
     let c = severity_color(s);
-    let centre = pos2(rect.center().x, rect.center().y + 0.5);
-    ui.painter().circle_filled(centre, 6.0, c);
+    painter.circle_filled(centre, 6.0, c);
     let ink = Color32::from_rgb(30, 30, 34);
-    ui.painter().line_segment(
+    painter.line_segment(
         [pos2(centre.x, centre.y - 3.0), pos2(centre.x, centre.y + 0.8)],
         Stroke::new(1.6, ink),
     );
-    ui.painter().circle_filled(pos2(centre.x, centre.y + 3.0), 0.95, ink);
+    painter.circle_filled(pos2(centre.x, centre.y + 3.0), 0.95, ink);
+}
+
+/// Draws a small round severity marker in the layout.
+pub fn severity_icon(ui: &mut Ui, s: Severity) {
+    let (rect, _) = ui.allocate_exact_size(vec2(14.0, 16.0), Sense::hover());
+    paint_severity(ui.painter(), pos2(rect.center().x, rect.center().y + 0.5), s);
+}
+
+/// A one-row text layout that ends in an ellipsis instead of wrapping.
+pub fn truncated(text: &str, font: FontId, color: Color32, width: f32) -> egui::text::LayoutJob {
+    let mut job = egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color);
+    job.wrap = egui::text::TextWrapping { max_width: width.max(8.0), max_rows: 1, break_anywhere: true, overflow_character: Some('\u{2026}') };
+    job
+}
+
+/// A two-line list entry (title over a dimmed subtitle) that highlights when selected.
+/// `a11y` is the accessible name; `marker` shows a severity dot on the right.
+pub fn list_item(ui: &mut Ui, selected: bool, title: &str, subtitle: &str, marker: Option<Severity>, a11y: &str) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width().max(160.0), 44.0), Sense::click());
+    resp.widget_info(|| WidgetInfo::selected(WidgetType::RadioButton, true, selected, a11y));
+    if ui.is_rect_visible(rect) {
+        let r = CornerRadius::same(5);
+        if selected {
+            ui.painter().rect_filled(rect, r, theme::ACTIVE_BG);
+            ui.painter().rect_stroke(rect, r, Stroke::new(1.0, theme::ACCENT), StrokeKind::Inside);
+        } else if resp.hovered() {
+            ui.painter().rect_filled(rect, r, theme::HOVER_BG.gamma_multiply(0.7));
+        }
+        if resp.has_focus() {
+            ui.painter().rect_stroke(rect, r, Stroke::new(1.5, Color32::WHITE), StrokeKind::Inside);
+        }
+        let text_w = rect.width() - 22.0 - if marker.is_some() { 20.0 } else { 0.0 };
+        let title_job = truncated(title, FontId::proportional(13.5), if selected { Color32::WHITE } else { theme::TEXT }, text_w);
+        let g = ui.painter().layout_job(title_job);
+        ui.painter().galley(pos2(rect.left() + 11.0, rect.top() + 6.0), g, theme::TEXT);
+        let sub_job = truncated(subtitle, FontId::proportional(11.5), if selected { Color32::from_rgb(196, 208, 230) } else { theme::TEXT_DIM }, text_w);
+        let g = ui.painter().layout_job(sub_job);
+        ui.painter().galley(pos2(rect.left() + 11.0, rect.top() + 25.0), g, theme::TEXT_DIM);
+        if let Some(sev) = marker {
+            paint_severity(ui.painter(), pos2(rect.right() - 14.0, rect.center().y), sev);
+        }
+    }
+    resp
 }
 
 /// A titled card with the page's standard padding.
@@ -128,12 +169,13 @@ pub struct Field<'a> {
     help: Option<&'a str>,
     issues: Option<(&'a Issues, &'a str)>,
     required: bool,
+    label_width: f32,
 }
 
 impl<'a> Field<'a> {
     /// A field called `label`.
     pub fn new(label: &'a str) -> Self {
-        Self { label, help: None, issues: None, required: false }
+        Self { label, help: None, issues: None, required: false, label_width: LABEL_W }
     }
 
     /// A help line under the control.
@@ -154,18 +196,20 @@ impl<'a> Field<'a> {
         self
     }
 
+    /// A wider (or narrower) label column, for long labels.
+    pub fn label_width(mut self, w: f32) -> Self {
+        self.label_width = w;
+        self
+    }
+
     /// Lays the field out; `add` draws the control(s).
     pub fn show<R>(self, ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
         ui.horizontal_top(|ui| {
-            let (rect, _) = ui.allocate_exact_size(vec2(LABEL_W, 26.0), Sense::hover());
+            let (rect, _) = ui.allocate_exact_size(vec2(self.label_width, 26.0), Sense::hover());
             let label = if self.required { format!("{} *", self.label) } else { self.label.to_owned() };
-            ui.painter().text(
-                rect.left_center(),
-                Align2::LEFT_CENTER,
-                label,
-                FontId::proportional(13.0),
-                theme::TEXT,
-            );
+            let job = truncated(&label, FontId::proportional(13.0), theme::TEXT, self.label_width - 8.0);
+            let g = ui.painter().layout_job(job);
+            ui.painter().galley(pos2(rect.left(), rect.center().y - g.size().y / 2.0), g, theme::TEXT);
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing.y = 3.0;
                 let r = add(ui);
@@ -270,9 +314,18 @@ pub fn segmented_row<T: PartialEq + Copy>(ui: &mut Ui, current: T, options: &[(T
 
 /// A rounded, selectable chip (filters, token buttons).
 pub fn chip(ui: &mut Ui, text: &str, selected: bool) -> Response {
+    chip_padded(ui, text, selected, 18.0)
+}
+
+/// A chip with less padding, for dense rows.
+pub fn chip_compact(ui: &mut Ui, text: &str, selected: bool) -> Response {
+    chip_padded(ui, text, selected, 12.0)
+}
+
+fn chip_padded(ui: &mut Ui, text: &str, selected: bool, pad: f32) -> Response {
     let font = FontId::proportional(12.5);
     let galley = ui.painter().layout_no_wrap(text.to_owned(), font.clone(), theme::TEXT);
-    let size = vec2(galley.size().x + 18.0, 24.0);
+    let size = vec2(galley.size().x + pad, 24.0);
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, selected, text));
     if ui.is_rect_visible(rect) {

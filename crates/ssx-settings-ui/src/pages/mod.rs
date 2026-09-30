@@ -5,8 +5,11 @@
 pub mod about;
 pub mod capture;
 pub mod general;
+pub mod history;
 pub mod hotkeys;
+pub mod integration;
 pub mod shared;
+pub mod uploaders;
 pub mod workflows;
 
 use chrono::{DateTime, FixedOffset};

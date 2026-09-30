@@ -158,21 +158,14 @@ fn list_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             |i| names[i].clone(),
             |ui, i| {
                 let w = &cx.settings.workflows[i];
-                let selected = st.selected == i;
-                ui.set_min_width(230.0);
+                ui.set_min_width(240.0);
                 let title = if w.name.trim().is_empty() { "(unnamed)".to_owned() } else { w.name.clone() };
-                let r = ui.add(egui::Button::selectable(selected, RichText::new(&title).color(if selected { Color32::WHITE } else { theme::TEXT })).min_size(egui::vec2(230.0, 22.0)).truncate());
-                let r = r.on_hover_text(&title);
-                r.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, selected, format!("Workflow {}", w.name)));
+                let marker = cx.issues.worst_at(&workflow_path(i));
+                let r = ui_kit::list_item(ui, st.selected == i, &title, &subtitle(w), marker, &format!("Workflow {title}"));
                 if r.clicked() {
                     st.select(i);
                 }
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(subtitle(w)).size(11.5).color(theme::TEXT_DIM));
-                    if let Some(sev) = cx.issues.worst_at(&workflow_path(i)) {
-                        ui_kit::severity_icon(ui, sev);
-                    }
-                });
+                r.on_hover_text(&title);
             },
         );
         if let Some(m) = moved {

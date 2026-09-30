@@ -2,6 +2,8 @@
 //! that go through egui's real event path.
 #![allow(dead_code)] // each test binary uses a different subset
 
+pub mod demo;
+
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -61,6 +63,36 @@ pub fn app_with(page: Page, settings: Settings) -> (SettingsApp, Fixture) {
     let mut a = SettingsApp::new(model, host, page, no_wake());
     a.set_now(chrono::DateTime::parse_from_rfc3339("2025-03-09T14:05:06+01:00").unwrap());
     (a, fx)
+}
+
+/// A lived-in app: uploaders, a history, detected file managers, a diagnostics report.
+pub fn demo_app(page: Page) -> (SettingsApp, Fixture) {
+    let fx = Fixture { dir: tempfile::tempdir().unwrap() };
+    let mut host = demo::demo_host(fx.root());
+    let vault = ssx_settings_ui::secrets::MemoryVault::keyring();
+    for n in ["my-s3-access-key-id", "my-s3-secret-access-key", "work-dropbox-auth-secret"] {
+        ssx_settings_ui::secrets::SecretVault::set(&vault, n, "demo-value").unwrap();
+    }
+    host.vault = Arc::new(vault);
+    std::fs::create_dir_all(&host.paths.config_dir).unwrap();
+    demo::lived_in_settings().save(&fx.settings_file()).unwrap();
+    let model = SettingsModel::load(fx.settings_file()).unwrap();
+    let mut a = SettingsApp::new(model, host, page, no_wake());
+    a.set_now(chrono::DateTime::parse_from_rfc3339("2025-03-09T14:05:06+01:00").unwrap());
+    (a, fx)
+}
+
+/// Runs frames until every background task of the app is done (or `secs` pass).
+pub fn wait_busy(h: &mut Harness<'_, SettingsApp>, secs: u64) {
+    let end = std::time::Instant::now() + std::time::Duration::from_secs(secs);
+    for _ in 0..4 {
+        h.step();
+    }
+    while h.state().busy() && std::time::Instant::now() < end {
+        std::thread::sleep(std::time::Duration::from_millis(15));
+        h.step();
+    }
+    settle(h);
 }
 
 /// A harness running the whole window (`logic` + `show`) at `size` points.

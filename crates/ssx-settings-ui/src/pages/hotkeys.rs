@@ -115,7 +115,7 @@ fn shortcuts_card(ui: &mut Ui, cx: &mut Cx<'_>) {
             let w = &mut cx.settings.workflows[i];
             let name = if w.name.is_empty() { format!("Workflow {}", i + 1) } else { w.name.clone() };
             let path = format!("{}.trigger.hotkey", workflow_path(i));
-            Field::new(&name).issues(&issues, &path).show(ui, |ui| {
+            Field::new(&name).label_width(250.0).issues(&issues, &path).show(ui, |ui| {
                 hotkey_field(ui, ("hk-wf", i), &format!("Hotkey of {name}"), &mut w.trigger.hotkey);
                 if !others.is_empty() {
                     let names: Vec<String> = others.iter().map(Owner::label).collect();
@@ -139,7 +139,7 @@ fn shortcuts_card(ui: &mut Ui, cx: &mut Cx<'_>) {
                 "hotkeys.open_settings" => &mut hk.open_settings,
                 _ => &mut hk.pause_recording,
             };
-            Field::new(&label).issues(&issues, name).show(ui, |ui| {
+            Field::new(&label).label_width(250.0).issues(&issues, name).show(ui, |ui| {
                 hotkey_field(ui, ("hk-global", name), &format!("Hotkey: {label}"), value);
             });
             ui.add_space(4.0);

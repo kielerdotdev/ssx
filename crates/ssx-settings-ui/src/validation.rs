@@ -34,6 +34,22 @@ impl Issues {
         Self(settings.validate())
     }
 
+    /// Drops the validator's hint that an uploader "has no [uploaders.x] section" for names
+    /// `is_known` recognises (built-in destinations and imported `.sxcu` files need no table).
+    pub fn without_known_uploader_hints(mut self, is_known: impl Fn(&str) -> bool) -> Self {
+        self.0.retain(|i| {
+            let name = i
+                .message
+                .strip_prefix("uploader \"")
+                .filter(|_| i.severity == Severity::Warning)
+                .and_then(|rest| rest.split_once('"'))
+                .filter(|(_, tail)| tail.starts_with(" has no [uploaders."))
+                .map(|(n, _)| n);
+            !name.is_some_and(&is_known)
+        });
+        self
+    }
+
     /// Wraps already computed issues.
     pub fn from_vec(v: Vec<ValidationIssue>) -> Self {
         Self(v)
@@ -190,6 +206,24 @@ mod tests {
         let i = Issues::of(&s);
         let all = i.at("general");
         assert!(all.iter().all(|x| x.severity == Severity::Warning));
+    }
+
+    #[test]
+    fn hints_about_missing_tables_are_dropped_for_known_uploaders_only() {
+        let mut s = Settings::default();
+        s.destinations.image = Some("is.gd".into());
+        s.destinations.file = Some("mystery".into());
+        let all = Issues::of(&s);
+        assert_eq!(all.warnings().count(), 2, "{:?}", all.all());
+        let filtered = all.without_known_uploader_hints(|n| n == "is.gd");
+        let left: Vec<_> = filtered.warnings().collect();
+        assert_eq!(left.len(), 1);
+        assert!(left[0].message.contains("mystery"));
+        // errors are never dropped, whatever the name
+        let mut s = Settings::default();
+        s.destinations.image = Some("bad name".into());
+        let f = Issues::of(&s).without_known_uploader_hints(|_| true);
+        assert_eq!(f.errors().count(), 1);
     }
 
     #[test]
