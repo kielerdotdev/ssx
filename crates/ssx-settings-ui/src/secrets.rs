@@ -119,17 +119,25 @@ impl SystemVault {
     }
 }
 
-struct Shared(Arc<LayeredSecretStore>);
+/// A handle to the store that opens it (waiting for the probe) only when a secret is read or
+/// written, so merely building the uploaders never waits for D-Bus.
+struct LazyHandle(Arc<OnceLock<Arc<LayeredSecretStore>>>);
 
-impl SecretStore for Shared {
+impl LazyHandle {
+    fn store(&self) -> &Arc<LayeredSecretStore> {
+        self.0.get_or_init(|| Arc::new(LayeredSecretStore::open()))
+    }
+}
+
+impl SecretStore for LazyHandle {
     fn get(&self, key: &str) -> Result<Option<String>, ssx_upload::SecretError> {
-        self.0.get(key)
+        self.store().get(key)
     }
     fn set(&self, key: &str, value: &str) -> Result<(), ssx_upload::SecretError> {
-        self.0.set(key, value)
+        self.store().set(key, value)
     }
     fn delete(&self, key: &str) -> Result<(), ssx_upload::SecretError> {
-        self.0.delete(key)
+        self.store().delete(key)
     }
 }
 
@@ -161,7 +169,7 @@ impl SecretVault for SystemVault {
         }
     }
     fn store(&self) -> Arc<dyn SecretStore> {
-        Arc::new(Shared(self.store_blocking()))
+        Arc::new(LazyHandle(self.cell.clone()))
     }
 }
 

@@ -152,6 +152,53 @@ pub const fn type_word(ty: DestinationType) -> &'static str {
     }
 }
 
+// ---- caching ------------------------------------------------------------------------------
+
+/// What the registry was built from: the settings tables and the `.sxcu` files.
+#[derive(Debug, Clone, PartialEq)]
+struct CacheKey {
+    tables: std::collections::BTreeMap<String, toml::Table>,
+    files: Vec<(String, u64, Option<std::time::SystemTime>)>,
+}
+
+fn file_signature(config_dir: &Path) -> Vec<(String, u64, Option<std::time::SystemTime>)> {
+    let Ok(rd) = std::fs::read_dir(sxcu_dir(config_dir)) else { return Vec::new() };
+    let mut v: Vec<_> = rd
+        .filter_map(Result::ok)
+        .filter(|e| e.path().extension().is_some_and(|x| x.eq_ignore_ascii_case("sxcu")))
+        .filter_map(|e| {
+            let m = e.metadata().ok()?;
+            Some((e.file_name().to_string_lossy().into_owned(), m.len(), m.modified().ok()))
+        })
+        .collect();
+    v.sort();
+    v
+}
+
+/// Rebuilds the [`Registry`] only when something it depends on changed.
+#[derive(Debug, Default)]
+pub struct RegistryCache {
+    key: Option<CacheKey>,
+    value: Arc<Registry>,
+}
+
+impl RegistryCache {
+    /// The registry for `settings` and the files in `config_dir`.
+    pub fn get(&mut self, settings: &Settings, config_dir: &Path, secrets: &Arc<dyn SecretStore>) -> Arc<Registry> {
+        let key = CacheKey { tables: settings.uploaders.clone(), files: file_signature(config_dir) };
+        if self.key.as_ref() != Some(&key) {
+            self.value = Arc::new(Registry::build(settings, config_dir, secrets.clone()));
+            self.key = Some(key);
+        }
+        self.value.clone()
+    }
+
+    /// Forces a rebuild on the next [`get`](Self::get).
+    pub fn invalidate(&mut self) {
+        self.key = None;
+    }
+}
+
 // ---- importing .sxcu ----------------------------------------------------------------------
 
 /// What checking a `.sxcu` file found, before anything is written.
@@ -611,6 +658,32 @@ client_id='abc'"#.parse().unwrap());
         assert!(matches!(import_collision(&r, dir.path(), "local"), Collision::Shadowed(w) if w.contains("built-in")));
         assert!(matches!(import_collision(&r, dir.path(), "mine"), Collision::Shadowed(w) if w.contains("precedence")));
         assert_eq!(import_collision(&r, dir.path(), "fresh"), Collision::None);
+    }
+
+    #[test]
+    fn the_cache_rebuilds_only_when_tables_or_files_change() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut cache = RegistryCache::default();
+        let store = secrets();
+        let mut s = Settings::default();
+        let a = cache.get(&s, dir.path(), &store);
+        let b = cache.get(&s, dir.path(), &store);
+        assert!(Arc::ptr_eq(&a, &b), "nothing changed");
+        s.uploaders.insert("mine".into(), "type='local'".parse().unwrap());
+        let c = cache.get(&s, dir.path(), &store);
+        assert!(!Arc::ptr_eq(&b, &c));
+        assert!(c.works("mine"));
+        std::fs::create_dir_all(dir.path().join("uploaders")).unwrap();
+        std::fs::write(dir.path().join("uploaders/x.sxcu"), SXCU).unwrap();
+        let d = cache.get(&s, dir.path(), &store);
+        assert!(d.works("x"), "a new file is noticed");
+        assert!(Arc::ptr_eq(&d, &cache.get(&s, dir.path(), &store)));
+        cache.invalidate();
+        assert!(!Arc::ptr_eq(&d, &cache.get(&s, dir.path(), &store)));
+        // an unrelated setting does not rebuild
+        let e = cache.get(&s, dir.path(), &store);
+        s.general.image_quality = 5;
+        assert!(Arc::ptr_eq(&e, &cache.get(&s, dir.path(), &store)));
     }
 
     #[test]
