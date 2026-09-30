@@ -23,6 +23,16 @@ use crate::{
     state::{AppState, Continuation, Dialog},
 };
 
+/// A right-aligned row that takes only one line of height (a bare `with_layout` would claim
+/// all the vertical space the dialog has left).
+fn right_aligned(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
+    ui.allocate_ui_with_layout(
+        vec2(ui.available_width(), 30.0),
+        Layout::right_to_left(Align::Center),
+        add,
+    );
+}
+
 fn title(ui: &mut Ui, text: &str) {
     ui.label(RichText::new(text).heading().strong());
     ui.add_space(6.0);
@@ -31,11 +41,11 @@ fn title(ui: &mut Ui, text: &str) {
 fn buttons(ui: &mut Ui, ok: &str, enabled: bool) -> Option<bool> {
     let mut out = None;
     ui.add_space(8.0);
-    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-        if ui.add_enabled(enabled, egui::Button::new(RichText::new(ok).strong())).clicked() {
+    right_aligned(ui, |ui| {
+        if widgets::accent_button_ex(ui, ok, None, enabled).clicked() && enabled {
             out = Some(true);
         }
-        if ui.button("Cancel").clicked() {
+        if ui.add(egui::Button::new("Cancel").min_size(vec2(70.0, 26.0))).clicked() {
             out = Some(false);
         }
     });
@@ -89,7 +99,9 @@ fn modal(
     width: f32,
     content: impl FnOnce(&mut Ui) -> Option<bool>,
 ) -> bool {
-    let m = Modal::new(Id::new(("ssx-dialog", id))).show(ctx, |ui| {
+    let frame = egui::Frame::popup(&ctx.global_style()).inner_margin(egui::Margin::same(18));
+    let m = Modal::new(Id::new(("ssx-dialog", id))).frame(frame).show(ctx, |ui| {
+        widgets::input_style(ui);
         ui.set_width(width);
         content(ui)
     });
@@ -392,12 +404,15 @@ fn shortcuts(ctx: &Context) -> bool {
     modal(ctx, "shortcuts", 620.0, |ui| {
         title(ui, "Keyboard shortcuts");
         egui::ScrollArea::vertical().max_height(460.0).show(ui, |ui| {
-            for (cat, list) in grouped() {
-                ui.add_space(4.0);
-                ui.label(RichText::new(cat).strong().color(theme::ACCENT));
-                egui::Grid::new(("shortcut-grid", cat)).num_columns(2).spacing([24.0, 3.0]).show(
-                    ui,
-                    |ui| {
+            egui::Grid::new("shortcut-grid")
+                .num_columns(2)
+                .spacing([28.0, 3.0])
+                .min_col_width(280.0)
+                .show(ui, |ui| {
+                    for (cat, list) in grouped() {
+                        ui.label(RichText::new(cat).strong().color(theme::ACCENT));
+                        ui.label("");
+                        ui.end_row();
                         for s in list {
                             ui.label(s.label);
                             ui.label(
@@ -405,22 +420,20 @@ fn shortcuts(ctx: &Context) -> bool {
                             );
                             ui.end_row();
                         }
-                    },
-                );
-            }
-            ui.add_space(6.0);
-            ui.label(RichText::new("Mouse").strong().color(theme::ACCENT));
-            egui::Grid::new("gesture-grid").num_columns(2).spacing([24.0, 3.0]).show(ui, |ui| {
-                for (g, e) in GESTURES {
-                    ui.label(*e);
-                    ui.label(RichText::new(*g).monospace().color(theme::TEXT_DIM));
+                    }
+                    ui.label(RichText::new("Mouse").strong().color(theme::ACCENT));
+                    ui.label("");
                     ui.end_row();
-                }
-            });
+                    for (g, e) in GESTURES {
+                        ui.label(*e);
+                        ui.label(RichText::new(*g).monospace().color(theme::TEXT_DIM));
+                        ui.end_row();
+                    }
+                });
         });
         ui.add_space(8.0);
         let mut out = None;
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        right_aligned(ui, |ui| {
             if accent_button(ui, "Close", None).clicked() {
                 out = Some(false);
             }
@@ -456,7 +469,7 @@ fn settings(ctx: &Context, state: &mut AppState) -> bool {
         });
         caption(ui, "Window size, tool styles and recent colours are remembered between sessions.");
         let mut out = None;
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        right_aligned(ui, |ui| {
             if accent_button(ui, "Close", None).clicked() {
                 out = Some(false);
             }
@@ -476,7 +489,7 @@ fn unsaved(ctx: &Context, state: &mut AppState, doc: &EditorDoc, cont: &Continua
         title(ui, "Unsaved changes");
         ui.label(format!("Save the changes to {name} {what}?"));
         ui.add_space(10.0);
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        right_aligned(ui, |ui| {
             if accent_button(ui, "Save", None).clicked() {
                 answer = Some(UnsavedAnswer::Save);
             }
@@ -508,7 +521,7 @@ fn error(ctx: &Context, t: &str, message: &str) -> bool {
         ui.label(message);
         ui.add_space(8.0);
         let mut out = None;
-        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+        right_aligned(ui, |ui| {
             if accent_button(ui, "OK", None).clicked() {
                 out = Some(false);
             }
@@ -531,15 +544,16 @@ fn effect(
         .id(Id::new("ssx-effect-window"))
         .collapsible(false)
         .resizable(false)
-        .anchor(egui::Align2::RIGHT_TOP, vec2(-16.0, 96.0))
+        .anchor(egui::Align2::RIGHT_TOP, vec2(-16.0, 140.0))
         .show(ctx, |ui| {
+            widgets::input_style(ui);
             ui.set_width(280.0);
             caption(ui, "Live preview on the picture");
             for (i, spec) in kind.params().iter().enumerate() {
                 if let Some(v) = f.values.get_mut(i) {
                     ui.horizontal(|ui| {
                         ui.label(spec.label);
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        right_aligned(ui, |ui| {
                             let mut slider = egui::Slider::new(v, spec.min..=spec.max)
                                 .suffix(spec.suffix)
                                 .trailing_fill(true);
@@ -583,7 +597,7 @@ fn effect(
                 caption(ui, "Preview is up to date.");
             }
             ui.add_space(4.0);
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            right_aligned(ui, |ui| {
                 if accent_button(ui, "Apply", Some(crate::icons::Icon::Check)).clicked() {
                     state.push(Action::ApplyEffect(f.effect()));
                     close = true;

@@ -16,7 +16,12 @@ use ssx_types::Frame;
 fn rect_obj(x: f32, y: f32, w: f32, h: f32, fill: Color, radius: f32) -> Object {
     Object::new(
         ObjectId(0),
-        Style { stroke_width: 0.0, fill: Fill::solid(fill), corner_radius: radius, ..Style::default() },
+        Style {
+            stroke_width: 0.0,
+            fill: Fill::solid(fill),
+            corner_radius: radius,
+            ..Style::default()
+        },
         ObjectKind::Rectangle(BoxShape { rect: RectF::new(x, y, w, h), rotation: 0.0 }),
     )
 }
@@ -57,16 +62,30 @@ pub fn dashboard() -> Frame {
     add(text_obj(24.0, 15.0, 24.0, white, true, "Acme Analytics"));
     add(text_obj(1080.0, 19.0, 15.0, Color::rgb(190, 200, 225), false, "marius@example.com"));
     add(rect_obj(0.0, 56.0, 210.0, 704.0, Color::rgb(232, 236, 244), 0.0));
-    for (i, label) in ["Overview", "Traffic", "Keywords", "Backlinks", "Reports", "Settings"].iter().enumerate() {
+    for (i, label) in
+        ["Overview", "Traffic", "Keywords", "Backlinks", "Reports", "Settings"].iter().enumerate()
+    {
         let y = 84.0 + i as f32 * 44.0;
         if i == 0 {
             add(rect_obj(12.0, y - 8.0, 186.0, 36.0, Color::rgb(210, 222, 250), 8.0));
         }
-        add(text_obj(32.0, y, 16.0, if i == 0 { Color::rgb(30, 70, 170) } else { ink }, i == 0, label));
+        add(text_obj(
+            32.0,
+            y,
+            16.0,
+            if i == 0 { Color::rgb(30, 70, 170) } else { ink },
+            i == 0,
+            label,
+        ));
     }
     // KPI cards.
-    for (i, (title, value, delta)) in
-        [("Visitors", "48,210", "+12.4%"), ("Revenue", "$9,840", "+3.1%"), ("Conversion", "4.7%", "-0.6%")].iter().enumerate()
+    for (i, (title, value, delta)) in [
+        ("Visitors", "48,210", "+12.4%"),
+        ("Revenue", "$9,840", "+3.1%"),
+        ("Conversion", "4.7%", "-0.6%"),
+    ]
+    .iter()
+    .enumerate()
     {
         let x = 240.0 + i as f32 * 340.0;
         add(rect_obj(x, 84.0, 320.0, 120.0, white, 14.0));
@@ -84,10 +103,18 @@ pub fn dashboard() -> Frame {
     // Bar chart card.
     add(rect_obj(240.0, 226.0, 660.0, 300.0, white, 14.0));
     add(text_obj(264.0, 242.0, 18.0, ink, true, "Traffic, last 12 weeks"));
-    let heights = [90.0, 120.0, 105.0, 150.0, 140.0, 170.0, 160.0, 190.0, 175.0, 210.0, 200.0, 230.0];
+    let heights =
+        [90.0, 120.0, 105.0, 150.0, 140.0, 170.0, 160.0, 190.0, 175.0, 210.0, 200.0, 230.0];
     for (i, h) in heights.iter().enumerate() {
         let x = 268.0 + i as f32 * 51.0;
-        add(rect_obj(x, 500.0 - h, 34.0, *h, if i == 11 { Color::rgb(60, 110, 240) } else { Color::rgb(160, 186, 245) }, 5.0));
+        add(rect_obj(
+            x,
+            500.0 - h,
+            34.0,
+            *h,
+            if i == 11 { Color::rgb(60, 110, 240) } else { Color::rgb(160, 186, 245) },
+            5.0,
+        ));
     }
     // Form card (with an email and a "password" to hide).
     add(rect_obj(930.0, 226.0, 320.0, 300.0, white, 14.0));
@@ -103,10 +130,14 @@ pub fn dashboard() -> Frame {
     // Table.
     add(rect_obj(240.0, 548.0, 1010.0, 190.0, white, 14.0));
     add(text_obj(264.0, 562.0, 18.0, ink, true, "Top pages"));
-    for (i, (page, visits, share)) in
-        [("/pricing", "12,304", "25.5%"), ("/blog/seo-checklist", "9,871", "20.5%"), ("/features", "7,420", "15.4%"), ("/login", "5,113", "10.6%")]
-            .iter()
-            .enumerate()
+    for (i, (page, visits, share)) in [
+        ("/pricing", "12,304", "25.5%"),
+        ("/blog/seo-checklist", "9,871", "20.5%"),
+        ("/features", "7,420", "15.4%"),
+        ("/login", "5,113", "10.6%"),
+    ]
+    .iter()
+    .enumerate()
     {
         let y = 598.0 + i as f32 * 32.0;
         if i % 2 == 0 {
@@ -157,18 +188,14 @@ pub fn click_dialog_button(h: &mut Harness<'_, EditorApp>, label: &str) {
 
 /// A harness running the whole window (`logic` + `show`) at `size` points.
 pub fn window(app: EditorApp, size: impl Into<Vec2>) -> Harness<'static, EditorApp> {
-    Harness::builder()
-        .with_size(size)
-        .with_max_steps(40)
-        .wgpu()
-        .build_ui_state(
-            |ui, app: &mut EditorApp| {
-                let ctx = ui.ctx().clone();
-                app.logic(&ctx);
-                app.show(ui);
-            },
-            app,
-        )
+    Harness::builder().with_size(size).with_max_steps(40).wgpu().build_ui_state(
+        |ui, app: &mut EditorApp| {
+            let ctx = ui.ctx().clone();
+            app.logic(&ctx);
+            app.show(ui);
+        },
+        app,
+    )
 }
 
 /// Screen position (points) of an image-space point at the current view.
@@ -188,7 +215,12 @@ pub fn drag_with(h: &mut Harness<'_, EditorApp>, from: Pos2, to: Pos2, m: Modifi
     h.hover_at(from);
     h.step();
     h.event_modifiers(
-        Event::PointerButton { pos: from, button: PointerButton::Primary, pressed: true, modifiers: m },
+        Event::PointerButton {
+            pos: from,
+            button: PointerButton::Primary,
+            pressed: true,
+            modifiers: m,
+        },
         m,
     );
     h.step();
@@ -198,7 +230,12 @@ pub fn drag_with(h: &mut Harness<'_, EditorApp>, from: Pos2, to: Pos2, m: Modifi
         h.step();
     }
     h.event_modifiers(
-        Event::PointerButton { pos: to, button: PointerButton::Primary, pressed: false, modifiers: m },
+        Event::PointerButton {
+            pos: to,
+            button: PointerButton::Primary,
+            pressed: false,
+            modifiers: m,
+        },
         m,
     );
     h.step();
@@ -216,9 +253,19 @@ pub fn click_image(h: &mut Harness<'_, EditorApp>, p: (f32, f32)) {
     let pos = screen_of(h, p.0, p.1);
     h.hover_at(pos);
     h.step();
-    h.event(Event::PointerButton { pos, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
+    h.event(Event::PointerButton {
+        pos,
+        button: PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
     h.step();
-    h.event(Event::PointerButton { pos, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
+    h.event(Event::PointerButton {
+        pos,
+        button: PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
     h.step();
     settle(h);
 }

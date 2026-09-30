@@ -72,24 +72,19 @@ pub fn show(ui: &mut Ui, state: &mut AppState, doc: &EditorDoc) {
     let selection = doc.session.selection().to_vec();
     let has_sel = !selection.is_empty();
     ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 1.0;
-        let size = vec2(26.0, 24.0);
-        let mut btn = |ui: &mut Ui, label: &str, enabled: bool, a: Action, glyph: &str| {
-            let r = ui.add_enabled(
-                enabled,
-                egui::Button::new(RichText::new(glyph).size(13.0)).min_size(size),
-            );
-            if r.on_hover_text(label).clicked() {
-                state.push(a);
+        ui.spacing_mut().item_spacing.x = 0.0;
+        for (icon, label, action) in [
+            (Icon::ToFront, "Bring to front", Action::BringToFront),
+            (Icon::ChevronUp, "Bring forward", Action::Raise),
+            (Icon::ChevronDown, "Send backward", Action::Lower),
+            (Icon::ToBack, "Send to back", Action::SendToBack),
+            (Icon::Copy, "Duplicate", Action::Duplicate),
+            (Icon::Trash, "Delete", Action::DeleteSelection),
+        ] {
+            let chord = crate::shortcuts::primary_for(&action).map(|c| c.display());
+            if icon_button(ui, icon, label, chord.as_deref(), false, has_sel).clicked() {
+                state.push(action);
             }
-        };
-        btn(ui, "Bring to front", has_sel, Action::BringToFront, "⤒");
-        btn(ui, "Bring forward", has_sel, Action::Raise, "↑");
-        btn(ui, "Send backward", has_sel, Action::Lower, "↓");
-        btn(ui, "Send to back", has_sel, Action::SendToBack, "⤓");
-        btn(ui, "Duplicate", has_sel, Action::Duplicate, "⧉");
-        if icon_button(ui, Icon::Trash, "Delete", Some("Del"), false, has_sel).clicked() {
-            state.push(Action::DeleteSelection);
         }
     });
     ui.separator();

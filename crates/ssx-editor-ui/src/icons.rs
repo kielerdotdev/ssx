@@ -139,11 +139,13 @@ pub enum Icon {
     Done,
     Menu,
     Plus,
+    ToFront,
+    ToBack,
 }
 
 impl Icon {
     /// Every icon, for tests and the icon sheet.
-    pub const ALL: [Icon; 62] = [
+    pub const ALL: [Icon; 64] = [
         Icon::RegionRect,
         Icon::RegionEllipse,
         Icon::RegionFree,
@@ -206,6 +208,8 @@ impl Icon {
         Icon::Done,
         Icon::Menu,
         Icon::Plus,
+        Icon::ToFront,
+        Icon::ToBack,
     ];
 }
 
@@ -780,6 +784,14 @@ impl Icon {
             I::Plus => {
                 vec![stroke(&[[12.0, 5.0], [12.0, 19.0]]), stroke(&[[5.0, 12.0], [19.0, 12.0]])]
             }
+            I::ToFront => vec![
+                stroke(&[[6.5, 11.0], [12.0, 5.5], [17.5, 11.0]]),
+                stroke(&[[6.5, 18.0], [12.0, 12.5], [17.5, 18.0]]),
+            ],
+            I::ToBack => vec![
+                stroke(&[[6.5, 13.0], [12.0, 18.5], [17.5, 13.0]]),
+                stroke(&[[6.5, 6.0], [12.0, 11.5], [17.5, 6.0]]),
+            ],
         }
     }
 }

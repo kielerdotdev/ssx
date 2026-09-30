@@ -62,7 +62,13 @@ fn toolbar_buttons_select_tools() {
 #[test]
 fn letter_shortcuts_pick_tools() {
     let mut h = ready();
-    for (k, tool) in [(Key::R, Tool::Rectangle), (Key::E, Tool::Ellipse), (Key::L, Tool::Line), (Key::T, Tool::Text), (Key::V, Tool::Select)] {
+    for (k, tool) in [
+        (Key::R, Tool::Rectangle),
+        (Key::E, Tool::Ellipse),
+        (Key::L, Tool::Line),
+        (Key::T, Tool::Text),
+        (Key::V, Tool::Select),
+    ] {
         key(&mut h, k);
         assert_eq!(h.state().doc.session.tool(), tool, "{k:?}");
     }
@@ -109,7 +115,11 @@ fn shift_constrains_to_a_square_and_alt_draws_from_the_centre() {
     drag_with(&mut h, a, b, Modifiers::ALT);
     let ObjectKind::Ellipse(el) = &h.state().doc.doc().objects()[1].kind else { panic!() };
     let c = el.rect.center();
-    assert!((c.x - 700.0).abs() < 3.0 && (c.y - 300.0).abs() < 3.0, "alt grows from the centre: {:?}", el.rect);
+    assert!(
+        (c.x - 700.0).abs() < 3.0 && (c.y - 300.0).abs() < 3.0,
+        "alt grows from the centre: {:?}",
+        el.rect
+    );
 }
 
 #[test]
@@ -149,7 +159,10 @@ fn text_tool_types_edits_and_commits() {
     let mut h = ready();
     key(&mut h, Key::T);
     click_image(&mut h, (300.0, 100.0));
-    assert!(h.state().doc.session.text_edit_state().is_some(), "clicking with the text tool starts editing");
+    assert!(
+        h.state().doc.session.text_edit_state().is_some(),
+        "clicking with the text tool starts editing"
+    );
     // Letters are text now, not tool shortcuts.
     type_text(&mut h, "Rect ");
     type_text(&mut h, "here");
@@ -181,7 +194,11 @@ fn ime_commit_and_preedit_go_through_the_session() {
     click_image(&mut h, (300.0, 100.0));
     h.event(Event::Ime(egui::ImeEvent::Preedit { text: "ni".into(), active_range_chars: None }));
     h.step();
-    assert_eq!(h.state().doc.session.text_edit_state().unwrap().text, "", "pre-edit is not in the document");
+    assert_eq!(
+        h.state().doc.session.text_edit_state().unwrap().text,
+        "",
+        "pre-edit is not in the document"
+    );
     let ov = h.state_mut().doc.session.overlay();
     assert_eq!(ov.caret.as_ref().and_then(|c| c.preedit.clone()).as_deref(), Some("ni"));
     h.event(Event::Ime(egui::ImeEvent::Commit("你好".into())));
@@ -203,7 +220,11 @@ fn escape_leaves_text_editing_and_then_selects_nothing() {
     key(&mut h, Key::Escape);
     assert!(h.state().doc.session.selection().is_empty());
     key(&mut h, Key::Escape);
-    assert_eq!(h.state().state.tool, ToolId::Select, "Esc with nothing to cancel returns to Select");
+    assert_eq!(
+        h.state().state.tool,
+        ToolId::Select,
+        "Esc with nothing to cancel returns to Select"
+    );
 }
 
 #[test]
@@ -276,26 +297,47 @@ fn zoom_shortcuts_wheel_and_pan() {
     h.step();
     let z0 = h.state().canvas.viewport.zoom();
     let before = h.state().canvas.to_image(h.state().canvas.last_rect, 1.0, p, h.state().doc.doc());
-    h.event(Event::MouseWheel { unit: MouseWheelUnit::Line, delta: vec2(0.0, 2.0), phase: TouchPhase::Move, modifiers: Modifiers::NONE });
+    h.event(Event::MouseWheel {
+        unit: MouseWheelUnit::Line,
+        delta: vec2(0.0, 2.0),
+        phase: TouchPhase::Move,
+        modifiers: Modifiers::NONE,
+    });
     h.step();
     settle(&mut h);
     assert!(h.state().canvas.viewport.zoom() > z0 * 1.2);
     let after = h.state().canvas.to_image(h.state().canvas.last_rect, 1.0, p, h.state().doc.doc());
-    assert!((before.x - after.x).abs() < 1.5 && (before.y - after.y).abs() < 1.5, "zoom keeps the point under the cursor");
+    assert!(
+        (before.x - after.x).abs() < 1.5 && (before.y - after.y).abs() < 1.5,
+        "zoom keeps the point under the cursor"
+    );
 
     // Middle-drag pans.
     let off0 = h.state().canvas.viewport.offset();
     let a = screen_of(&h, 600.0, 400.0);
     h.hover_at(a);
     h.step();
-    h.event(Event::PointerButton { pos: a, button: PointerButton::Middle, pressed: true, modifiers: Modifiers::NONE });
+    h.event(Event::PointerButton {
+        pos: a,
+        button: PointerButton::Middle,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
     h.step();
     h.hover_at(a + vec2(-50.0, -30.0));
     h.step();
-    h.event(Event::PointerButton { pos: a + vec2(-50.0, -30.0), button: PointerButton::Middle, pressed: false, modifiers: Modifiers::NONE });
+    h.event(Event::PointerButton {
+        pos: a + vec2(-50.0, -30.0),
+        button: PointerButton::Middle,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
     h.step();
     let off1 = h.state().canvas.viewport.offset();
-    assert!((off1.x - off0.x + 50.0).abs() < 1.0 && (off1.y - off0.y + 30.0).abs() < 1.0, "{off0:?} -> {off1:?}");
+    assert!(
+        (off1.x - off0.x + 50.0).abs() < 1.0 && (off1.y - off0.y + 30.0).abs() < 1.0,
+        "{off0:?} -> {off1:?}"
+    );
     assert!(h.state().doc.doc().objects().is_empty(), "panning must not draw");
 
     // Space + left drag pans too, without drawing.
@@ -319,7 +361,10 @@ fn zoom_level_is_reported_in_the_status_bar() {
     assert_eq!(h.state().state.zoom_percent.round() as i32, 100);
     h.get_by_label("Zoom level").click();
     settle(&mut h);
-    assert!(h.query_all_by_label_contains("Fit to window").count() >= 2, "the zoom popup lists Fit");
+    assert!(
+        h.query_all_by_label_contains("Fit to window").count() >= 2,
+        "the zoom popup lists Fit"
+    );
 }
 
 #[test]
@@ -334,7 +379,11 @@ fn drawing_at_high_zoom_lands_on_the_right_pixels() {
     let (x0, y0) = (vis.min.x + 30.0, vis.min.y + 30.0);
     drag_image(&mut h, (x0, y0), (x0 + 40.0, y0 + 25.0));
     let ObjectKind::Rectangle(b) = &h.state().doc.doc().objects()[0].kind else { panic!() };
-    assert!((b.rect.x - x0).abs() < 1.0 && (b.rect.y - y0).abs() < 1.0, "{:?} vs {x0},{y0}", b.rect);
+    assert!(
+        (b.rect.x - x0).abs() < 1.0 && (b.rect.y - y0).abs() < 1.0,
+        "{:?} vs {x0},{y0}",
+        b.rect
+    );
     assert!((b.rect.w - 40.0).abs() < 1.0 && (b.rect.h - 25.0).abs() < 1.0);
 }
 
@@ -524,7 +573,11 @@ fn save_in_workflow_mode_writes_the_output_and_clears_the_dirty_marker() {
     ctrl(&mut h, Key::S);
     assert!(out.exists());
     let saved = ssx_types::Frame::decode(&std::fs::read(&out).unwrap()).unwrap();
-    assert_eq!(saved, ssx_editor_ui::export::flatten(h.state().doc.doc()), "the file equals the export render");
+    assert_eq!(
+        saved,
+        ssx_editor_ui::export::flatten(h.state().doc.doc()),
+        "the file equals the export render"
+    );
     assert!(!h.state().doc.is_dirty());
     assert!(!h.state().doc.title().contains('*'));
     // Closing afterwards reports the save.
@@ -584,9 +637,12 @@ fn saving_the_project_keeps_annotations_editable() {
 
 #[test]
 fn done_variants_produce_the_documented_outcomes() {
-    for (finish, action, needs_file) in
-        [(Finish::Save, OutcomeAction::Save, true), (Finish::Copy, OutcomeAction::Copy, true), (Finish::Upload, OutcomeAction::Upload, true), (Finish::Cancel, OutcomeAction::Cancel, false)]
-    {
+    for (finish, action, needs_file) in [
+        (Finish::Save, OutcomeAction::Save, true),
+        (Finish::Copy, OutcomeAction::Copy, true),
+        (Finish::Upload, OutcomeAction::Upload, true),
+        (Finish::Cancel, OutcomeAction::Cancel, false),
+    ] {
         let dir = tempfile::tempdir().unwrap();
         let out = dir.path().join("o.png");
         let mut app = app_for(flat(200, 100));
@@ -599,7 +655,9 @@ fn done_variants_produce_the_documented_outcomes() {
             // Nothing changed, so cancel needs no confirmation... but a fresh capture counts as
             // unsaved content, so the prompt may appear first.
             if matches!(h.state().state.dialog, Some(Dialog::Unsaved(_))) {
-                h.state_mut().state.push(Action::Unsaved(ssx_editor_ui::action::UnsavedAnswer::Discard));
+                h.state_mut()
+                    .state
+                    .push(Action::Unsaved(ssx_editor_ui::action::UnsavedAnswer::Discard));
                 settle(&mut h);
             }
         }
@@ -625,7 +683,10 @@ fn closing_with_unsaved_changes_asks_and_discard_cancels() {
     assert!(matches!(h.state().state.dialog, Some(Dialog::Unsaved(_))));
     assert!(h.state().outcome().is_none(), "nothing happens until the user answers");
     click_dialog_button(&mut h, "Cancel");
-    assert!(h.state().state.dialog.is_none() && h.state().outcome().is_none(), "Cancel stays in the editor");
+    assert!(
+        h.state().state.dialog.is_none() && h.state().outcome().is_none(),
+        "Cancel stays in the editor"
+    );
 
     h.state_mut().state.push(Action::RequestClose);
     settle(&mut h);
@@ -663,7 +724,10 @@ fn opening_a_file_replaces_the_document_and_asks_when_dirty() {
     drag_image(&mut h, (300.0, 120.0), (500.0, 220.0));
     h.state_mut().state.push(Action::OpenPath(other.clone()));
     settle(&mut h);
-    assert!(matches!(h.state().state.dialog, Some(Dialog::Unsaved(_))), "dirty documents are protected");
+    assert!(
+        matches!(h.state().state.dialog, Some(Dialog::Unsaved(_))),
+        "dirty documents are protected"
+    );
     assert_eq!(h.state().doc.doc().image_size(), (1280, 760));
     click_dialog_button(&mut h, "Discard");
     assert_eq!(h.state().doc.doc().image_size(), (90, 60));
@@ -680,7 +744,9 @@ fn dropping_a_file_opens_it_and_shift_drop_inserts_it() {
     let mut h = window(app_for(flat(400, 300)), [1100.0, 700.0]);
     settle(&mut h);
     h.state_mut().doc.mark_saved();
-    h.input_mut().dropped_files.push(egui::DroppedFile { path: Some(other.clone()), ..Default::default() });
+    h.input_mut()
+        .dropped_files
+        .push(egui::DroppedFile { path: Some(other.clone()), ..Default::default() });
     h.step();
     settle(&mut h);
     assert_eq!(h.state().doc.doc().image_size(), (64, 48));

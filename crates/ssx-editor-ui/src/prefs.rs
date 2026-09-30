@@ -13,7 +13,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use ssx_editor::{Color, StyleMemory};
+use ssx_editor::{Color, Preset, StyleMemory};
 
 use crate::tools::ToolId;
 
@@ -95,6 +95,11 @@ pub struct Prefs {
     pub blur_variant: ToolId,
     /// Variant chosen in the highlighter toolbar slot.
     pub highlight_variant: ToolId,
+    /// Remembered style of the plain text tool (the engine has one Text preset; the toolbar's
+    /// "text with outline and background" button is a second identity that keeps its own).
+    pub text_plain: Option<Preset>,
+    /// Remembered style of the boxed text tool.
+    pub text_boxed: Option<Preset>,
 }
 
 impl Default for Prefs {
@@ -111,6 +116,8 @@ impl Default for Prefs {
             last_dir: None,
             blur_variant: ToolId::Blur,
             highlight_variant: ToolId::Highlight,
+            text_plain: None,
+            text_boxed: None,
         }
     }
 }

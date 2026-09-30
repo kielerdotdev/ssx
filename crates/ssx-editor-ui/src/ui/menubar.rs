@@ -136,7 +136,30 @@ fn view_menu(ui: &mut Ui, state: &mut AppState) {
 }
 
 /// Undo/redo button with the history popup on its chevron.
-fn history_button(ui: &mut Ui, state: &mut AppState, doc: &EditorDoc, undo: bool) {
+fn history_chevron(ui: &mut Ui, enabled: bool) -> egui::Response {
+    let chev = ui
+        .add_enabled(enabled, egui::Button::new("").min_size(egui::vec2(14.0, 28.0)).frame(false));
+    let colors = crate::icons::IconColors::with_ink(if enabled {
+        super::theme::TEXT_DIM
+    } else {
+        super::theme::TEXT_DIM.gamma_multiply(0.4)
+    });
+    crate::icons::paint(
+        ui.painter(),
+        Icon::ChevronDown,
+        egui::Rect::from_center_size(chev.rect.center(), egui::vec2(11.0, 11.0)),
+        colors,
+    );
+    chev
+}
+
+fn history_button(
+    ui: &mut Ui,
+    state: &mut AppState,
+    doc: &EditorDoc,
+    undo: bool,
+    chevron_first: bool,
+) {
     let (icon, label, enabled) = if undo {
         (Icon::Undo, "Undo", doc.session.can_undo())
     } else {
@@ -153,26 +176,17 @@ fn history_button(ui: &mut Ui, state: &mut AppState, doc: &EditorDoc, undo: bool
         (Some(n), true) => format!("{label} {n}"),
         _ => label.to_owned(),
     };
+    let mut chev = if chevron_first { Some(history_chevron(ui, enabled)) } else { None };
     let r = icon_button(ui, icon, &tip, chord.as_deref(), false, enabled);
     if r.clicked() {
         state.push(action);
     }
-    // History list, opened with a secondary click (or the chevron next to it).
+    if chev.is_none() {
+        chev = Some(history_chevron(ui, enabled));
+    }
+    let Some(chev) = chev else { return };
+    // History list, opened from the chevron next to the button.
     let id = egui::Id::new(("history", undo));
-    let chev = ui
-        .add_enabled(enabled, egui::Button::new("").min_size(egui::vec2(14.0, 28.0)).frame(false));
-    let c = chev.rect.center();
-    let colors = crate::icons::IconColors::with_ink(if enabled {
-        super::theme::TEXT_DIM
-    } else {
-        super::theme::TEXT_DIM.gamma_multiply(0.4)
-    });
-    crate::icons::paint(
-        ui.painter(),
-        Icon::ChevronDown,
-        egui::Rect::from_center_size(c, egui::vec2(11.0, 11.0)),
-        colors,
-    );
     Popup::from_toggle_button_response(&chev)
         .id(id)
         .close_behavior(PopupCloseBehavior::CloseOnClick)
@@ -215,11 +229,6 @@ pub fn show(ui: &mut Ui, state: &mut AppState, doc: &EditorDoc) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             // Done split button.
-            let done = accent_button(ui, "Done", Some(Icon::Done))
-                .on_hover_text("Save and close (Ctrl+Enter)");
-            if done.clicked() {
-                state.push(Action::Done(Finish::Save));
-            }
             let chev = ui.add(egui::Button::new("").min_size(egui::vec2(16.0, 26.0)).frame(false));
             crate::icons::paint(
                 ui.painter(),
@@ -234,6 +243,11 @@ pub fn show(ui: &mut Ui, state: &mut AppState, doc: &EditorDoc) {
                 ui.separator();
                 item(ui, state, "Cancel (discard)", Action::Done(Finish::Cancel), true);
             });
+            let done = accent_button(ui, "Done", Some(Icon::Done))
+                .on_hover_text("Save and close (Ctrl+Enter)");
+            if done.clicked() {
+                state.push(Action::Done(Finish::Save));
+            }
             widgets::separator(ui);
             if icon_button(
                 ui,
@@ -285,14 +299,10 @@ pub fn show(ui: &mut Ui, state: &mut AppState, doc: &EditorDoc) {
             }
             widgets::separator(ui);
             // Right-to-left: add redo first so undo ends up on its left.
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 0.0;
-                history_button(ui, state, doc, false);
-            });
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 0.0;
-                history_button(ui, state, doc, true);
-            });
+            // Right-to-left layout: the first widget added is the rightmost, so each pair adds
+            // its chevron first to read "icon, chevron" on screen, and redo before undo.
+            history_button(ui, state, doc, false, true);
+            history_button(ui, state, doc, true, true);
         });
     });
 }

@@ -50,6 +50,8 @@ pub fn show(ui: &mut Ui, state: &mut AppState, doc: &EditorDoc) {
     let props = Props::current(session, engine_tool);
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = vec2(6.0, 5.0);
+        ui.spacing_mut().slider_width = 72.0;
+        widgets::input_style(ui);
         ui.set_min_height(30.0);
         match (&props, tool) {
             (_, ToolId::CropRect | ToolId::CropEllipse | ToolId::CropFree) => crop_bar(ui, state, doc),

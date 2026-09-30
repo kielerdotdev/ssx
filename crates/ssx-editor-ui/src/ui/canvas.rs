@@ -836,8 +836,18 @@ impl Canvas {
                     Stroke::NONE,
                 ));
             }
-            let t = ui.input(|i| i.time);
-            let on = ((t * 2.0) as i64) % 2 == 0;
+            // The caret is solid right after any movement or typing and blinks after that.
+            let now = ui.input(|i| i.time);
+            let stamp = (c.caret.x.to_bits(), c.caret.y.to_bits(), c.selection.len());
+            let key = egui::Id::new("ssx-caret-epoch");
+            let epoch = ui.data_mut(|d| {
+                let e: &mut (f64, (u32, u32, usize)) = d.get_temp_mut_or_insert_with(key, || (now, stamp));
+                if e.1 != stamp {
+                    *e = (now, stamp);
+                }
+                e.0
+            });
+            let on = (((now - epoch) * 2.0) as i64) % 2 == 0;
             let top = pf(PointF::new(c.caret.x, c.caret.y));
             let bottom = pf(PointF::new(c.caret.x, c.caret.bottom()));
             let pivot = pf(c.pivot);

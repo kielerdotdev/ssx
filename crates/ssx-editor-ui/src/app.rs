@@ -13,8 +13,7 @@ use std::{
 
 use egui::{Context, Event, ImeEvent, Key, ViewportCommand};
 use ssx_editor::{
-    Color, DocError, EditorSession, Fill, Modifiers, PointF, Tool, object::TextOutline,
-    style::Shadow,
+    DocError, EditorSession, Fill, Modifiers, PointF, Tool, object::TextOutline, style::Shadow,
 };
 use ssx_types::Frame;
 
@@ -214,26 +213,9 @@ impl EditorApp {
     /// Draws all panels, the canvas and the dialogs.
     pub fn show(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
-        egui::Panel::top("menubar")
-            .frame(
-                egui::Frame::new().fill(theme::BAR_BG).inner_margin(egui::Margin::symmetric(8, 3)),
-            )
-            .show_separator_line(false)
-            .show(ui, |ui| menubar::show(ui, &mut self.state, &self.doc));
-        egui::Panel::top("toolbar")
-            .frame(
-                egui::Frame::new()
-                    .fill(theme::TOOLBAR_BG)
-                    .inner_margin(egui::Margin::symmetric(8, 4)),
-            )
-            .show_separator_line(false)
-            .show(ui, |ui| toolbar::show(ui, &mut self.state, &self.doc));
-        egui::Panel::top("props")
-            .frame(
-                egui::Frame::new().fill(theme::BAR_BG).inner_margin(egui::Margin::symmetric(10, 5)),
-            )
-            .show_separator_line(false)
-            .show(ui, |ui| props_bar::show(ui, &mut self.state, &self.doc));
+        self.show_menubar(ui);
+        self.show_toolbar(ui);
+        self.show_props(ui);
         egui::Panel::bottom("status")
             .frame(
                 egui::Frame::new().fill(theme::BAR_BG).inner_margin(egui::Margin::symmetric(10, 3)),
@@ -276,6 +258,38 @@ impl EditorApp {
         }
         self.state.crop_pending = self.doc.session.pending_crop().is_some();
         self.state.text_editing = self.doc.session.text_edit_state().is_some();
+    }
+
+    /// The menu / undo / finish row (exposed so tests can snapshot the bars on their own).
+    pub fn show_menubar(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::top("menubar")
+            .frame(
+                egui::Frame::new().fill(theme::BAR_BG).inner_margin(egui::Margin::symmetric(8, 3)),
+            )
+            .show_separator_line(false)
+            .show(ui, |ui| menubar::show(ui, &mut self.state, &self.doc));
+    }
+
+    /// The tool bar row.
+    pub fn show_toolbar(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::top("toolbar")
+            .frame(
+                egui::Frame::new()
+                    .fill(theme::TOOLBAR_BG)
+                    .inner_margin(egui::Margin::symmetric(8, 4)),
+            )
+            .show_separator_line(false)
+            .show(ui, |ui| toolbar::show(ui, &mut self.state, &self.doc));
+    }
+
+    /// The properties bar row.
+    pub fn show_props(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::top("props")
+            .frame(
+                egui::Frame::new().fill(theme::BAR_BG).inner_margin(egui::Margin::symmetric(10, 5)),
+            )
+            .show_separator_line(false)
+            .show(ui, |ui| props_bar::show(ui, &mut self.state, &self.doc));
     }
 
     fn drop_overlay(&self, ctx: &Context) {
@@ -804,24 +818,32 @@ impl EditorApp {
     /// Switches tool (toolbar identity plus the engine tool and its side effects).
     pub fn select_tool(&mut self, t: ToolId) {
         let prev = self.state.tool;
+        // The engine has a single Text preset; keep one per toolbar identity so the plain and
+        // the boxed text tools do not overwrite each other's colours.
+        let current_text = self.doc.session.styles().get(Tool::Text);
+        match prev {
+            ToolId::Text => self.state.prefs.text_plain = current_text,
+            ToolId::TextBoxed => self.state.prefs.text_boxed = current_text,
+            _ => {}
+        }
         self.state.select_tool(t);
         let engine = t.engine();
         if t != ToolId::Select {
             self.doc.session.clear_selection();
         }
         self.doc.session.set_tool(engine);
-        match (prev, t) {
-            (_, ToolId::TextBoxed) => props::make_text_boxed(&mut self.doc.session),
-            (ToolId::TextBoxed, ToolId::Text) => {
-                self.doc.session.set_kind_props(|k| {
-                    if let Some(c) = k.text_content_mut() {
-                        c.outline = None;
-                        c.background = None;
-                        c.color = Color::RED;
-                        c.padding = 4.0;
-                    }
-                });
-            }
+        match t {
+            ToolId::Text => match self.state.prefs.text_plain.clone() {
+                Some(p) => self.doc.session.styles_mut().remember(Tool::Text, p),
+                None => self.doc.session.styles_mut().reset(Tool::Text),
+            },
+            ToolId::TextBoxed => match self.state.prefs.text_boxed.clone() {
+                Some(p) => self.doc.session.styles_mut().remember(Tool::Text, p),
+                None => {
+                    self.doc.session.styles_mut().reset(Tool::Text);
+                    props::make_text_boxed(&mut self.doc.session);
+                }
+            },
             _ => {}
         }
         if t == ToolId::Image && !self.state.has_pending_image {

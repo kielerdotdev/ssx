@@ -120,16 +120,34 @@ pub fn dropdown_button(ui: &mut Ui, icon: Icon, label: &str, open: bool) -> Resp
     resp.on_hover_text(label)
 }
 
-/// A text-and-optional-icon button in the bars' style (used for Done, dialogs' secondary actions).
+/// A text-and-optional-icon button in the accent colour (Done, the primary action of a dialog).
 pub fn accent_button(ui: &mut Ui, text: &str, icon: Option<Icon>) -> Response {
+    accent_button_ex(ui, text, icon, true)
+}
+
+/// Gives inputs (drag values, combo boxes, toggles) a visible box, for dialogs and the
+/// properties bar; the toolbar's flat look is kept elsewhere.
+pub fn input_style(ui: &mut Ui) {
+    let w = &mut ui.visuals_mut().widgets;
+    w.inactive.weak_bg_fill = Color32::from_rgb(58, 60, 67);
+    w.inactive.bg_stroke = Stroke::new(1.0, Color32::from_rgb(78, 81, 90));
+    w.hovered.weak_bg_fill = Color32::from_rgb(72, 75, 84);
+    w.hovered.bg_stroke = Stroke::new(1.0, Color32::from_rgb(98, 102, 114));
+}
+
+/// [`accent_button`] that can be disabled.
+pub fn accent_button_ex(ui: &mut Ui, text: &str, icon: Option<Icon>, enabled: bool) -> Response {
     let font = FontId::proportional(13.0);
     let galley = ui.painter().layout_no_wrap(text.to_owned(), font, Color32::WHITE);
     let icon_w = if icon.is_some() { 20.0 } else { 0.0 };
     let size = vec2(galley.size().x + icon_w + 20.0, 26.0);
-    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
-    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, text));
+    let (rect, resp) =
+        ui.allocate_exact_size(size, if enabled { Sense::click() } else { Sense::hover() });
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, text));
     if ui.is_rect_visible(rect) {
-        let fill = if resp.is_pointer_button_down_on() {
+        let fill = if !enabled {
+            Color32::from_rgb(58, 62, 72)
+        } else if resp.is_pointer_button_down_on() {
             theme::ACTIVE_BG
         } else if resp.hovered() {
             Color32::from_rgb(88, 158, 236)
