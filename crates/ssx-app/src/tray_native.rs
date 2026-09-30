@@ -211,10 +211,13 @@ pub fn run(app: Arc<App>) {
                     update_tray(t, &view);
                 }
             }
-            Event::UserEvent(UserEvent::Menu(id)) => match Action::from_id(&id) {
-                Some(a) => app.handle_action(a, Origin::Tray),
-                None => tracing::debug!("unknown tray menu id {id:?}"),
-            },
+            Event::UserEvent(UserEvent::Menu(id)) => {
+                if let Some(a) = Action::from_id(&id) {
+                    app.handle_action(a, Origin::Tray);
+                } else {
+                    tracing::debug!("unknown tray menu id {id:?}");
+                }
+            }
             Event::UserEvent(UserEvent::Hotkeys { plan, enabled, reply }) => {
                 let _ = reply.send(runner.apply(&plan, enabled));
             }
