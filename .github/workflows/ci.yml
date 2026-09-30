@@ -49,7 +49,22 @@ jobs:
             mesa-vulkan-drivers libvulkan1 vulkan-tools
       - run: cargo clippy --workspace --all-targets
       - name: Tests
-        run: xvfb-run -a cargo test --workspace --no-fail-fast
+        run: |
+          set +e
+          xvfb-run -a cargo test --workspace --no-fail-fast 2>&1 | tee test.log
+          rc=${PIPESTATUS[0]}
+
+          # Failure digest: the failing tests and the start of each one's output, printed last so
+          # it is what you see at the end of the log (the full output is hundreds of thousands of lines).
+          if [ "$rc" -ne 0 ]; then
+            echo "=== FAILED TESTS ==="
+            grep -E "^test .* FAILED$" test.log | sort -u || true
+            echo "=== FAILURE DETAILS ==="
+            awk '/^---- .* stdout ----$/ {p = 1; n = 0} p {print; if (++n > 22) p = 0}' test.log | head -400
+            echo "=== FAILED TARGETS ==="
+            grep -E "^\s+\`-p " test.log | sort -u || true
+          fi
+          exit "$rc"
 
   # Informational canary (never blocks): how does the newest stable Rust see this code? A red
   # result here is the to-do list for the next deliberate toolchain upgrade (see rust-toolchain.toml).
@@ -101,11 +116,25 @@ jobs:
             -p ssx-services -p ssx-cli -p ssx-app
       - name: Tests (live Windows capture tests are #[ignore]d: they need an interactive session)
         run: |
+          set +e
           cargo test --locked --no-fail-fast --no-default-features --features "$LITE_FEATURES" \
             -p ssx-types -p ssx-hdr -p ssx-capture -p ssx-capture-win -p ssx-platform \
             -p ssx-gpu -p ssx-editor -p ssx-imgfx -p ssx-upload -p ssx-core -p ssx-ipc \
             -p ssx-shell -p ssx-hotkeys -p ssx-overlay -p ssx-editor-ui -p ssx-settings-ui \
-            -p ssx-services -p ssx-cli -p ssx-app
+            -p ssx-services -p ssx-cli -p ssx-app 2>&1 | tee test.log
+          rc=${PIPESTATUS[0]}
+
+          # Failure digest: the failing tests and the start of each one's output, printed last so
+          # it is what you see at the end of the log (the full output is hundreds of thousands of lines).
+          if [ "$rc" -ne 0 ]; then
+            echo "=== FAILED TESTS ==="
+            grep -E "^test .* FAILED$" test.log | sort -u || true
+            echo "=== FAILURE DETAILS ==="
+            awk '/^---- .* stdout ----$/ {p = 1; n = 0} p {print; if (++n > 22) p = 0}' test.log | head -400
+            echo "=== FAILED TARGETS ==="
+            grep -E "^\s+\`-p " test.log | sort -u || true
+          fi
+          exit "$rc"
 
   # The scripts that build the release archives and install them (also run by release.yml).
   packaging:

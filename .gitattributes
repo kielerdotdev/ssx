@@ -1,0 +1,24 @@
+# Keep line endings identical on every platform. Without this, Git on Windows checks text files
+# out with CRLF and every golden-file test that compares generated text (hotkey snippets, shell
+# integration files, CLI help) fails there.
+* text=auto eol=lf
+
+# Binary assets must never be touched by line-ending conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.bmp binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff2 binary
+*.sqlite3 binary
+*.tgz binary
+*.zip binary
+
+# Windows scripts want CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
