@@ -51,46 +51,43 @@ jobs:
       - name: Tests
         run: xvfb-run -a cargo test --workspace --no-fail-fast
 
-  # Crates that build without FFmpeg. `ssx-record` (and through it the CLI and daemon's default
-  # features) needs an FFmpeg SDK on Windows; see `windows-full` below.
+  # Windows has no system FFmpeg, so CI builds the FFmpeg-free ("lite") feature set: everything
+  # except MP4/WebM encoding. The vcpkg-FFmpeg build that ships is exercised by release.yml.
   windows:
     runs-on: windows-latest
+    env:
+      LITE_FEATURES: ssx-cli/record,ssx-app/record,ssx-app/file-dialog,ssx-settings-ui/record
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with: { components: clippy }
       - uses: Swatinem/rust-cache@v2
       - name: Clippy
-        run: >
-          cargo clippy --all-targets
-          -p ssx-types -p ssx-hdr -p ssx-capture -p ssx-capture-win -p ssx-platform
-          -p ssx-gpu -p ssx-editor -p ssx-imgfx -p ssx-upload -p ssx-core -p ssx-ipc
-          -p ssx-shell -p ssx-hotkeys -p ssx-overlay -p ssx-editor-ui -p ssx-settings-ui
+        run: |
+          cargo clippy --locked --all-targets --no-default-features --features "$LITE_FEATURES" \
+            -p ssx-types -p ssx-hdr -p ssx-capture -p ssx-capture-win -p ssx-platform \
+            -p ssx-gpu -p ssx-editor -p ssx-imgfx -p ssx-upload -p ssx-core -p ssx-ipc \
+            -p ssx-shell -p ssx-hotkeys -p ssx-overlay -p ssx-editor-ui -p ssx-settings-ui \
+            -p ssx-services -p ssx-cli -p ssx-app
       - name: Tests (live Windows capture tests are #[ignore]d: they need an interactive session)
-        run: >
-          cargo test --no-fail-fast
-          -p ssx-types -p ssx-hdr -p ssx-capture -p ssx-capture-win -p ssx-platform
-          -p ssx-gpu -p ssx-editor -p ssx-imgfx -p ssx-upload -p ssx-core -p ssx-ipc
-          -p ssx-shell -p ssx-hotkeys -p ssx-overlay -p ssx-editor-ui -p ssx-settings-ui
+        run: |
+          cargo test --locked --no-fail-fast --no-default-features --features "$LITE_FEATURES" \
+            -p ssx-types -p ssx-hdr -p ssx-capture -p ssx-capture-win -p ssx-platform \
+            -p ssx-gpu -p ssx-editor -p ssx-imgfx -p ssx-upload -p ssx-core -p ssx-ipc \
+            -p ssx-shell -p ssx-hotkeys -p ssx-overlay -p ssx-editor-ui -p ssx-settings-ui \
+            -p ssx-services -p ssx-cli -p ssx-app
 
-  # EXPERIMENTAL / UNVERIFIED: builds the CLI and daemon with a vcpkg FFmpeg, which is the
-  # path the release build needs. Nobody has run this job yet, so it may need tweaks; it does
-  # not gate merges until it has gone green once. See crates/ssx-record/build/README.md.
-  windows-full:
-    runs-on: windows-latest
-    continue-on-error: true
-    env:
-      VCPKG_ROOT: C:\vcpkg
-      VCPKGRS_TRIPLET: x64-windows-static-md
+  # The scripts that build the release archives and install them (also run by release.yml).
+  packaging:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: FFmpeg from vcpkg
-        run: vcpkg install "ffmpeg[x264,x265,vpx,opus,nvcodec,amf]:x64-windows-static-md"
-      - run: cargo build --release -p ssx-cli -p ssx-app -p ssx-overlay -p ssx-editor-ui -p ssx-settings-ui
-        env:
-          RUSTFLAGS: ""
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
+      - run: python3 packaging/test_package.py
+      - run: shellcheck -s sh packaging/install.sh packaging/uninstall.sh
 
   # EXPERIMENTAL: macOS has no capture backend yet; this only proves the portable crates build.
   macos:

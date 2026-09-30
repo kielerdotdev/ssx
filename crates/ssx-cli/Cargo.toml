@@ -22,6 +22,8 @@ default = ["record", "ffmpeg"]
 record = ["ssx-services/record"]
 # MP4 encoding through the system FFmpeg.
 ffmpeg = ["record", "ssx-services/ffmpeg"]
+# MP4 encoding through a statically linked FFmpeg (release builds). Needs `--no-default-features`.
+ffmpeg-static = ["record", "ssx-services/ffmpeg-static"]
 
 [dependencies]
 ssx-types.workspace = true

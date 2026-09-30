@@ -300,7 +300,7 @@ pub struct EncoderProbe {
 /// Probes the H.264 encoder chain (hardware first, then software) on this machine: what
 /// `ssx doctor` shows under "recorder". Empty when built without `FFmpeg`.
 pub fn probe_encoders() -> Vec<EncoderProbe> {
-    #[cfg(feature = "ffmpeg")]
+    #[cfg(any(feature = "ffmpeg", feature = "ffmpeg-static"))]
     {
         use ssx_record::encode::{
             Codec, Container, HwPolicy, Prober, SelectionRequest, candidates, ffmpeg::FfmpegProber,
@@ -328,7 +328,7 @@ pub fn probe_encoders() -> Vec<EncoderProbe> {
             })
             .collect()
     }
-    #[cfg(not(feature = "ffmpeg"))]
+    #[cfg(not(any(feature = "ffmpeg", feature = "ffmpeg-static")))]
     {
         Vec::new()
     }
@@ -336,7 +336,7 @@ pub fn probe_encoders() -> Vec<EncoderProbe> {
 
 /// `true` when this build can encode MP4 (`FFmpeg` linked); GIF needs nothing extra.
 pub const fn has_ffmpeg() -> bool {
-    cfg!(feature = "ffmpeg")
+    cfg!(any(feature = "ffmpeg", feature = "ffmpeg-static"))
 }
 
 /// A longest-sane wait used by callers that stop a recording after a fixed time.

@@ -17,6 +17,15 @@ name = "ssx_settings_ui"
 name = "ssx-settings-ui"
 path = "src/main.rs"
 
+[features]
+# Mirrors ssx-cli so the Integration page's diagnostics describe the build that would be
+# shipped. The defaults match `ssx-cli` (recorder with the system FFmpeg); a release build
+# selects the linkage explicitly with `--no-default-features` (see .github/workflows/release.yml).
+default = ["record", "ffmpeg"]
+record = ["ssx-cli/record"]
+ffmpeg = ["record", "ssx-cli/ffmpeg"]
+ffmpeg-static = ["record", "ssx-cli/ffmpeg-static"]
+
 [dependencies]
 ssx-types.workspace = true
 ssx-core.workspace = true
@@ -25,7 +34,10 @@ ssx-hotkeys.workspace = true
 ssx-shell.workspace = true
 ssx-upload.workspace = true
 ssx-services = { path = "../ssx-services" }
-ssx-cli = { path = "../ssx-cli" }
+# `default-features = false`: the FFmpeg linkage is chosen by this crate's own features above.
+# Otherwise cargo's feature unification would switch on the system FFmpeg in every build that
+# includes the settings window, including static and FFmpeg-free ones.
+ssx-cli = { path = "../ssx-cli", default-features = false }
 # Reused for the dark theme and the shared widgets/icons, so both windows look like one product.
 ssx-editor-ui = { path = "../ssx-editor-ui" }
 serde.workspace = true

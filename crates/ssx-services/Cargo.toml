@@ -16,8 +16,12 @@ save-dialog = ["dep:rfd"]
 # The real screen recorder (`ssx-record`): region selection on the overlay, audio choice.
 # Without `ffmpeg` only GIF recordings work.
 record = ["dep:ssx-record", "ssx-record/gif", "ssx-record/audio", "ssx-record/gpu"]
-# MP4/WebM/MKV encoding through the system FFmpeg (see ssx-record for the static builds).
+# MP4/WebM/MKV encoding through the system FFmpeg, linked dynamically (development default).
 ffmpeg = ["record", "ssx-record/system", "ssx-record/gpl", "ssx-record/portal"]
+# The same encoders through a statically linked FFmpeg you provide (FFMPEG_DIR / vcpkg; see
+# crates/ssx-record/build/README.md). Use with `--no-default-features`: the two linkages are
+# alternatives, and enabling both would make the build ambiguous.
+ffmpeg-static = ["record", "ssx-record/static-prebuilt", "ssx-record/gpl", "ssx-record/portal"]
 
 [dependencies]
 ssx-types.workspace = true
