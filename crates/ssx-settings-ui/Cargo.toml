@@ -1,0 +1,55 @@
+[package]
+name = "ssx-settings-ui"
+description = "egui window for ssx settings and history: general, capture and HDR, workflows, hotkeys, uploaders, history, integration (library + `ssx-settings-ui` binary)."
+version.workspace = true
+edition.workspace = true
+# egui/eframe 0.35 need a newer compiler than the workspace floor.
+rust-version = "1.92"
+license.workspace = true
+repository.workspace = true
+publish = false
+default-run = "ssx-settings-ui"
+
+[lib]
+name = "ssx_settings_ui"
+
+[[bin]]
+name = "ssx-settings-ui"
+path = "src/main.rs"
+
+[dependencies]
+ssx-types.workspace = true
+ssx-core.workspace = true
+ssx-hdr.workspace = true
+ssx-hotkeys.workspace = true
+ssx-shell.workspace = true
+ssx-upload.workspace = true
+ssx-services = { path = "../ssx-services" }
+ssx-cli = { path = "../ssx-cli" }
+# Reused for the dark theme and the shared widgets/icons, so both windows look like one product.
+ssx-editor-ui = { path = "../ssx-editor-ui" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+image.workspace = true
+half.workspace = true
+toml = "0.9"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+eframe = { version = "0.35", default-features = false, features = ["accesskit", "default_fonts", "wayland", "x11", "wgpu"] }
+egui = "0.35"
+rfd = { version = "0.17", default-features = false, features = ["xdg-portal", "wayland"] }
+clap = { version = "4", features = ["derive"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter"] }
+
+[target.'cfg(windows)'.dependencies]
+# Same version ssx-shell uses for the classic Explorer verbs.
+windows-registry = "0.6"
+
+[dev-dependencies]
+egui_kittest = { version = "0.35", features = ["wgpu", "snapshot"] }
+proptest = { version = "1", default-features = false, features = ["std"] }
+tempfile = "3"
+
+[lints]
+workspace = true
