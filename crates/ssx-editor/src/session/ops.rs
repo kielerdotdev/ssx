@@ -28,7 +28,10 @@ impl EditorSession {
     pub fn undo(&mut self) {
         self.cancel_drag();
         self.history.seal();
-        let info = self.history.undo(&mut self.doc).map(|c| (c.affected(), matches!(c, Command::SetDocument { .. })));
+        let info = self
+            .history
+            .undo(&mut self.doc)
+            .map(|c| (c.affected(), matches!(c, Command::SetDocument { .. })));
         if let Some((affected, canvas)) = info {
             self.after_change(affected, canvas);
             self.clamp_text_edit();
@@ -39,7 +42,10 @@ impl EditorSession {
     pub fn redo(&mut self) {
         self.cancel_drag();
         self.history.seal();
-        let info = self.history.redo(&mut self.doc).map(|c| (c.affected(), matches!(c, Command::SetDocument { .. })));
+        let info = self
+            .history
+            .redo(&mut self.doc)
+            .map(|c| (c.affected(), matches!(c, Command::SetDocument { .. })));
         if let Some((affected, canvas)) = info {
             self.after_change(affected, canvas);
             self.clamp_text_edit();
@@ -52,14 +58,16 @@ impl EditorSession {
 
     /// Selects the given objects (groups are expanded).
     pub fn select(&mut self, ids: &[ObjectId]) {
-        let valid: Vec<ObjectId> = ids.iter().copied().filter(|i| self.doc.object(*i).is_some()).collect();
+        let valid: Vec<ObjectId> =
+            ids.iter().copied().filter(|i| self.doc.object(*i).is_some()).collect();
         self.commit_text_edit();
         self.set_selection(valid);
     }
 
     /// Selects everything selectable.
     pub fn select_all(&mut self) {
-        let ids = self.doc.objects().iter().filter(|o| o.visible && !o.locked).map(|o| o.id).collect();
+        let ids =
+            self.doc.objects().iter().filter(|o| o.visible && !o.locked).map(|o| o.id).collect();
         self.set_selection(ids);
     }
 
@@ -82,7 +90,8 @@ impl EditorSession {
     /// Deletes the selected (unlocked) objects.
     pub fn delete_selection(&mut self) {
         self.commit_text_edit();
-        let items: Vec<(usize, Object)> = self.selected_sorted().into_iter().filter(|(_, o)| !o.locked).collect();
+        let items: Vec<(usize, Object)> =
+            self.selected_sorted().into_iter().filter(|(_, o)| !o.locked).collect();
         if items.is_empty() {
             return;
         }
@@ -95,8 +104,12 @@ impl EditorSession {
         if !(dx.is_finite() && dy.is_finite()) {
             return;
         }
-        let before: Vec<Object> =
-            self.selection.iter().filter_map(|i| self.doc.object(*i).cloned()).filter(|o| !o.locked).collect();
+        let before: Vec<Object> = self
+            .selection
+            .iter()
+            .filter_map(|i| self.doc.object(*i).cloned())
+            .filter(|o| !o.locked)
+            .collect();
         if before.is_empty() {
             return;
         }
@@ -139,7 +152,8 @@ impl EditorSession {
             return;
         }
         let g = self.doc.fresh_group_id();
-        let before: Vec<Object> = self.selection.iter().filter_map(|i| self.doc.object(*i).cloned()).collect();
+        let before: Vec<Object> =
+            self.selection.iter().filter_map(|i| self.doc.object(*i).cloned()).collect();
         let after = before
             .iter()
             .map(|o| {
@@ -153,8 +167,12 @@ impl EditorSession {
 
     /// Dissolves the groups of the selected objects.
     pub fn ungroup_selection(&mut self) {
-        let before: Vec<Object> =
-            self.selection.iter().filter_map(|i| self.doc.object(*i).cloned()).filter(|o| o.group.is_some()).collect();
+        let before: Vec<Object> = self
+            .selection
+            .iter()
+            .filter_map(|i| self.doc.object(*i).cloned())
+            .filter(|o| o.group.is_some())
+            .collect();
         let after = before
             .iter()
             .map(|o| {
@@ -172,7 +190,8 @@ impl EditorSession {
 
     fn reorder(&mut self, f: impl Fn(&[ObjectId], &[ObjectId]) -> Vec<ObjectId>) {
         let before = self.doc.order();
-        let sel: Vec<ObjectId> = before.iter().copied().filter(|i| self.selection.contains(i)).collect();
+        let sel: Vec<ObjectId> =
+            before.iter().copied().filter(|i| self.selection.contains(i)).collect();
         if sel.is_empty() {
             return;
         }
@@ -184,12 +203,16 @@ impl EditorSession {
 
     /// Brings the selection to the front.
     pub fn bring_to_front(&mut self) {
-        self.reorder(|all, sel| all.iter().copied().filter(|i| !sel.contains(i)).chain(sel.iter().copied()).collect());
+        self.reorder(|all, sel| {
+            all.iter().copied().filter(|i| !sel.contains(i)).chain(sel.iter().copied()).collect()
+        });
     }
 
     /// Sends the selection to the back.
     pub fn send_to_back(&mut self) {
-        self.reorder(|all, sel| sel.iter().copied().chain(all.iter().copied().filter(|i| !sel.contains(i))).collect());
+        self.reorder(|all, sel| {
+            sel.iter().copied().chain(all.iter().copied().filter(|i| !sel.contains(i))).collect()
+        });
     }
 
     /// Raises the selection one step.
@@ -269,13 +292,12 @@ impl EditorSession {
             o.locked = false;
             o.translate_with_source(offset, offset);
             if let Some(g) = o.group {
-                let ng = match group_map.iter().find(|(old, _)| *old == g) {
-                    Some((_, n)) => *n,
-                    None => {
-                        group_map.push((g, fresh));
-                        fresh += 1;
-                        fresh - 1
-                    }
+                let ng = if let Some((_, n)) = group_map.iter().find(|(old, _)| *old == g) {
+                    *n
+                } else {
+                    group_map.push((g, fresh));
+                    fresh += 1;
+                    fresh - 1
                 };
                 o.group = Some(ng);
             }
@@ -309,7 +331,10 @@ impl EditorSession {
     // ---------------------------------------------------------------------------------
 
     /// Runs a whole-document edit as a single undoable command. On error nothing changes.
-    pub fn global_op(&mut self, f: impl FnOnce(&mut Document, &mut crate::render::Renderer) -> Result<(), DocError>) -> Result<(), DocError> {
+    pub fn global_op(
+        &mut self,
+        f: impl FnOnce(&mut Document, &mut crate::render::Renderer) -> Result<(), DocError>,
+    ) -> Result<(), DocError> {
         self.commit_text_edit();
         self.cancel_drag();
         let before = self.doc.clone();
@@ -339,7 +364,13 @@ impl EditorSession {
     }
 
     /// Grows (positive) or shrinks (negative) the canvas on each side.
-    pub fn resize_canvas(&mut self, left: i32, top: i32, right: i32, bottom: i32) -> Result<(), DocError> {
+    pub fn resize_canvas(
+        &mut self,
+        left: i32,
+        top: i32,
+        right: i32,
+        bottom: i32,
+    ) -> Result<(), DocError> {
         self.global_op(|d, _| d.resize_canvas(left, top, right, bottom))
     }
 
@@ -402,10 +433,16 @@ impl EditorSession {
             let (ox, oy) = d.canvas_offset();
             let full = renderer.render(d, &RenderOptions::default());
             // Rectangle in canvas pixels.
-            let rc = Rect::new(r.x + ox as i32, r.y + oy as i32, r.width, r.height);
+            let rc = Rect::new(
+                r.x + i32::try_from(ox).unwrap_or(0),
+                r.y + i32::try_from(oy).unwrap_or(0),
+                r.width,
+                r.height,
+            );
             let piece = ssx_imgfx::crop(&full, rc)?;
             let (w, h) = (piece.width(), piece.height());
-            let mut mask = tiny_skia::Pixmap::new(w.max(1), h.max(1)).ok_or(DocError::EmptySize(w, h))?;
+            let mut mask =
+                tiny_skia::Pixmap::new(w.max(1), h.max(1)).ok_or(DocError::EmptySize(w, h))?;
             let paint = {
                 let mut p = tiny_skia::Paint::default();
                 p.set_color_rgba8(255, 255, 255, 255);
@@ -414,7 +451,8 @@ impl EditorSession {
             };
             let local = |p: PointF| (p.x - r.x as f32, p.y - r.y as f32);
             let path = if ellipse {
-                tiny_skia::Rect::from_xywh(0.0, 0.0, w as f32, h as f32).and_then(tiny_skia::PathBuilder::from_oval)
+                tiny_skia::Rect::from_xywh(0.0, 0.0, w as f32, h as f32)
+                    .and_then(tiny_skia::PathBuilder::from_oval)
             } else {
                 let mut pb = tiny_skia::PathBuilder::new();
                 for (i, p) in polygon.iter().enumerate() {
@@ -429,7 +467,13 @@ impl EditorSession {
                 pb.finish()
             };
             let Some(path) = path else { return Err(DocError::EmptySize(w, h)) };
-            mask.fill_path(&path, &paint, tiny_skia::FillRule::Winding, tiny_skia::Transform::identity(), None);
+            mask.fill_path(
+                &path,
+                &paint,
+                tiny_skia::FillRule::Winding,
+                tiny_skia::Transform::identity(),
+                None,
+            );
             let mut out = piece;
             for (px, m) in out.data_mut().chunks_exact_mut(4).zip(mask.data().chunks_exact(4)) {
                 px[3] = ((u32::from(px[3]) * u32::from(m[3]) + 127) / 255) as u8;

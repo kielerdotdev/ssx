@@ -15,13 +15,12 @@ use crate::{
     object::{
         ArrowHeads, ArrowShape, BalloonShape, BoxShape, BuiltinSticker, CursorShape, EffectBox,
         FreehandShape, GridShape, HeadStyle, HighlightShape, ImageShape, LineShape, MagnifyShape,
-        ObjectKind, SpotlightShape, StepShape, StickerShape, StickerSource, TextContent,
-        TextShape,
+        ObjectKind, SpotlightShape, StepShape, StickerShape, StickerSource, TextContent, TextShape,
     },
     style::{BlendMode, Fill, Shadow, Style},
 };
 
-/// The editor tools (one per ShareX toolbar entry).
+/// The editor tools (one per `ShareX` toolbar entry).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Tool {
@@ -143,14 +142,12 @@ impl Tool {
         let red = Style::default();
         let none = |style: Style, kind: ObjectKind| Some(Preset { style, kind });
         match self {
-            Tool::Rectangle => none(
-                Style { stroke_width: 3.0, ..red },
-                ObjectKind::Rectangle(BoxShape::default()),
-            ),
-            Tool::Ellipse => none(
-                Style { stroke_width: 3.0, ..red },
-                ObjectKind::Ellipse(BoxShape::default()),
-            ),
+            Tool::Rectangle => {
+                none(Style { stroke_width: 3.0, ..red }, ObjectKind::Rectangle(BoxShape::default()))
+            }
+            Tool::Ellipse => {
+                none(Style { stroke_width: 3.0, ..red }, ObjectKind::Ellipse(BoxShape::default()))
+            }
             Tool::Line => none(red, ObjectKind::Line(LineShape::default())),
             Tool::Arrow => none(red, ObjectKind::Arrow(ArrowShape::default())),
             Tool::Freehand => none(red, ObjectKind::Freehand(FreehandShape::default())),
@@ -161,10 +158,9 @@ impl Tool {
                     ..FreehandShape::default()
                 }),
             ),
-            Tool::Text => none(
-                Style { stroke_width: 0.0, ..red },
-                ObjectKind::Text(TextShape::default()),
-            ),
+            Tool::Text => {
+                none(Style { stroke_width: 0.0, ..red }, ObjectKind::Text(TextShape::default()))
+            }
             Tool::Balloon => none(
                 Style {
                     stroke: Color::BLACK,
@@ -194,11 +190,12 @@ impl Tool {
                 ObjectKind::Magnify(MagnifyShape::default()),
             ),
             Tool::Spotlight => none(red, ObjectKind::Spotlight(SpotlightShape::default())),
-            Tool::Blur => none(red, ObjectKind::Blur(EffectBox { amount: 10.0, ..EffectBox::default() })),
-            Tool::Pixelate => none(
-                red,
-                ObjectKind::Pixelate(EffectBox { amount: 10.0, ..EffectBox::default() }),
-            ),
+            Tool::Blur => {
+                none(red, ObjectKind::Blur(EffectBox { amount: 10.0, ..EffectBox::default() }))
+            }
+            Tool::Pixelate => {
+                none(red, ObjectKind::Pixelate(EffectBox { amount: 10.0, ..EffectBox::default() }))
+            }
             Tool::Highlight => none(
                 Style {
                     stroke: Color::YELLOW,
@@ -318,7 +315,14 @@ mod tests {
                 None => assert!(!t.creates_object()),
             }
         }
-        for t in [Tool::Select, Tool::Eraser, Tool::Crop, Tool::CropEllipse, Tool::CropFreeform, Tool::CutOut] {
+        for t in [
+            Tool::Select,
+            Tool::Eraser,
+            Tool::Crop,
+            Tool::CropEllipse,
+            Tool::CropFreeform,
+            Tool::CutOut,
+        ] {
             assert!(!t.creates_object(), "{t:?}");
         }
     }
@@ -352,7 +356,10 @@ mod tests {
     #[test]
     fn highlight_variants_are_distinguished() {
         assert_eq!(Tool::for_kind(&Tool::Highlight.preset().unwrap().kind), Some(Tool::Highlight));
-        assert_eq!(Tool::for_kind(&Tool::HighlightPen.preset().unwrap().kind), Some(Tool::HighlightPen));
+        assert_eq!(
+            Tool::for_kind(&Tool::HighlightPen.preset().unwrap().kind),
+            Some(Tool::HighlightPen)
+        );
         assert_eq!(
             Tool::for_kind(&Tool::FreehandArrow.preset().unwrap().kind),
             Some(Tool::FreehandArrow)

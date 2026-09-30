@@ -1,6 +1,6 @@
 //! Visual style shared by all object kinds.
 //!
-//! One flat struct (like ShareX's shape options) rather than per-kind styles: a GUI can bind
+//! One flat struct (like `ShareX`'s shape options) rather than per-kind styles: a GUI can bind
 //! a single "colour / width / fill / shadow" panel to whatever is selected, and per-tool
 //! "last used style" memory stays trivial. Fields that make no sense for a kind (a text
 //! object has no corner radius) are simply ignored by that kind.
@@ -149,6 +149,7 @@ impl Style {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // exact geometry values are what these tests assert
 mod tests {
     use super::*;
 

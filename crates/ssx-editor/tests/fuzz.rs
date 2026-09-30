@@ -1,6 +1,8 @@
 //! No-panic "fuzz-ish" tests: thousands of random (and hostile) events must never panic and
 //! must leave the document in a valid, renderable, serialisable state.
 
+#![allow(clippy::float_cmp)] // tests assert exact geometry values
+
 mod common;
 
 use common::*;
@@ -66,13 +68,17 @@ const TEXTS: [&str; 8] = ["a", "hello world", "日本語", "\n", "😀", "e\u{30
 fn find_bad_null(v: &serde_json::Value, path: String) -> Option<String> {
     match v {
         serde_json::Value::Object(m) => m.iter().find_map(|(k, x)| {
-            if x.is_null() && !["shadow", "outline", "background", "arrow", "manual"].contains(&k.as_str()) {
+            if x.is_null()
+                && !["shadow", "outline", "background", "arrow", "manual"].contains(&k.as_str())
+            {
                 Some(format!("{path}/{k}"))
             } else {
                 find_bad_null(x, format!("{path}/{k}"))
             }
         }),
-        serde_json::Value::Array(a) => a.iter().enumerate().find_map(|(i, x)| find_bad_null(x, format!("{path}/{i}"))),
+        serde_json::Value::Array(a) => {
+            a.iter().enumerate().find_map(|(i, x)| find_bad_null(x, format!("{path}/{i}")))
+        }
         _ => None,
     }
 }
@@ -105,25 +111,52 @@ fn run(seed: u64, events: usize) {
             86 => s.set_view_scale(rng.coord()),
             87 => match rng.below(9) {
                 0 => {
-                    let _ = s.crop(Rect::new(rng.below(200) as i32 - 50, rng.below(120) as i32 - 30, rng.below(200) as u32, rng.below(150) as u32));
+                    let _ = s.crop(Rect::new(
+                        rng.below(200) as i32 - 50,
+                        rng.below(120) as i32 - 30,
+                        rng.below(200) as u32,
+                        rng.below(150) as u32,
+                    ));
                 }
                 1 => {
-                    let _ = s.cut_out(Axis::X, rng.below(200) as i32 - 20, rng.below(200) as i32 - 20);
+                    let _ =
+                        s.cut_out(Axis::X, rng.below(200) as i32 - 20, rng.below(200) as i32 - 20);
                 }
                 2 => {
-                    let _ = s.cut_out(Axis::Y, rng.below(150) as i32 - 20, rng.below(150) as i32 - 20);
+                    let _ =
+                        s.cut_out(Axis::Y, rng.below(150) as i32 - 20, rng.below(150) as i32 - 20);
                 }
                 3 => {
-                    let _ = s.orient([Orient::Rotate90, Orient::Rotate180, Orient::Rotate270, Orient::FlipH, Orient::FlipV][rng.below(5) as usize]);
+                    let _ = s.orient(
+                        [
+                            Orient::Rotate90,
+                            Orient::Rotate180,
+                            Orient::Rotate270,
+                            Orient::FlipH,
+                            Orient::FlipV,
+                        ][rng.below(5) as usize],
+                    );
                 }
                 4 => {
-                    let _ = s.resize_canvas(rng.below(40) as i32 - 20, rng.below(40) as i32 - 20, rng.below(40) as i32 - 20, rng.below(40) as i32 - 20);
+                    let _ = s.resize_canvas(
+                        rng.below(40) as i32 - 20,
+                        rng.below(40) as i32 - 20,
+                        rng.below(40) as i32 - 20,
+                        rng.below(40) as i32 - 20,
+                    );
                 }
                 5 => {
-                    let _ = s.resize(rng.below(300) as u32, rng.below(200) as u32, ssx_imgfx::ResizeFilter::Lanczos3);
+                    let _ = s.resize(
+                        rng.below(300) as u32,
+                        rng.below(200) as u32,
+                        ssx_imgfx::ResizeFilter::Lanczos3,
+                    );
                 }
                 6 => {
-                    let _ = s.apply_effect(&ssx_imgfx::Effect::GaussianBlur { sigma: rng.coord() }, Some(Rect::new(rng.below(100) as i32 - 50, 0, 80, 80)));
+                    let _ = s.apply_effect(
+                        &ssx_imgfx::Effect::GaussianBlur { sigma: rng.coord() },
+                        Some(Rect::new(rng.below(100) as i32 - 50, 0, 80, 80)),
+                    );
                 }
                 7 => {
                     let _ = s.apply_crop();
@@ -176,8 +209,14 @@ fn run(seed: u64, events: usize) {
             let d = s.document();
             let scale = [0.25, 1.0, 2.5][rng.below(3) as usize];
             let (cw, ch) = d.canvas_size();
-            let vp = Rect::new(rng.below(60) as i32 - 30, rng.below(40) as i32 - 20, rng.below(200) as u32, rng.below(200) as u32);
-            let f = s.render(&RenderOptions { scale, viewport: Some(vp), ..RenderOptions::default() });
+            let vp = Rect::new(
+                rng.below(60) as i32 - 30,
+                rng.below(40) as i32 - 20,
+                rng.below(200) as u32,
+                rng.below(200) as u32,
+            );
+            let f =
+                s.render(&RenderOptions { scale, viewport: Some(vp), ..RenderOptions::default() });
             assert_eq!((f.width(), f.height()), (vp.width, vp.height));
             let _ = (cw, ch);
         }
@@ -215,7 +254,8 @@ fn random_events_never_panic() {
 
 #[test]
 fn hostile_pointer_positions_on_every_tool() {
-    let hostile = [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, 1e30, -1e30, f32::MAX, f32::MIN, 0.0];
+    let hostile =
+        [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, 1e30, -1e30, f32::MAX, f32::MIN, 0.0];
     for tool in Tool::ALL {
         eprintln!("tool {tool:?}");
         let mut s = EditorSession::new(doc(160, 100));
@@ -244,7 +284,11 @@ fn many_objects_and_long_freehand_stay_responsive() {
     s.set_tool(Tool::Freehand);
     s.pointer_down(PointF::new(0.0, 0.0), Modifiers::NONE, None);
     for i in 0..5000 {
-        s.pointer_move(PointF::new(i as f32 * 0.07, (i as f32 * 0.01).sin() * 100.0 + 150.0), Modifiers::NONE, None);
+        s.pointer_move(
+            PointF::new(i as f32 * 0.07, (i as f32 * 0.01).sin() * 100.0 + 150.0),
+            Modifiers::NONE,
+            None,
+        );
     }
     s.pointer_up(PointF::new(350.0, 150.0), Modifiers::NONE);
     let pts = match &s.document().objects()[0].kind {

@@ -94,12 +94,24 @@ pub fn handles(layout: &Layout, zoom: f32, extras: &[(HandleKind, PointF)]) -> V
             if *rotatable {
                 let knob = PointF::new(c.x, rect.y - ROTATE_KNOB_PX / zoom.max(1e-3))
                     .rotate_about(c, *rotation);
-                out.push(Handle { kind: HandleKind::Rotate, pos: knob, cursor: CursorHint::Rotate });
+                out.push(Handle {
+                    kind: HandleKind::Rotate,
+                    pos: knob,
+                    cursor: CursorHint::Rotate,
+                });
             }
         }
         Layout::Segment { a, b } => {
-            out.push(Handle { kind: HandleKind::Endpoint(0), pos: *a, cursor: CursorHint::Crosshair });
-            out.push(Handle { kind: HandleKind::Endpoint(1), pos: *b, cursor: CursorHint::Crosshair });
+            out.push(Handle {
+                kind: HandleKind::Endpoint(0),
+                pos: *a,
+                cursor: CursorHint::Crosshair,
+            });
+            out.push(Handle {
+                kind: HandleKind::Endpoint(1),
+                pos: *b,
+                cursor: CursorHint::Crosshair,
+            });
         }
         Layout::Group { bounds } => {
             if bounds.w > 0.0 || bounds.h > 0.0 {
@@ -147,7 +159,13 @@ pub fn hit_handle(handles: &[Handle], p: PointF, radius: f32) -> Option<Handle> 
 /// Works in the box's own (unrotated) frame, then rotates the new centre back so the
 /// opposite edge stays put on screen. `shift` keeps the aspect ratio on corner handles,
 /// `alt` resizes symmetrically about the centre. Sizes never drop below 1 px.
-pub fn resize_box(orig: RectF, rotation: f32, handle: HandleKind, p: PointF, mods: Modifiers) -> RectF {
+pub fn resize_box(
+    orig: RectF,
+    rotation: f32,
+    handle: HandleKind,
+    p: PointF,
+    mods: Modifiers,
+) -> RectF {
     let Some((dx, dy)) = handle.direction() else { return orig };
     let c = orig.center();
     let local = p.rotate_about(c, -rotation);
@@ -203,16 +221,10 @@ pub fn resize_box(orig: RectF, rotation: f32, handle: HandleKind, p: PointF, mod
         };
     }
     // Edge handles with no shift/alt: the moved edge follows the pointer exactly.
-    let (nx, w) = if !mods.alt && !(mods.shift && dx != 0 && dy != 0) && dx != 0 {
-        (l.min(r), (r - l).abs().max(1.0))
-    } else {
-        (nx, w)
-    };
-    let (ny, h) = if !mods.alt && !(mods.shift && dx != 0 && dy != 0) && dy != 0 {
-        (t.min(b), (b - t).abs().max(1.0))
-    } else {
-        (ny, h)
-    };
+    let corner_shift = mods.shift && dx != 0 && dy != 0;
+    let free = !(mods.alt || corner_shift);
+    let (nx, w) = if free && dx != 0 { (l.min(r), (r - l).abs().max(1.0)) } else { (nx, w) };
+    let (ny, h) = if free && dy != 0 { (t.min(b), (b - t).abs().max(1.0)) } else { (ny, h) };
     let local_new = RectF::new(nx, ny, w, h);
     let world_c = local_new.center().rotate_about(c, rotation);
     RectF::from_center_size(world_c, w, h)
@@ -282,7 +294,10 @@ pub fn drag_rect(start: PointF, cur: PointF, mods: Modifiers) -> RectF {
     let mut d = cur - start;
     if mods.shift {
         let s = d.x.abs().max(d.y.abs());
-        d = PointF::new(s.copysign(if d.x == 0.0 { 1.0 } else { d.x }), s.copysign(if d.y == 0.0 { 1.0 } else { d.y }));
+        d = PointF::new(
+            s.copysign(if d.x == 0.0 { 1.0 } else { d.x }),
+            s.copysign(if d.y == 0.0 { 1.0 } else { d.y }),
+        );
     }
     if mods.alt {
         RectF::from_center_size(start, d.x.abs() * 2.0, d.y.abs() * 2.0)
@@ -309,11 +324,9 @@ impl SnapTargets {
 }
 
 fn nearest(v: f32, targets: &[f32], thr: f32) -> Option<f32> {
-    targets
-        .iter()
-        .copied()
-        .filter(|t| (t - v).abs() <= thr)
-        .min_by(|a, b| (a - v).abs().partial_cmp(&(b - v).abs()).unwrap_or(std::cmp::Ordering::Equal))
+    targets.iter().copied().filter(|t| (t - v).abs() <= thr).min_by(|a, b| {
+        (a - v).abs().partial_cmp(&(b - v).abs()).unwrap_or(std::cmp::Ordering::Equal)
+    })
 }
 
 /// Snaps a single point; returns the point and the guides that fired.
@@ -354,6 +367,7 @@ pub fn snap_rect(r: RectF, t: &SnapTargets, thr: f32, extent: RectF) -> (f32, f3
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // exact geometry values are what these tests assert
 mod tests {
     use super::*;
 
@@ -366,14 +380,21 @@ mod tests {
         assert_eq!(resize_cursor(HandleKind::SouthEast, 0.0), CursorHint::ResizeNwse);
         assert_eq!(resize_cursor(HandleKind::NorthEast, 0.0), CursorHint::ResizeNesw);
         // Rotated by 90°, an east handle points south.
-        assert_eq!(resize_cursor(HandleKind::East, std::f32::consts::FRAC_PI_2), CursorHint::ResizeNs);
-        assert_eq!(resize_cursor(HandleKind::SouthEast, std::f32::consts::FRAC_PI_2), CursorHint::ResizeNesw);
+        assert_eq!(
+            resize_cursor(HandleKind::East, std::f32::consts::FRAC_PI_2),
+            CursorHint::ResizeNs
+        );
+        assert_eq!(
+            resize_cursor(HandleKind::SouthEast, std::f32::consts::FRAC_PI_2),
+            CursorHint::ResizeNesw
+        );
         assert_eq!(resize_cursor(HandleKind::Rotate, 0.0), CursorHint::Move);
     }
 
     #[test]
     fn box_handles_include_rotate_knob_and_rotate_with_box() {
-        let l = Layout::Box { rect: RectF::new(0.0, 0.0, 100.0, 50.0), rotation: 0.0, rotatable: true };
+        let l =
+            Layout::Box { rect: RectF::new(0.0, 0.0, 100.0, 50.0), rotation: 0.0, rotatable: true };
         let hs = handles(&l, 1.0, &[]);
         assert_eq!(hs.len(), 9);
         let knob = hs.iter().find(|h| h.kind == HandleKind::Rotate).unwrap();
@@ -415,7 +436,8 @@ mod tests {
     #[test]
     fn resize_shift_keeps_aspect_and_alt_is_symmetric() {
         let r = RectF::new(0.0, 0.0, 100.0, 50.0);
-        let s = resize_box(r, 0.0, HandleKind::SouthEast, PointF::new(200.0, 60.0), Modifiers::SHIFT);
+        let s =
+            resize_box(r, 0.0, HandleKind::SouthEast, PointF::new(200.0, 60.0), Modifiers::SHIFT);
         assert!((s.w / s.h - 2.0).abs() < 1e-4, "{s:?}");
         assert_eq!((s.x, s.y), (0.0, 0.0), "opposite corner fixed");
         let a = resize_box(r, 0.0, HandleKind::East, PointF::new(80.0, 25.0), Modifiers::ALT);
@@ -444,7 +466,8 @@ mod tests {
         let (a, sx, sy) = group_scale(b, HandleKind::SouthEast, PointF::new(200.0, 150.0), NONE);
         assert_eq!(a, PointF::new(0.0, 0.0));
         assert_eq!((sx, sy), (2.0, 1.5));
-        let (_, ux, uy) = group_scale(b, HandleKind::SouthEast, PointF::new(200.0, 150.0), Modifiers::SHIFT);
+        let (_, ux, uy) =
+            group_scale(b, HandleKind::SouthEast, PointF::new(200.0, 150.0), Modifiers::SHIFT);
         assert_eq!(ux, uy);
         assert_eq!(ux, 2.0);
         let (_, ex, ey) = group_scale(b, HandleKind::East, PointF::new(50.0, 0.0), NONE);
@@ -462,7 +485,10 @@ mod tests {
         assert!((p.y).abs() < 1e-3 && (p.x - 100.499).abs() < 0.01, "{p:?}");
         let d = constrain_45(PointF::new(0.0, 0.0), PointF::new(50.0, 60.0));
         assert!((d.x - d.y).abs() < 1e-3);
-        assert_eq!(constrain_45(PointF::new(1.0, 1.0), PointF::new(1.0, 1.0)), PointF::new(1.0, 1.0));
+        assert_eq!(
+            constrain_45(PointF::new(1.0, 1.0), PointF::new(1.0, 1.0)),
+            PointF::new(1.0, 1.0)
+        );
         let sq = drag_rect(PointF::new(10.0, 10.0), PointF::new(60.0, 30.0), Modifiers::SHIFT);
         assert_eq!((sq.w, sq.h), (50.0, 50.0));
         let neg = drag_rect(PointF::new(10.0, 10.0), PointF::new(-40.0, 30.0), Modifiers::SHIFT);

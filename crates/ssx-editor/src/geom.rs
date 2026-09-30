@@ -185,7 +185,7 @@ impl Color {
     pub const BLACK: Color = Color::rgb(0, 0, 0);
     /// Opaque white.
     pub const WHITE: Color = Color::rgb(255, 255, 255);
-    /// Opaque red (ShareX's default shape colour).
+    /// Opaque red (`ShareX`'s default shape colour).
     pub const RED: Color = Color::rgb(255, 0, 0);
     /// Opaque yellow (highlighter).
     pub const YELLOW: Color = Color::rgb(255, 255, 0);
@@ -263,6 +263,7 @@ impl<'de> Deserialize<'de> for Color {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // exact geometry values are what these tests assert
 mod tests {
     use super::*;
 

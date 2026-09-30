@@ -21,7 +21,7 @@ pub fn sk_rect(r: RectF) -> Option<SkRect> {
 }
 
 /// Circular-arc control-point factor for a quarter circle drawn with one cubic.
-const KAPPA: f32 = 0.552_284_75;
+const KAPPA: f32 = 0.552_284_8;
 
 /// Rounded rectangle (`radius` clamped to half the shorter side). A zero radius gives a
 /// plain rectangle.
@@ -276,7 +276,9 @@ pub fn builtin_sticker(which: BuiltinSticker) -> Option<(Path, FillRule)> {
             let t = tiny_skia::Transform::from_rotate_at(45.0, 0.5, 0.5);
             winding(p.transform(t))
         }
-        BuiltinSticker::Minus => winding(polygon(&[(0.05, 0.4), (0.95, 0.4), (0.95, 0.6), (0.05, 0.6)])),
+        BuiltinSticker::Minus => {
+            winding(polygon(&[(0.05, 0.4), (0.95, 0.4), (0.95, 0.6), (0.05, 0.6)]))
+        }
         BuiltinSticker::ArrowRight => winding(polygon(&[
             (0.02, 0.35),
             (0.55, 0.35),
@@ -461,6 +463,7 @@ pub fn grid_dots(r: RectF, spacing: f32) -> Vec<PointF> {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // exact geometry values are what these tests assert
 mod tests {
     use super::*;
 
@@ -557,14 +560,21 @@ mod tests {
         assert!(freehand_path(&[PointF::new(1.0, 1.0)], true).is_none());
         assert!(freehand_path(&[PointF::new(1.0, 1.0), PointF::new(1.0, 1.0)], true).is_none());
         assert!(freehand_path(&[PointF::new(0.0, 0.0), PointF::new(5.0, 5.0)], true).is_some());
-        assert!(freehand_path(&[PointF::new(f32::NAN, 0.0), PointF::new(5.0, 5.0)], true).is_none());
+        assert!(
+            freehand_path(&[PointF::new(f32::NAN, 0.0), PointF::new(5.0, 5.0)], true).is_none()
+        );
     }
 
     #[test]
     fn catmull_rom_passes_through_points() {
         // A spline segment starts and ends exactly on the input points; the bounding box of a
         // straight line of points stays a line.
-        let pts = [PointF::new(0.0, 0.0), PointF::new(10.0, 0.0), PointF::new(20.0, 0.0), PointF::new(30.0, 0.0)];
+        let pts = [
+            PointF::new(0.0, 0.0),
+            PointF::new(10.0, 0.0),
+            PointF::new(20.0, 0.0),
+            PointF::new(30.0, 0.0),
+        ];
         let p = freehand_path(&pts, true).unwrap();
         let r = p.bounds();
         assert_eq!((r.left(), r.right(), r.top(), r.bottom()), (0.0, 30.0, 0.0, 0.0));
@@ -595,7 +605,10 @@ mod tests {
         ] {
             let (p, _) = builtin_sticker(w).unwrap_or_else(|| panic!("{w:?}"));
             let r = p.bounds();
-            assert!(r.left() >= -0.01 && r.top() >= -0.01 && r.right() <= 1.01 && r.bottom() <= 1.01, "{w:?} {r:?}");
+            assert!(
+                r.left() >= -0.01 && r.top() >= -0.01 && r.right() <= 1.01 && r.bottom() <= 1.01,
+                "{w:?} {r:?}"
+            );
             assert!(r.width() > 0.3 && r.height() > 0.15, "{w:?}");
         }
     }

@@ -1,5 +1,7 @@
 //! Undo/redo property tests: random operation sequences must be perfectly reversible.
 
+#![allow(clippy::float_cmp)] // tests assert exact geometry values
+
 mod common;
 
 use common::*;
@@ -112,7 +114,7 @@ fn apply(s: &mut EditorSession, op: &Op) {
             s.set_tool(TOOLS[*tool as usize % TOOLS.len()]);
             let m = Modifiers { shift: *shift, ..none };
             s.pointer_down(pf(*a), none, None);
-            s.pointer_move(pf(((a.0 + b.0) / 2, (a.1 + b.1) / 2)), m, None);
+            s.pointer_move(pf((u16::midpoint(a.0, b.0), u16::midpoint(a.1, b.1))), m, None);
             s.pointer_move(pf(*b), m, None);
             s.pointer_up(pf(*b), m);
             // Text tools start editing: type something short, then commit.
@@ -153,12 +155,12 @@ fn apply(s: &mut EditorSession, op: &Op) {
         }
         Op::Type { text } => {
             s.set_tool(Tool::Select);
-            if let Some(id) = s.selection().first().copied() {
-                if s.document().object(id).is_some_and(|o| o.kind.text_content().is_some()) {
-                    s.begin_text_edit(id);
-                    s.text_insert(text);
-                    s.commit_text_edit();
-                }
+            if let Some(id) = s.selection().first().copied()
+                && s.document().object(id).is_some_and(|o| o.kind.text_content().is_some())
+            {
+                s.begin_text_edit(id);
+                s.text_insert(text);
+                s.commit_text_edit();
             }
         }
         Op::Erase { a, b } => {
@@ -175,7 +177,13 @@ fn apply(s: &mut EditorSession, op: &Op) {
             let _ = s.cut_out(axis, i32::from(*a), i32::from(*b));
         }
         Op::Orient(k) => {
-            let o = [Orient::Rotate90, Orient::Rotate180, Orient::Rotate270, Orient::FlipH, Orient::FlipV][*k as usize % 5];
+            let o = [
+                Orient::Rotate90,
+                Orient::Rotate180,
+                Orient::Rotate270,
+                Orient::FlipH,
+                Orient::FlipV,
+            ][*k as usize % 5];
             let _ = s.orient(o);
         }
         Op::Canvas { l, t, r, b } => {
@@ -186,7 +194,11 @@ fn apply(s: &mut EditorSession, op: &Op) {
             let _ = s.set_padding(Padding::uniform(u32::from(*v % 20)));
         }
         Op::Background(v) => {
-            let _ = s.set_background(if v % 2 == 0 { Fill::None } else { Fill::solid(Color::rgb(*v, 10, 10)) });
+            let _ = s.set_background(if v % 2 == 0 {
+                Fill::None
+            } else {
+                Fill::solid(Color::rgb(*v, 10, 10))
+            });
         }
         Op::Effect(k) => {
             let e = match k % 8 {
@@ -327,6 +339,10 @@ fn redo_is_cleared_by_new_edits_and_history_is_bounded() {
     for i in 0..30 {
         m.resize(120 + i, 80, ResizeFilter::Nearest).unwrap();
     }
-    assert!(m.history().approx_bytes() <= 40_000 + 120 * 100 * 4 * 2, "byte budget respected: {}", m.history().approx_bytes());
+    assert!(
+        m.history().approx_bytes() <= 40_000 + 120 * 100 * 4 * 2,
+        "byte budget respected: {}",
+        m.history().approx_bytes()
+    );
     assert!(m.history().undo_len() < 30);
 }

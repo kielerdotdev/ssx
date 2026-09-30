@@ -23,8 +23,8 @@ use ssx_imgfx::{BlurMethod, Lens, LensShape};
 use ssx_types::{Frame, Rect};
 use tiny_skia::{
     BlendMode as SkBlend, FillRule, FilterQuality, GradientStop, LineCap, LineJoin, LinearGradient,
-    Paint, Path, PathBuilder, Pattern, Pixmap, PixmapPaint, Shader, SpreadMode, Stroke,
-    StrokeDash, Transform,
+    Paint, Path, PathBuilder, Pattern, Pixmap, PixmapPaint, Shader, SpreadMode, Stroke, StrokeDash,
+    Transform,
 };
 
 use crate::{
@@ -159,7 +159,7 @@ fn fill_paint(fill: &Fill, bounds: RectF) -> Option<Paint<'static>> {
             let c = bounds.center();
             let a = angle.to_radians();
             let (dx, dy) = (a.cos(), a.sin());
-            let half = (bounds.w * dx.abs() + bounds.h * dy.abs()) / 2.0;
+            let half = f32::midpoint(bounds.w * dx.abs(), bounds.h * dy.abs());
             let shader = LinearGradient::new(
                 tiny_skia::Point::from_xy(c.x - dx * half, c.y - dy * half),
                 tiny_skia::Point::from_xy(c.x + dx * half, c.y + dy * half),
@@ -208,7 +208,11 @@ fn premul(c: u8, a: u8) -> u8 {
 }
 
 fn unpremul(c: u8, a: u8) -> u8 {
-    if a == 0 || a == 255 { c } else { ((u32::from(c) * 255 + u32::from(a) / 2) / u32::from(a)).min(255) as u8 }
+    if a == 0 || a == 255 {
+        c
+    } else {
+        ((u32::from(c) * 255 + u32::from(a) / 2) / u32::from(a)).min(255) as u8
+    }
 }
 
 fn frame_to_pixmap(f: &Frame) -> Option<Pixmap> {
@@ -285,7 +289,8 @@ impl Renderer {
 
     /// Renders the document. See [`RenderOptions`].
     pub fn render(&mut self, doc: &Document, opts: &RenderOptions) -> Frame {
-        let scale = if opts.scale.is_finite() && opts.scale > 0.0 { opts.scale.min(64.0) } else { 1.0 };
+        let scale =
+            if opts.scale.is_finite() && opts.scale > 0.0 { opts.scale.min(64.0) } else { 1.0 };
         let (cw, ch) = doc.canvas_size();
         let fw = if cw == 0 { 0 } else { ((cw as f32 * scale).round() as u32).max(1) };
         let fh = if ch == 0 { 0 } else { ((ch as f32 * scale).round() as u32).max(1) };
@@ -293,7 +298,7 @@ impl Renderer {
         let out = opts.viewport.unwrap_or(full);
         let mut result = ssx_imgfx::solid_frame(out.width, out.height, [0; 4]);
         let Some(vis) = out.intersect(full) else { return result };
-        let work = self.work_rect(doc, scale, vis, full);
+        let work = Self::work_rect(doc, scale, vis, full);
         let Some(pm) = self.paint(doc, scale, work, opts) else { return result };
         // Copy the visible part into the result.
         let inner = Rect::new(vis.x - work.x, vis.y - work.y, vis.width, vis.height);
@@ -314,11 +319,16 @@ impl Renderer {
     }
 
     /// The rectangle (output pixels) that must be painted to render `vis` correctly.
-    fn work_rect(&self, doc: &Document, scale: f32, vis: Rect, full: Rect) -> Rect {
+    fn work_rect(doc: &Document, scale: f32, vis: Rect, full: Rect) -> Rect {
         let (ox, oy) = doc.canvas_offset();
         let dev = |r: RectF| -> Rect {
-            RectF::new((r.x + ox as f32) * scale, (r.y + oy as f32) * scale, r.w * scale, r.h * scale)
-                .to_outer_rect()
+            RectF::new(
+                (r.x + ox as f32) * scale,
+                (r.y + oy as f32) * scale,
+                r.w * scale,
+                r.h * scale,
+            )
+            .to_outer_rect()
         };
         let mut work = vis;
         for _ in 0..8 {
@@ -347,14 +357,16 @@ impl Renderer {
     }
 
     fn base_pixmap(&mut self, doc: &Document) -> Option<(Arc<Pixmap>, bool)> {
-        if let Some(c) = &self.base {
-            if Arc::ptr_eq(&c.frame, doc.base()) && c.rev == doc.base_revision() {
-                return Some((c.pixmap.clone(), c.opaque));
-            }
+        if let Some(c) = &self.base
+            && Arc::ptr_eq(&c.frame, doc.base())
+            && c.rev == doc.base_revision()
+        {
+            return Some((c.pixmap.clone(), c.opaque));
         }
         let f = doc.base();
         let pm = Arc::new(frame_to_pixmap(f)?);
-        let opaque = (0..f.height()).into_par_iter().all(|y| f.row(y).chunks_exact(4).all(|p| p[3] == 255));
+        let opaque =
+            (0..f.height()).into_par_iter().all(|y| f.row(y).chunks_exact(4).all(|p| p[3] == 255));
         self.base = Some(BaseCache {
             frame: f.clone(),
             rev: doc.base_revision(),
@@ -376,7 +388,13 @@ impl Renderer {
         Some(p)
     }
 
-    fn paint(&mut self, doc: &Document, scale: f32, work: Rect, opts: &RenderOptions) -> Option<Pixmap> {
+    fn paint(
+        &mut self,
+        doc: &Document,
+        scale: f32,
+        work: Rect,
+        opts: &RenderOptions,
+    ) -> Option<Pixmap> {
         let mut pm = Pixmap::new(work.width, work.height)?;
         let (ox, oy) = doc.canvas_offset();
         let off = (ox as f32 * scale, oy as f32 * scale);
@@ -384,7 +402,14 @@ impl Renderer {
             scale,
             work,
             off,
-            view: Transform::from_row(scale, 0.0, 0.0, scale, off.0 - work.x as f32, off.1 - work.y as f32),
+            view: Transform::from_row(
+                scale,
+                0.0,
+                0.0,
+                scale,
+                off.0 - work.x as f32,
+                off.1 - work.y as f32,
+            ),
         };
         self.draw_base(doc, &ctx, &mut pm, opts);
         let mut spotlights_done = false;
@@ -399,11 +424,13 @@ impl Renderer {
         Some(pm)
     }
 
+    #[allow(clippy::float_cmp)] // scale 1.0 is the sentinel for the pixel-exact export path
     fn draw_base(&mut self, doc: &Document, ctx: &Ctx, pm: &mut Pixmap, opts: &RenderOptions) {
         let (cw, ch) = doc.canvas_size();
         let s = ctx.scale;
         // Canvas background over the whole canvas.
-        let canvas = RectF::new(-(ctx.work.x as f32), -(ctx.work.y as f32), cw as f32 * s, ch as f32 * s);
+        let canvas =
+            RectF::new(-(ctx.work.x as f32), -(ctx.work.y as f32), cw as f32 * s, ch as f32 * s);
         if let (Some(paint), Some(r)) =
             (fill_paint(&doc.canvas().background, canvas), shapes::sk_rect(canvas))
         {
@@ -434,7 +461,12 @@ impl Renderer {
                 }
             }
         };
-        let rect = RectF::new(ctx.off.0 - ctx.work.x as f32, ctx.off.1 - ctx.work.y as f32, w as f32 * s, h as f32 * s);
+        let rect = RectF::new(
+            ctx.off.0 - ctx.work.x as f32,
+            ctx.off.1 - ctx.work.y as f32,
+            w as f32 * s,
+            h as f32 * s,
+        );
         let Some(r) = shapes::sk_rect(rect) else { return };
         let paint = Paint {
             shader: Pattern::new(
@@ -460,13 +492,13 @@ impl Renderer {
         spotlights_done: &mut bool,
     ) {
         match &o.kind {
-            ObjectKind::Blur(e) => return self.effect_blur(ctx, pm, e),
-            ObjectKind::Pixelate(e) => return self.effect_pixelate(ctx, pm, e),
-            ObjectKind::Magnify(_) => return self.effect_magnify(ctx, pm, o),
+            ObjectKind::Blur(e) => return Self::effect_blur(ctx, pm, e),
+            ObjectKind::Pixelate(e) => return Self::effect_pixelate(ctx, pm, e),
+            ObjectKind::Magnify(_) => return Self::effect_magnify(ctx, pm, o),
             ObjectKind::Spotlight(_) => {
                 if !*spotlights_done {
                     *spotlights_done = true;
-                    self.effect_spotlights(doc, ctx, pm);
+                    Self::effect_spotlights(doc, ctx, pm);
                 }
                 return;
             }
@@ -514,7 +546,9 @@ impl Renderer {
                 }
             }
             ObjectKind::Arrow(a) => draw_arrow(pm, tf, st, a.a, a.b, &a.heads),
-            ObjectKind::Freehand(f) => draw_freehand(pm, tf, st, &f.points, f.smooth, f.arrow.as_ref()),
+            ObjectKind::Freehand(f) => {
+                draw_freehand(pm, tf, st, &f.points, f.smooth, f.arrow.as_ref());
+            }
             ObjectKind::Text(t) => {
                 let c = &t.content;
                 let pad = c.padding.max(0.0);
@@ -528,7 +562,13 @@ impl Renderer {
             }
             ObjectKind::Balloon(b) => {
                 if let Some(p) = shapes::balloon_outline(b, st.corner_radius) {
-                    fill_and_stroke(pm, &p, tf, st, b.rect.union(&RectF::new(b.tail.x, b.tail.y, 0.0, 0.0)));
+                    fill_and_stroke(
+                        pm,
+                        &p,
+                        tf,
+                        st,
+                        b.rect.union(&RectF::new(b.tail.x, b.tail.y, 0.0, 0.0)),
+                    );
                 }
                 let c = &b.content;
                 let pad = c.padding.max(0.0);
@@ -554,10 +594,8 @@ impl Renderer {
                     ..TextContent::default()
                 };
                 let layout = self.text.layout_content(&content, None);
-                let origin = PointF::new(
-                    s.center.x - layout.width / 2.0,
-                    s.center.y - layout.height / 2.0,
-                );
+                let origin =
+                    PointF::new(s.center.x - layout.width / 2.0, s.center.y - layout.height / 2.0);
                 self.draw_glyphs(pm, tf, origin, &content, &layout);
             }
             ObjectKind::Highlight(h) => {
@@ -582,7 +620,9 @@ impl Renderer {
                 }
             }
             ObjectKind::Sticker(s) => match &s.source {
-                StickerSource::Builtin { which } => draw_builtin(pm, tf, st, s.rect, s.rotation, *which),
+                StickerSource::Builtin { which } => {
+                    draw_builtin(pm, tf, st, s.rect, s.rotation, *which);
+                }
                 StickerSource::Bitmap { image } => {
                     if let Some(img) = self.image_pixmap(&image.0) {
                         draw_bitmap(pm, tf, s.rect, s.rotation, &img);
@@ -638,15 +678,15 @@ impl Renderer {
             if let Some(p) = shapes::rounded_rect(rect, st.corner_radius) {
                 pm.fill_path(&p, &solid(bg), FillRule::Winding, tf, None);
             }
-        } else if let Some(paint) = fill_paint(&st.fill, rect) {
-            if let Some(p) = shapes::rounded_rect(rect, st.corner_radius) {
-                pm.fill_path(&p, &paint, FillRule::Winding, tf, None);
-            }
+        } else if let Some(paint) = fill_paint(&st.fill, rect)
+            && let Some(p) = shapes::rounded_rect(rect, st.corner_radius)
+        {
+            pm.fill_path(&p, &paint, FillRule::Winding, tf, None);
         }
-        if st.has_stroke() {
-            if let Some(p) = shapes::rounded_rect(rect, st.corner_radius) {
-                stroke_only(pm, &p, tf, st, st.stroke);
-            }
+        if st.has_stroke()
+            && let Some(p) = shapes::rounded_rect(rect, st.corner_radius)
+        {
+            stroke_only(pm, &p, tf, st, st.stroke);
         }
         let pad = c.padding.max(0.0);
         self.draw_glyphs(pm, tf, PointF::new(rect.x + pad, rect.y + pad), c, layout);
@@ -680,7 +720,7 @@ impl Renderer {
     // Backdrop effects
     // -------------------------------------------------------------------------------
 
-    fn effect_blur(&mut self, ctx: &Ctx, pm: &mut Pixmap, e: &EffectBox) {
+    fn effect_blur(ctx: &Ctx, pm: &mut Pixmap, e: &EffectBox) {
         let Some(r) = ctx.dev(e.rect.normalized()).intersect(pm_bounds(pm)) else { return };
         let sigma = e.amount * ctx.scale;
         if sigma <= 0.0 {
@@ -706,7 +746,7 @@ impl Renderer {
         }
     }
 
-    fn effect_pixelate(&mut self, ctx: &Ctx, pm: &mut Pixmap, e: &EffectBox) {
+    fn effect_pixelate(ctx: &Ctx, pm: &mut Pixmap, e: &EffectBox) {
         let Some(r) = ctx.dev(e.rect.normalized()).intersect(pm_bounds(pm)) else { return };
         let block = (e.amount * ctx.scale).round().max(1.0) as u32;
         let mut f = pixmap_region_to_frame(pm, r);
@@ -715,33 +755,31 @@ impl Renderer {
         }
     }
 
-    fn effect_magnify(&mut self, ctx: &Ctx, pm: &mut Pixmap, o: &Object) {
+    fn effect_magnify(ctx: &Ctx, pm: &mut Pixmap, o: &Object) {
         let ObjectKind::Magnify(m) = &o.kind else { return };
         let st = &o.style;
         let lens_dr = ctx.dev(m.rect.normalized());
         let bounds = pm_bounds(pm);
         let shape_rect = m.rect.normalized();
         // Shadow of the lens silhouette, beneath the lens.
-        if let Some(sh) = st.shadow {
-            if let Some(bbox) = ctx.dev(o.render_bounds()).intersect(bounds) {
-                if let Some(mut layer) = Pixmap::new(bbox.width, bbox.height) {
-                    let tf = ctx.view.post_translate(-(bbox.x as f32), -(bbox.y as f32));
-                    let p = if m.circular {
-                        shapes::ellipse(shape_rect)
-                    } else {
-                        shapes::rounded_rect(shape_rect, 0.0)
-                    };
-                    if let Some(p) = p {
-                        layer.fill_path(&p, &solid(Color::BLACK), FillRule::Winding, tf, None);
-                    }
-                    draw_shadow(pm, &layer, bbox, &sh, ctx.scale, st.opacity);
-                }
+        if let Some(sh) = st.shadow
+            && let Some(bbox) = ctx.dev(o.render_bounds()).intersect(bounds)
+            && let Some(mut layer) = Pixmap::new(bbox.width, bbox.height)
+        {
+            let tf = ctx.view.post_translate(-(bbox.x as f32), -(bbox.y as f32));
+            let p = if m.circular {
+                shapes::ellipse(shape_rect)
+            } else {
+                shapes::rounded_rect(shape_rect, 0.0)
+            };
+            if let Some(p) = p {
+                layer.fill_path(&p, &solid(Color::BLACK), FillRule::Winding, tf, None);
             }
+            draw_shadow(pm, &layer, bbox, &sh, ctx.scale, st.opacity);
         }
-        let (Some(dst_r), Some(src_r)) = (
-            lens_dr.intersect(bounds),
-            ctx.dev(m.source_rect().inflate(2.0)).intersect(bounds),
-        ) else {
+        let (Some(dst_r), Some(src_r)) =
+            (lens_dr.intersect(bounds), ctx.dev(m.source_rect().inflate(2.0)).intersect(bounds))
+        else {
             return;
         };
         let src = pixmap_region_to_frame(pm, src_r);
@@ -770,7 +808,7 @@ impl Renderer {
     }
 
     /// All visible spotlights together: dim everything except the union of their shapes.
-    fn effect_spotlights(&mut self, doc: &Document, ctx: &Ctx, pm: &mut Pixmap) {
+    fn effect_spotlights(doc: &Document, ctx: &Ctx, pm: &mut Pixmap) {
         let spots: Vec<&crate::object::SpotlightShape> = doc
             .objects()
             .iter()
@@ -783,7 +821,8 @@ impl Renderer {
         let Some(first) = spots.first() else { return };
         let Some(mut mask) = Pixmap::new(pm.width(), pm.height()) else { return };
         for s in &spots {
-            let p = if s.ellipse { shapes::ellipse(s.rect) } else { shapes::rounded_rect(s.rect, 0.0) };
+            let p =
+                if s.ellipse { shapes::ellipse(s.rect) } else { shapes::rounded_rect(s.rect, 0.0) };
             if let Some(p) = p {
                 mask.fill_path(&p, &solid(Color::WHITE), FillRule::Winding, ctx.view, None);
             }
@@ -791,23 +830,33 @@ impl Renderer {
         let feather = first.feather * ctx.scale;
         if feather > 0.0 {
             let (w, h) = (mask.width() as usize, mask.height() as usize);
-            ssx_imgfx::gaussian_blur_premultiplied(mask.data_mut(), w, h, feather, BlurMethod::Auto);
+            ssx_imgfx::gaussian_blur_premultiplied(
+                mask.data_mut(),
+                w,
+                h,
+                feather,
+                BlurMethod::Auto,
+            );
         }
         let dim = first.dim;
         let da = f32::from(dim.a) / 255.0;
         let dc = [f32::from(dim.r), f32::from(dim.g), f32::from(dim.b)];
-        pm.data_mut().par_chunks_mut(4096).zip(mask.data().par_chunks(4096)).for_each(|(px, mk)| {
-            for (p, m) in px.chunks_exact_mut(4).zip(mk.chunks_exact(4)) {
-                let k = da * (1.0 - f32::from(m[3]) / 255.0);
-                if k <= 0.0 {
-                    continue;
+        pm.data_mut().par_chunks_mut(4096).zip(mask.data().par_chunks(4096)).for_each(
+            |(px, mk)| {
+                for (p, m) in px.chunks_exact_mut(4).zip(mk.chunks_exact(4)) {
+                    let k = da * (1.0 - f32::from(m[3]) / 255.0);
+                    if k <= 0.0 {
+                        continue;
+                    }
+                    for c in 0..3 {
+                        p[c] = (f32::from(p[c]) * (1.0 - k) + dc[c] * k).round().clamp(0.0, 255.0)
+                            as u8;
+                    }
+                    p[3] =
+                        (f32::from(p[3]) * (1.0 - k) + 255.0 * k).round().clamp(0.0, 255.0) as u8;
                 }
-                for c in 0..3 {
-                    p[c] = (f32::from(p[c]) * (1.0 - k) + dc[c] * k).round().clamp(0.0, 255.0) as u8;
-                }
-                p[3] = (f32::from(p[3]) * (1.0 - k) + 255.0 * k).round().clamp(0.0, 255.0) as u8;
-            }
-        });
+            },
+        );
     }
 }
 
@@ -918,12 +967,16 @@ fn draw_bitmap(pm: &mut Pixmap, tf: Transform, rect: RectF, rotation: f32, img: 
         return;
     }
     let (iw, ih) = (img.width() as f32, img.height() as f32);
-    let t = rot_transform(tf, r, rotation)
-        .pre_translate(r.x, r.y)
-        .pre_scale(r.w / iw, r.h / ih);
+    let t = rot_transform(tf, r, rotation).pre_translate(r.x, r.y).pre_scale(r.w / iw, r.h / ih);
     let Some(rect) = tiny_skia::Rect::from_xywh(0.0, 0.0, iw, ih) else { return };
     let paint = Paint {
-        shader: Pattern::new(img.as_ref(), SpreadMode::Pad, FilterQuality::Bicubic, 1.0, Transform::identity()),
+        shader: Pattern::new(
+            img.as_ref(),
+            SpreadMode::Pad,
+            FilterQuality::Bicubic,
+            1.0,
+            Transform::identity(),
+        ),
         blend_mode: SkBlend::SourceOver,
         anti_alias: true,
         force_hq_pipeline: false,
@@ -946,7 +999,14 @@ fn draw_builtin(
     pm.fill_path(&path, &solid(colour), rule, t, None);
 }
 
-fn draw_grid(pm: &mut Pixmap, tf: Transform, st: &Style, rect: RectF, pat: GridPattern, spacing: f32) {
+fn draw_grid(
+    pm: &mut Pixmap,
+    tf: Transform,
+    st: &Style,
+    rect: RectF,
+    pat: GridPattern,
+    spacing: f32,
+) {
     if let (Some(paint), Some(r)) = (fill_paint(&st.fill, rect), shapes::sk_rect(rect)) {
         pm.fill_rect(r, &paint, tf, None);
     }
@@ -979,11 +1039,8 @@ fn draw_grid(pm: &mut Pixmap, tf: Transform, st: &Style, rect: RectF, pat: GridP
 
 fn draw_guide(ctx: &Ctx, pm: &mut Pixmap, bounds: RectF) {
     let Some(p) = shapes::rounded_rect(bounds, 0.0) else { return };
-    let stroke = Stroke {
-        width: 1.0,
-        dash: StrokeDash::new(vec![3.0, 3.0], 0.0),
-        ..Stroke::default()
-    };
+    let stroke =
+        Stroke { width: 1.0, dash: StrokeDash::new(vec![3.0, 3.0], 0.0), ..Stroke::default() };
     pm.stroke_path(&p, &solid(Color::rgb(0, 160, 255)), &stroke, ctx.view, None);
 }
 

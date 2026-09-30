@@ -138,8 +138,10 @@ impl EditorSession {
             }
             ObjectKind::Balloon(b) => {
                 let pad = b.content.padding.max(0.0);
-                let layout = engine
-                    .layout(&LayoutRequest::from_content(&b.content, Some((b.rect.w - 2.0 * pad).max(1.0))));
+                let layout = engine.layout(&LayoutRequest::from_content(
+                    &b.content,
+                    Some((b.rect.w - 2.0 * pad).max(1.0)),
+                ));
                 let origin = balloon_text_origin(b, layout.height);
                 Some(Geom { layout, origin, rotation: 0.0, pivot: b.rect.center() })
             }
@@ -163,7 +165,8 @@ impl EditorSession {
             self.history.seal();
         }
         let was_editing = self.text.is_some();
-        self.text = Some(TextEdit { id, caret: end, anchor: end, preferred_x: None, preedit: None });
+        self.text =
+            Some(TextEdit { id, caret: end, anchor: end, preferred_x: None, preedit: None });
         self.set_selection(vec![id]);
         if !was_editing {
             self.events.push(SessionEvent::TextEditing(true));
@@ -180,7 +183,8 @@ impl EditorSession {
             .object(te.id)
             .and_then(|o| o.kind.text_content())
             .is_some_and(|c| c.text.trim().is_empty());
-        let is_text_tool_object = matches!(self.doc.object(te.id).map(|o| &o.kind), Some(ObjectKind::Text(_)));
+        let is_text_tool_object =
+            matches!(self.doc.object(te.id).map(|o| &o.kind), Some(ObjectKind::Text(_)));
         if empty && is_text_tool_object {
             let id = te.id;
             let discarded = self
@@ -219,7 +223,9 @@ impl EditorSession {
         }
         let ins = s.replace("\r\n", "\n").replace('\r', "\n");
         let (id, caret, anchor) = (te.id, te.caret, te.anchor);
-        let Some(cur) = self.doc.object(id).and_then(|o| o.kind.text_content()).map(|c| c.text.clone()) else {
+        let Some(cur) =
+            self.doc.object(id).and_then(|o| o.kind.text_content()).map(|c| c.text.clone())
+        else {
             return;
         };
         let (a, b) = (caret.min(anchor).min(cur.len()), caret.max(anchor).min(cur.len()));
@@ -272,12 +278,10 @@ impl EditorSession {
     /// Clamps caret/anchor after an undo/redo changed the text under the editor.
     pub(crate) fn clamp_text_edit(&mut self) {
         let Some(te) = self.text.as_ref() else { return };
-        let len = self
-            .doc
-            .object(te.id)
-            .and_then(|o| o.kind.text_content())
-            .map_or(0, |c| c.text.len());
-        let text = self.doc.object(te.id).and_then(|o| o.kind.text_content()).map(|c| c.text.clone());
+        let len =
+            self.doc.object(te.id).and_then(|o| o.kind.text_content()).map_or(0, |c| c.text.len());
+        let text =
+            self.doc.object(te.id).and_then(|o| o.kind.text_content()).map(|c| c.text.clone());
         if let (Some(te), Some(text)) = (self.text.as_mut(), text) {
             let snap = |mut i: usize| {
                 i = i.min(len);
@@ -294,7 +298,9 @@ impl EditorSession {
     /// Handles a key while editing. Returns `true` if consumed.
     pub(crate) fn text_key(&mut self, key: Key, mods: Modifiers) -> bool {
         let Some(te) = self.text.clone() else { return false };
-        let Some(cur) = self.doc.object(te.id).and_then(|o| o.kind.text_content()).map(|c| c.text.clone()) else {
+        let Some(cur) =
+            self.doc.object(te.id).and_then(|o| o.kind.text_content()).map(|c| c.text.clone())
+        else {
             return false;
         };
         let (lo, hi) = (te.caret.min(te.anchor), te.caret.max(te.anchor));
@@ -348,10 +354,18 @@ impl EditorSession {
                 let (a, b) = if has_sel {
                     (lo, hi)
                 } else if key == Key::Backspace {
-                    let p = if mods.ctrl { prev_word(&cur, te.caret) } else { prev_char(&cur, te.caret) };
+                    let p = if mods.ctrl {
+                        prev_word(&cur, te.caret)
+                    } else {
+                        prev_char(&cur, te.caret)
+                    };
                     (p, te.caret)
                 } else {
-                    let n = if mods.ctrl { next_word(&cur, te.caret) } else { next_char(&cur, te.caret) };
+                    let n = if mods.ctrl {
+                        next_word(&cur, te.caret)
+                    } else {
+                        next_char(&cur, te.caret)
+                    };
                     (te.caret, n)
                 };
                 if a < b {
@@ -456,6 +470,7 @@ impl EditorSession {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // exact geometry values are what these tests assert
 mod tests {
     use super::*;
 

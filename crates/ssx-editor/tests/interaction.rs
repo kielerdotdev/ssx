@@ -1,13 +1,14 @@
 //! Interaction-script tests: drive `EditorSession` with pointer/key sequences and assert on the
 //! resulting document (typed fields and JSON).
 
+#![allow(clippy::float_cmp)] // tests assert exact geometry values
+
 mod common;
 
 use common::*;
 use ssx_editor::{
-    Color, CursorHint, EditorSession, Key, Modifiers, ObjectKind, PointF, RectF, SessionEvent, Tool,
-    HandleKind,
-    object::Axis,
+    Color, CursorHint, EditorSession, HandleKind, Key, Modifiers, ObjectKind, PointF, RectF,
+    SessionEvent, Tool, object::Axis,
 };
 
 const NONE: Modifiers = Modifiers::NONE;
@@ -22,7 +23,7 @@ fn session() -> EditorSession {
 
 fn drag(s: &mut EditorSession, from: (f32, f32), to: (f32, f32), mods: Modifiers) {
     s.pointer_down(p(from.0, from.1), mods, None);
-    let mid = p((from.0 + to.0) / 2.0, (from.1 + to.1) / 2.0);
+    let mid = p(f32::midpoint(from.0, to.0), f32::midpoint(from.1, to.1));
     s.pointer_move(mid, mods, None);
     s.pointer_move(p(to.0, to.1), mods, None);
     s.pointer_up(p(to.0, to.1), mods);
@@ -49,7 +50,10 @@ fn drawing_a_rectangle_is_one_undo_step_and_matches_json() {
     assert_eq!(s.history().undo_len(), 1, "creation + drag coalesce into one step");
     let json = serde_json::to_value(&s.document().objects()[0]).unwrap();
     assert_eq!(json["kind"]["type"], "rectangle");
-    assert_eq!(json["kind"]["rect"], serde_json::json!({"x": 10.0, "y": 10.0, "w": 50.0, "h": 30.0}));
+    assert_eq!(
+        json["kind"]["rect"],
+        serde_json::json!({"x": 10.0, "y": 10.0, "w": 50.0, "h": 30.0})
+    );
     assert_eq!(json["style"]["stroke"], "#ff0000ff");
     assert_eq!(json["visible"], true);
     s.undo();
@@ -110,7 +114,11 @@ fn freehand_collects_points_in_one_step() {
     s.set_tool(Tool::Freehand);
     s.pointer_down(p(10.0, 10.0), NONE, Some(0.7));
     for i in 1..30 {
-        s.pointer_move(p(10.0 + i as f32 * 3.0, 10.0 + (i as f32 * 0.3).sin() * 20.0), NONE, Some(0.3));
+        s.pointer_move(
+            p(10.0 + i as f32 * 3.0, 10.0 + (i as f32 * 0.3).sin() * 20.0),
+            NONE,
+            Some(0.3),
+        );
     }
     s.pointer_up(p(100.0, 10.0), NONE);
     let ObjectKind::Freehand(f) = &s.document().objects()[0].kind else { panic!() };
@@ -332,16 +340,28 @@ fn text_caret_selection_and_editing_keys() {
     s.key_down(Key::Up, NONE);
     assert_eq!(s.text_edit_state().unwrap().caret, 0);
     s.key_down(Key::Down, NONE);
-    assert_eq!(s.text_edit_state().unwrap().caret, 1, "down from the empty first line lands on line 2");
+    assert_eq!(
+        s.text_edit_state().unwrap().caret,
+        1,
+        "down from the empty first line lands on line 2"
+    );
     s.key_down(Key::End, NONE);
     assert_eq!(s.text_edit_state().unwrap().caret, 5);
     s.key_down(Key::Char('a'), Modifiers::CTRL);
     let st = s.text_edit_state().unwrap();
     assert_eq!((st.anchor.min(st.caret), st.anchor.max(st.caret)), (0, 5));
     s.key_down(Key::Char('c'), Modifiers::CTRL);
-    assert!(s.take_events().iter().any(|e| matches!(e, SessionEvent::SetClipboardText(t) if t == "\nbcXf")));
+    assert!(
+        s.take_events()
+            .iter()
+            .any(|e| matches!(e, SessionEvent::SetClipboardText(t) if t == "\nbcXf"))
+    );
     s.key_down(Key::Char('v'), Modifiers::CTRL);
-    assert_eq!(s.text_edit_state().unwrap().text, "\nbcXf", "paste replaces the selection with the same text");
+    assert_eq!(
+        s.text_edit_state().unwrap().text,
+        "\nbcXf",
+        "paste replaces the selection with the same text"
+    );
 }
 
 #[test]
@@ -372,7 +392,12 @@ fn clicking_inside_edited_text_moves_caret_and_outside_commits() {
     s.pointer_down(p(280.0, 180.0), NONE, None); // elsewhere: commits (and starts a new text)
     s.pointer_up(p(280.0, 180.0), NONE);
     s.key_down(Key::Escape, NONE);
-    let texts: Vec<_> = s.document().objects().iter().map(|o| o.kind.text_content().unwrap().text.clone()).collect();
+    let texts: Vec<_> = s
+        .document()
+        .objects()
+        .iter()
+        .map(|o| o.kind.text_content().unwrap().text.clone())
+        .collect();
     assert_eq!(texts, vec!["abcdef".to_string()]);
 }
 
@@ -386,7 +411,10 @@ fn step_tool_numbers_and_renumbers() {
         s.pointer_up(p(x, 30.0), NONE);
     }
     let ids: Vec<_> = s.document().objects().iter().map(|o| o.id).collect();
-    assert_eq!(ids.iter().map(|i| s.document().step_number(*i).unwrap()).collect::<Vec<_>>(), vec![1, 2, 3, 4]);
+    assert_eq!(
+        ids.iter().map(|i| s.document().step_number(*i).unwrap()).collect::<Vec<_>>(),
+        vec![1, 2, 3, 4]
+    );
     s.select(&[ids[1]]);
     s.delete_selection();
     assert_eq!(s.document().step_number(ids[2]), Some(2));
@@ -534,7 +562,10 @@ fn delete_key_and_shortcuts() {
     assert!(s.key_down(Key::Char('y'), Modifiers::CTRL));
     assert!(s.document().objects().is_empty());
     assert!(s.key_down(Key::Char('z'), Modifiers { shift: false, ctrl: true, alt: false }));
-    assert!(s.key_down(Key::Char('Z'), Modifiers { shift: true, ctrl: true, alt: false }), "ctrl+shift+z redoes");
+    assert!(
+        s.key_down(Key::Char('Z'), Modifiers { shift: true, ctrl: true, alt: false }),
+        "ctrl+shift+z redoes"
+    );
     assert!(s.document().objects().is_empty());
     assert!(!s.key_down(Key::Tab, NONE));
     assert!(!s.key_down(Key::Delete, NONE), "nothing selected: not consumed");
@@ -646,7 +677,11 @@ fn cutout_tool_removes_a_strip() {
         s.pointer_move(p(140.0, 60.0), NONE, None);
         s.overlay().cut_strip
     };
-    assert_eq!(ov_check, Some(RectF::new(100.0, 0.0, 40.0, 200.0)), "mostly-horizontal drag cuts a vertical strip");
+    assert_eq!(
+        ov_check,
+        Some(RectF::new(100.0, 0.0, 40.0, 200.0)),
+        "mostly-horizontal drag cuts a vertical strip"
+    );
     s.pointer_up(p(140.0, 60.0), NONE);
     assert_eq!(s.document().image_size(), (260, 200));
     drag(&mut s, (10.0, 20.0), (15.0, 70.0), NONE);
@@ -675,7 +710,11 @@ fn global_ops_are_undoable_and_report_canvas_change() {
     while s.can_undo() {
         s.undo();
     }
-    assert_eq!(*s.document(), initial, "undo-all restores the initial document exactly, ids included");
+    assert_eq!(
+        *s.document(),
+        initial,
+        "undo-all restores the initial document exactly, ids included"
+    );
     while s.can_redo() {
         s.redo();
     }
@@ -696,7 +735,11 @@ fn snapping_with_ctrl_shows_guides() {
     let g = s.overlay().guides;
     assert!(g.iter().any(|g| g.vertical && g.position == 100.0), "{g:?}");
     s.pointer_up(p(102.0, 50.0), Modifiers::CTRL);
-    assert_eq!(s.document().objects()[1].bounds().right(), 100.0, "corner snapped to the other rectangle's edge");
+    assert_eq!(
+        s.document().objects()[1].bounds().right(),
+        100.0,
+        "corner snapped to the other rectangle's edge"
+    );
     assert!(s.overlay().guides.is_empty(), "guides vanish after the gesture");
     // Without ctrl there is no snapping.
     drag(&mut s, (20.0, 150.0), (102.0, 190.0), NONE);
@@ -732,9 +775,12 @@ fn events_report_dirty_rects_in_image_space() {
     s.take_events();
     drag(&mut s, (10.0, 10.0), (60.0, 40.0), NONE);
     let evs = s.take_events();
-    let dirty: Vec<_> = evs.iter().filter_map(|e| if let SessionEvent::Dirty(r) = e { Some(*r) } else { None }).collect();
+    let dirty: Vec<_> = evs
+        .iter()
+        .filter_map(|e| if let SessionEvent::Dirty(r) = e { Some(*r) } else { None })
+        .collect();
     assert!(!dirty.is_empty());
-    let all = dirty.iter().copied().reduce(|a, b| a.union(b)).unwrap();
+    let all = dirty.iter().copied().reduce(ssx_types::Rect::union).unwrap();
     assert!(all.x <= 8 && all.y <= 8 && all.right() >= 62 && all.bottom() >= 42, "{all:?}");
     assert!(all.right() < 100, "dirty area stays local to the shape: {all:?}");
     assert!(evs.iter().any(|e| matches!(e, SessionEvent::HistoryChanged { can_undo: true, .. })));
@@ -800,4 +846,33 @@ fn zoomed_view_scales_hit_slack_and_handles() {
     s.set_view_scale(f32::NAN);
     s.set_view_scale(-3.0);
     assert!(s.hit_test(p(100.0, 110.0)).is_some(), "invalid zoom values are ignored");
+}
+
+#[test]
+fn insert_image_from_encoded_bytes_and_stickers() {
+    let mut s = session();
+    let png = ssx_imgfx::solid_frame(40, 20, [0, 255, 0, 255])
+        .encode(ssx_types::EncodeOptions::new(ssx_types::ImageFormat::Png))
+        .unwrap();
+    s.insert_image_bytes(&png, Some(p(100.0, 100.0))).unwrap();
+    assert_eq!(types(&s), vec!["image"]);
+    assert_eq!(s.document().objects()[0].bounds(), RectF::new(80.0, 90.0, 40.0, 20.0));
+    assert_eq!(s.selection().len(), 1);
+    assert!(s.insert_image_bytes(b"definitely not an image", None).is_err());
+    assert_eq!(s.document().objects().len(), 1, "a failed decode changes nothing");
+    // Oversized bitmaps are scaled down to fit inside the image.
+    let big = ssx_imgfx::solid_frame(3000, 1000, [1, 2, 3, 255]);
+    s.insert_image(big, None);
+    let b = s.document().objects()[1].bounds();
+    assert!(b.w <= 300.0 * 0.8 + 0.01 && b.h <= 200.0 * 0.8 + 0.01, "{b:?}");
+    s.insert_sticker(
+        ssx_editor::object::StickerSource::Glyph { text: "★".into() },
+        p(50.0, 50.0),
+        40.0,
+    );
+    assert_eq!(types(&s), vec!["image", "image", "sticker"]);
+    s.undo();
+    s.undo();
+    s.undo();
+    assert!(s.document().objects().is_empty());
 }

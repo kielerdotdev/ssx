@@ -14,7 +14,8 @@
 //! * `minor` is bumped for additive changes: every struct here tolerates unknown fields and
 //!   missing fields (defaults), and unknown object kinds load as `ObjectKind::Unknown` and
 //!   are written back verbatim, so a file round-trips through an older editor without losing
-//!   the newer parts.
+//!   the newer parts. An object whose data is malformed for its kind is treated the same way
+//!   (inert, preserved), so one corrupt object never makes a whole project unreadable.
 
 use std::{path::Path, sync::Arc};
 
@@ -111,6 +112,16 @@ fn one32() -> u32 {
     1
 }
 
+/// Borrowed mirror of [`DocumentRepr`] so serialising does not clone every object.
+#[derive(Serialize)]
+struct DocumentOut<'a> {
+    base: &'a BaseRepr,
+    canvas: &'a Canvas,
+    objects: &'a [Object],
+    next_id: u64,
+    step_start: u32,
+}
+
 impl Serialize for Document {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         let png = if self.base.width() == 0 || self.base.height() == 0 {
@@ -118,17 +129,8 @@ impl Serialize for Document {
         } else {
             to_base64(&encode_png(&self.base).map_err(serde::ser::Error::custom)?)
         };
-        // Serialise through a borrowed mirror to avoid cloning objects.
-        #[derive(Serialize)]
-        struct Out<'a> {
-            base: &'a BaseRepr,
-            canvas: &'a Canvas,
-            objects: &'a [Object],
-            next_id: u64,
-            step_start: u32,
-        }
         let base = BaseRepr { width: self.base.width(), height: self.base.height(), png };
-        Out {
+        DocumentOut {
             base: &base,
             canvas: &self.canvas,
             objects: &self.objects,
@@ -205,9 +207,11 @@ pub fn from_json(text: &str) -> Result<Document, ProjectError> {
     if format != FORMAT_NAME {
         return Err(ProjectError::WrongFormat(format));
     }
-    let version =
-        value.get("version").and_then(serde_json::Value::as_u64).unwrap_or(0).min(u64::from(u32::MAX))
-            as u32;
+    let version = value
+        .get("version")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(0)
+        .min(u64::from(u32::MAX)) as u32;
     if version > FORMAT_VERSION {
         return Err(ProjectError::TooNew { found: version, supported: FORMAT_VERSION });
     }
@@ -260,13 +264,23 @@ mod tests {
             Object::new(
                 id,
                 Style { stroke: Color::rgb(1, 2, 3), ..Style::default() },
-                ObjectKind::Rectangle(BoxShape { rect: RectF::new(0.5, 1.25, 3.0, 2.0), rotation: 0.3 }),
+                ObjectKind::Rectangle(BoxShape {
+                    rect: RectF::new(0.5, 1.25, 3.0, 2.0),
+                    rotation: 0.3,
+                }),
             ),
         );
         let id = d.alloc_id();
         d.insert_object(
             1,
-            Object::new(id, Style::default(), ObjectKind::Step(StepShape { center: PointF::new(2.0, 2.0), ..StepShape::default() })),
+            Object::new(
+                id,
+                Style::default(),
+                ObjectKind::Step(StepShape {
+                    center: PointF::new(2.0, 2.0),
+                    ..StepShape::default()
+                }),
+            ),
         );
         d
     }

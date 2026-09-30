@@ -999,7 +999,8 @@ impl Object {
         st.opacity = st.opacity.clamp(0.0, 1.0);
         fix(&mut st.corner_radius, 0.0);
         st.corner_radius = st.corner_radius.clamp(0.0, 10_000.0);
-        if st.shadow.is_some_and(|s| !(s.dx.is_finite() && s.dy.is_finite() && s.blur.is_finite())) {
+        if st.shadow.is_some_and(|s| !(s.dx.is_finite() && s.dy.is_finite() && s.blur.is_finite()))
+        {
             st.shadow = None;
         }
         if let Some(s) = &mut st.shadow {
@@ -1199,15 +1200,12 @@ impl Object {
         // effect kinds swap width and height on quarter turns.
         let remap_box = |r: &mut RectF, rot: Option<&mut f32>| {
             let c = o.map(r.center(), w, h);
-            match rot {
-                Some(rot) => {
-                    *r = RectF::from_center_size(c, r.w, r.h);
-                    *rot = normalize_angle(if mirror { -*rot } else { *rot + rot_delta });
-                }
-                None => {
-                    let (bw, bh) = if o.swaps_axes() { (r.h, r.w) } else { (r.w, r.h) };
-                    *r = RectF::from_center_size(c, bw, bh);
-                }
+            if let Some(rot) = rot {
+                *r = RectF::from_center_size(c, r.w, r.h);
+                *rot = normalize_angle(if mirror { -*rot } else { *rot + rot_delta });
+            } else {
+                let (bw, bh) = if o.swaps_axes() { (r.h, r.w) } else { (r.w, r.h) };
+                *r = RectF::from_center_size(c, bw, bh);
             }
         };
         match &mut self.kind {
@@ -1433,13 +1431,25 @@ pub fn balloon_tail(b: &BalloonShape) -> Option<BalloonTail> {
     // Pick the side by comparing the tip direction to the rectangle's aspect ratio.
     let horizontal = d.x.abs() * r.h > d.y.abs() * r.w;
     Some(if horizontal {
-        let (x, side) = if d.x > 0.0 { (r.right(), TailSide::Right) } else { (r.x, TailSide::Left) };
+        let (x, side) =
+            if d.x > 0.0 { (r.right(), TailSide::Right) } else { (r.x, TailSide::Left) };
         let cy = b.tail.y.clamp(r.y + half, (r.bottom() - half).max(r.y + half));
-        BalloonTail { side, a: PointF::new(x, cy - half), b: PointF::new(x, cy + half), tip: b.tail }
+        BalloonTail {
+            side,
+            a: PointF::new(x, cy - half),
+            b: PointF::new(x, cy + half),
+            tip: b.tail,
+        }
     } else {
-        let (y, side) = if d.y > 0.0 { (r.bottom(), TailSide::Bottom) } else { (r.y, TailSide::Top) };
+        let (y, side) =
+            if d.y > 0.0 { (r.bottom(), TailSide::Bottom) } else { (r.y, TailSide::Top) };
         let cx = b.tail.x.clamp(r.x + half, (r.right() - half).max(r.x + half));
-        BalloonTail { side, a: PointF::new(cx - half, y), b: PointF::new(cx + half, y), tip: b.tail }
+        BalloonTail {
+            side,
+            a: PointF::new(cx - half, y),
+            b: PointF::new(cx + half, y),
+            tip: b.tail,
+        }
     })
 }
 
@@ -1452,7 +1462,8 @@ pub fn balloon_tail_triangle(b: &BalloonShape) -> [PointF; 3] {
 }
 
 fn point_in_triangle(p: PointF, t: [PointF; 3], tol: f32) -> bool {
-    let sign = |a: PointF, b: PointF, c: PointF| (a.x - c.x) * (b.y - c.y) - (b.x - c.x) * (a.y - c.y);
+    let sign =
+        |a: PointF, b: PointF, c: PointF| (a.x - c.x) * (b.y - c.y) - (b.x - c.x) * (a.y - c.y);
     let (d1, d2, d3) = (sign(p, t[0], t[1]), sign(p, t[1], t[2]), sign(p, t[2], t[0]));
     let neg = d1 < 0.0 || d2 < 0.0 || d3 < 0.0;
     let pos = d1 > 0.0 || d2 > 0.0 || d3 > 0.0;
@@ -1466,6 +1477,7 @@ fn point_in_triangle(p: PointF, t: [PointF; 3], tol: f32) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // exact geometry values are what these tests assert
 mod tests {
     use super::*;
 
@@ -1528,7 +1540,10 @@ mod tests {
         let mut o = Object::new(
             ObjectId(3),
             Style { stroke_width: 2.0, ..Style::default() },
-            ObjectKind::Ellipse(BoxShape { rect: RectF::new(0.0, 0.0, 100.0, 50.0), rotation: 0.0 }),
+            ObjectKind::Ellipse(BoxShape {
+                rect: RectF::new(0.0, 0.0, 100.0, 50.0),
+                rotation: 0.0,
+            }),
         );
         assert!(o.hit_test(PointF::new(0.0, 25.0), 0.0));
         assert!(o.hit_test(PointF::new(50.0, 0.0), 0.0));
@@ -1635,7 +1650,8 @@ mod tests {
         o.style.stroke_width = 10.0;
         let base = o.render_bounds();
         assert!(base.x <= 10.0 - 5.0 && base.right() >= 30.0 + 5.0);
-        o.style.shadow = Some(crate::style::Shadow { dx: 10.0, dy: 10.0, blur: 4.0, ..Default::default() });
+        o.style.shadow =
+            Some(crate::style::Shadow { dx: 10.0, dy: 10.0, blur: 4.0, ..Default::default() });
         let with_shadow = o.render_bounds();
         assert!(with_shadow.right() >= base.right() + 10.0);
     }

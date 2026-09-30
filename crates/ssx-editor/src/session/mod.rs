@@ -26,7 +26,7 @@ use self::geometry::SnapTargets;
 use crate::{
     doc::Document,
     geom::{PointF, RectF},
-    history::{Command, CoalesceKey, History, HistoryLimits},
+    history::{CoalesceKey, Command, History, HistoryLimits},
     input::{
         CropOverlay, CursorHint, Guide, Handle, HandleKind, Key, Modifiers, Overlay, SessionEvent,
     },
@@ -62,68 +62,18 @@ pub struct CropPending {
 }
 
 pub(crate) enum Drag {
-    Create {
-        id: ObjectId,
-        tool: Tool,
-        start: PointF,
-        points: Vec<PointF>,
-        key: CoalesceKey,
-    },
-    Move {
-        originals: Vec<Object>,
-        start: PointF,
-        key: CoalesceKey,
-    },
-    ResizeBox {
-        original: Object,
-        handle: HandleKind,
-        rect: RectF,
-        rotation: f32,
-        key: CoalesceKey,
-    },
-    ResizeGroup {
-        originals: Vec<Object>,
-        handle: HandleKind,
-        bounds: RectF,
-        key: CoalesceKey,
-    },
-    Rotate {
-        original: Object,
-        pivot: PointF,
-        start_angle: f32,
-        key: CoalesceKey,
-    },
-    Endpoint {
-        original: Object,
-        which: u8,
-        key: CoalesceKey,
-    },
-    Tail {
-        original: Object,
-        key: CoalesceKey,
-    },
-    Source {
-        original: Object,
-        key: CoalesceKey,
-    },
-    Marquee {
-        start: PointF,
-        cur: PointF,
-        base: Vec<ObjectId>,
-    },
-    Erase {
-        marks: Vec<ObjectId>,
-        last: PointF,
-    },
-    Crop {
-        start: PointF,
-        cur: PointF,
-        points: Vec<PointF>,
-    },
-    CutOut {
-        start: PointF,
-        cur: PointF,
-    },
+    Create { id: ObjectId, tool: Tool, start: PointF, points: Vec<PointF>, key: CoalesceKey },
+    Move { originals: Vec<Object>, start: PointF, key: CoalesceKey },
+    ResizeBox { original: Object, handle: HandleKind, rect: RectF, rotation: f32, key: CoalesceKey },
+    ResizeGroup { originals: Vec<Object>, handle: HandleKind, bounds: RectF, key: CoalesceKey },
+    Rotate { original: Object, pivot: PointF, start_angle: f32, key: CoalesceKey },
+    Endpoint { original: Object, which: u8, key: CoalesceKey },
+    Tail { original: Object, key: CoalesceKey },
+    Source { original: Object, key: CoalesceKey },
+    Marquee { start: PointF, cur: PointF, base: Vec<ObjectId> },
+    Erase { marks: Vec<ObjectId>, last: PointF },
+    Crop { start: PointF, cur: PointF, points: Vec<PointF> },
+    CutOut { start: PointF, cur: PointF },
     TextSelect,
 }
 
@@ -309,12 +259,11 @@ impl EditorSession {
 
     /// Records the effects of a command that has just been executed/undone/redone.
     pub(crate) fn after_change(&mut self, affected: Option<RectF>, canvas_changed: bool) {
-        match affected {
-            Some(r) => self.mark_dirty(r),
-            None => {
-                let c = RectF::from(self.doc.canvas_rect());
-                self.mark_dirty(c);
-            }
+        if let Some(r) = affected {
+            self.mark_dirty(r);
+        } else {
+            let c = RectF::from(self.doc.canvas_rect());
+            self.mark_dirty(c);
         }
         if canvas_changed {
             self.events.push(SessionEvent::CanvasChanged);
@@ -339,11 +288,11 @@ impl EditorSession {
         let before = self.selection.len();
         let doc = &self.doc;
         self.selection.retain(|id| doc.object(*id).is_some());
-        if let Some(t) = &self.text {
-            if self.doc.object(t.id).is_none() {
-                self.text = None;
-                self.events.push(SessionEvent::TextEditing(false));
-            }
+        if let Some(t) = &self.text
+            && self.doc.object(t.id).is_none()
+        {
+            self.text = None;
+            self.events.push(SessionEvent::TextEditing(false));
         }
         if before != self.selection.len() {
             self.events.push(SessionEvent::SelectionChanged);
@@ -374,7 +323,12 @@ impl EditorSession {
     }
 
     /// Replaces `before` objects with `after` versions (skipped when identical).
-    pub(crate) fn modify(&mut self, before: Vec<Object>, mut after: Vec<Object>, key: Option<CoalesceKey>) {
+    pub(crate) fn modify(
+        &mut self,
+        before: Vec<Object>,
+        mut after: Vec<Object>,
+        key: Option<CoalesceKey>,
+    ) {
         // Never let non-finite numbers into the document; an unusable edit is dropped.
         if !after.iter_mut().all(Object::sanitize) {
             return;
@@ -436,7 +390,12 @@ impl EditorSession {
             .objects()
             .iter()
             .rev()
-            .find(|o| o.visible && !o.locked && !matches!(o.kind, ObjectKind::Spotlight(_)) && o.hit_test(p, tol))
+            .find(|o| {
+                o.visible
+                    && !o.locked
+                    && !matches!(o.kind, ObjectKind::Spotlight(_))
+                    && o.hit_test(p, tol)
+            })
             .map(|o| o.id)
             .or_else(|| {
                 // Spotlights are hit last (they are big and dim everything else).
@@ -444,14 +403,20 @@ impl EditorSession {
                     .objects()
                     .iter()
                     .rev()
-                    .find(|o| o.visible && !o.locked && matches!(o.kind, ObjectKind::Spotlight(_)) && o.hit_test(p, tol))
+                    .find(|o| {
+                        o.visible
+                            && !o.locked
+                            && matches!(o.kind, ObjectKind::Spotlight(_))
+                            && o.hit_test(p, tol)
+                    })
                     .map(|o| o.id)
             })
     }
 
     /// Handles of the current selection.
     pub fn handles(&self) -> Vec<Handle> {
-        let objs: Vec<&Object> = self.selection.iter().filter_map(|id| self.doc.object(*id)).collect();
+        let objs: Vec<&Object> =
+            self.selection.iter().filter_map(|id| self.doc.object(*id)).collect();
         if objs.iter().any(|o| o.locked) {
             return Vec::new();
         }
@@ -475,21 +440,27 @@ impl EditorSession {
     pub fn cursor_hint(&self) -> CursorHint {
         if let Some(d) = &self.drag {
             return match d {
-                Drag::Create { .. } | Drag::Crop { .. } | Drag::CutOut { .. } => CursorHint::Crosshair,
+                Drag::Create { .. }
+                | Drag::Crop { .. }
+                | Drag::CutOut { .. }
+                | Drag::Endpoint { .. }
+                | Drag::Tail { .. }
+                | Drag::Source { .. } => CursorHint::Crosshair,
                 Drag::Move { .. } => CursorHint::Grabbing,
-                Drag::ResizeBox { handle, rotation, .. } => geometry::resize_cursor(*handle, *rotation),
+                Drag::ResizeBox { handle, rotation, .. } => {
+                    geometry::resize_cursor(*handle, *rotation)
+                }
                 Drag::ResizeGroup { handle, .. } => geometry::resize_cursor(*handle, 0.0),
                 Drag::Rotate { .. } => CursorHint::Rotate,
-                Drag::Endpoint { .. } | Drag::Tail { .. } | Drag::Source { .. } => CursorHint::Crosshair,
                 Drag::Marquee { .. } => CursorHint::Default,
                 Drag::Erase { .. } => CursorHint::Eraser,
                 Drag::TextSelect => CursorHint::Text,
             };
         }
-        if let Some(t) = &self.text {
-            if self.obj(t.id).is_some_and(|o| o.hit_test(self.hover, self.hit_slack())) {
-                return CursorHint::Text;
-            }
+        if let Some(t) = &self.text
+            && self.obj(t.id).is_some_and(|o| o.hit_test(self.hover, self.hit_slack()))
+        {
+            return CursorHint::Text;
         }
         if let Some(h) = self.hit_handle(self.hover) {
             return h.cursor;
@@ -518,7 +489,8 @@ impl EditorSession {
 
     /// Everything the GUI should draw over the rendered document.
     pub fn overlay(&mut self) -> Overlay {
-        let objs: Vec<&Object> = self.selection.iter().filter_map(|id| self.doc.object(*id)).collect();
+        let objs: Vec<&Object> =
+            self.selection.iter().filter_map(|id| self.doc.object(*id)).collect();
         let mut o = Overlay {
             selection: geometry::outlines(&objs),
             handles: if self.drag.is_none() || matches!(self.drag, Some(Drag::TextSelect)) {
@@ -532,11 +504,13 @@ impl EditorSession {
         };
         o.caret = self.caret_overlay();
         match &self.drag {
-            Some(Drag::Marquee { start, cur, .. }) => o.marquee = Some(RectF::from_points(*start, *cur)),
-            Some(Drag::Erase { marks, .. }) => o.erase_marks = marks.clone(),
+            Some(Drag::Marquee { start, cur, .. }) => {
+                o.marquee = Some(RectF::from_points(*start, *cur));
+            }
+            Some(Drag::Erase { marks, .. }) => o.erase_marks.clone_from(marks),
             Some(Drag::CutOut { start, cur }) => o.cut_strip = Some(self.cut_strip(*start, *cur)),
             Some(Drag::Crop { start, cur, points }) => {
-                o.crop = Some(self.crop_overlay(self.tool, *start, *cur, points));
+                o.crop = Some(Self::crop_overlay(self.tool, *start, *cur, points));
             }
             _ => {}
         }
@@ -550,7 +524,7 @@ impl EditorSession {
         o
     }
 
-    fn crop_overlay(&self, tool: Tool, start: PointF, cur: PointF, points: &[PointF]) -> CropOverlay {
+    fn crop_overlay(tool: Tool, start: PointF, cur: PointF, points: &[PointF]) -> CropOverlay {
         let rect = if tool == Tool::CropFreeform {
             RectF::bounding(points).unwrap_or_default()
         } else {
@@ -685,11 +659,11 @@ impl EditorSession {
     pub fn double_click(&mut self, pos: PointF, _mods: Modifiers) {
         let Some(pos) = sane(pos) else { return };
         self.cancel_drag();
-        if let Some(id) = self.hit_test(pos) {
-            if self.obj(id).is_some_and(|o| o.kind.text_content().is_some()) {
-                self.set_selection(vec![id]);
-                self.begin_text_edit(id);
-            }
+        if let Some(id) = self.hit_test(pos)
+            && self.obj(id).is_some_and(|o| o.kind.text_content().is_some())
+        {
+            self.set_selection(vec![id]);
+            self.begin_text_edit(id);
         }
     }
 
@@ -701,13 +675,14 @@ impl EditorSession {
                 self.history.discard_open(&mut self.doc, |c| matches!(c, Command::Add { .. }));
                 self.after_change(None, false);
             }
-            Drag::Move { originals, .. } => self.revert_to(&originals),
+            Drag::Move { originals, .. } | Drag::ResizeGroup { originals, .. } => {
+                self.revert_to(&originals);
+            }
             Drag::ResizeBox { original, .. }
             | Drag::Rotate { original, .. }
             | Drag::Endpoint { original, .. }
             | Drag::Tail { original, .. }
             | Drag::Source { original, .. } => self.revert_to(std::slice::from_ref(&original)),
-            Drag::ResizeGroup { originals, .. } => self.revert_to(&originals),
             _ => {}
         }
         self.guides.clear();
@@ -718,7 +693,8 @@ impl EditorSession {
     fn revert_to(&mut self, originals: &[Object]) {
         let cur: Vec<Object> = originals.iter().filter_map(|o| self.obj(o.id).cloned()).collect();
         // Drop the open (coalesced) drag entry so cancelling leaves no undo step.
-        let dropped = self.history.discard_open(&mut self.doc, |c| matches!(c, Command::Modify { .. }));
+        let dropped =
+            self.history.discard_open(&mut self.doc, |c| matches!(c, Command::Modify { .. }));
         if dropped {
             self.after_change(None, false);
         } else if cur != originals {
@@ -735,46 +711,48 @@ impl EditorSession {
             self.begin_handle_drag(h, pos);
             return;
         }
-        match self.hit_test(pos) {
-            Some(id) => {
-                if mods.shift {
-                    let mut sel = self.selection.clone();
-                    if let Some(i) = sel.iter().position(|s| *s == id) {
-                        sel.remove(i);
-                        // Toggling a grouped object off removes its whole group.
-                        let g = self.obj(id).and_then(|o| o.group);
-                        if let Some(g) = g {
-                            sel.retain(|s| self.obj(*s).and_then(|o| o.group) != Some(g));
-                        }
-                    } else {
-                        sel.push(id);
+        if let Some(id) = self.hit_test(pos) {
+            if mods.shift {
+                let mut sel = self.selection.clone();
+                if let Some(i) = sel.iter().position(|s| *s == id) {
+                    sel.remove(i);
+                    // Toggling a grouped object off removes its whole group.
+                    let g = self.obj(id).and_then(|o| o.group);
+                    if let Some(g) = g {
+                        sel.retain(|s| self.obj(*s).and_then(|o| o.group) != Some(g));
                     }
-                    self.set_selection(sel);
-                    return;
+                } else {
+                    sel.push(id);
                 }
-                if !self.selection.contains(&id) {
-                    self.set_selection(vec![id]);
-                }
-                let originals: Vec<Object> =
-                    self.selection.iter().filter_map(|i| self.obj(*i).cloned()).filter(|o| !o.locked).collect();
-                if originals.is_empty() {
-                    return;
-                }
-                let key = self.next_key("drag");
-                self.drag = Some(Drag::Move { originals, start: pos, key });
+                self.set_selection(sel);
+                return;
             }
-            None => {
-                let base = if mods.shift { self.selection.clone() } else { Vec::new() };
-                if !mods.shift {
-                    self.set_selection(Vec::new());
-                }
-                self.drag = Some(Drag::Marquee { start: pos, cur: pos, base });
+            if !self.selection.contains(&id) {
+                self.set_selection(vec![id]);
             }
+            let originals: Vec<Object> = self
+                .selection
+                .iter()
+                .filter_map(|i| self.obj(*i).cloned())
+                .filter(|o| !o.locked)
+                .collect();
+            if originals.is_empty() {
+                return;
+            }
+            let key = self.next_key("drag");
+            self.drag = Some(Drag::Move { originals, start: pos, key });
+        } else {
+            let base = if mods.shift { self.selection.clone() } else { Vec::new() };
+            if !mods.shift {
+                self.set_selection(Vec::new());
+            }
+            self.drag = Some(Drag::Marquee { start: pos, cur: pos, base });
         }
     }
 
     fn begin_handle_drag(&mut self, h: Handle, pos: PointF) {
-        let objs: Vec<Object> = self.selection.iter().filter_map(|i| self.obj(*i).cloned()).collect();
+        let objs: Vec<Object> =
+            self.selection.iter().filter_map(|i| self.obj(*i).cloned()).collect();
         let key = self.next_key("drag");
         match (h.kind, objs.as_slice()) {
             (HandleKind::Rotate, [o]) => {
@@ -792,7 +770,9 @@ impl EditorSession {
                 self.drag = Some(Drag::Endpoint { original: o.clone(), which: w, key });
             }
             (HandleKind::Tail, [o]) => self.drag = Some(Drag::Tail { original: o.clone(), key }),
-            (HandleKind::Source, [o]) => self.drag = Some(Drag::Source { original: o.clone(), key }),
+            (HandleKind::Source, [o]) => {
+                self.drag = Some(Drag::Source { original: o.clone(), key });
+            }
             (kind, [o]) if kind.direction().is_some() => match o.kind.as_box() {
                 Some((rect, rotation)) => {
                     self.drag = Some(Drag::ResizeBox {
@@ -813,8 +793,10 @@ impl EditorSession {
                 }
             },
             (kind, many) if kind.direction().is_some() && !many.is_empty() => {
-                let bounds = many.iter().map(Object::bounds).reduce(|a, b| a.union(&b)).unwrap_or_default();
-                self.drag = Some(Drag::ResizeGroup { bounds, originals: many.to_vec(), handle: kind, key });
+                let bounds =
+                    many.iter().map(Object::bounds).reduce(|a, b| a.union(&b)).unwrap_or_default();
+                self.drag =
+                    Some(Drag::ResizeGroup { bounds, originals: many.to_vec(), handle: kind, key });
             }
             _ => {}
         }
@@ -843,8 +825,17 @@ impl EditorSession {
                 if mods.ctrl {
                     let ids: Vec<ObjectId> = originals.iter().map(|o| o.id).collect();
                     let t = self.snap_targets(&ids);
-                    let b = originals.iter().map(Object::bounds).reduce(|a, b| a.union(&b)).unwrap_or_default();
-                    let (sx, sy, g) = geometry::snap_rect(b.translate(delta.x, delta.y), &t, self.snap_thr(), self.extent());
+                    let b = originals
+                        .iter()
+                        .map(Object::bounds)
+                        .reduce(|a, b| a.union(&b))
+                        .unwrap_or_default();
+                    let (sx, sy, g) = geometry::snap_rect(
+                        b.translate(delta.x, delta.y),
+                        &t,
+                        self.snap_thr(),
+                        self.extent(),
+                    );
                     delta = delta + PointF::new(sx, sy);
                     self.guides = g;
                 } else {
@@ -868,17 +859,18 @@ impl EditorSession {
                 if let Some(r) = n.kind.rect_mut() {
                     *r = nr;
                 }
-                if let ObjectKind::Text(t) = &mut n.kind {
-                    if handle.direction().is_some_and(|(dx, _)| dx != 0) {
-                        t.auto_width = false;
-                    }
+                if let ObjectKind::Text(t) = &mut n.kind
+                    && handle.direction().is_some_and(|(dx, _)| dx != 0)
+                {
+                    t.auto_width = false;
                 }
                 self.sync_text(&mut n);
                 self.modify(vec![original.clone()], vec![n], Some(key));
                 Drag::ResizeBox { original, handle, rect, rotation, key }
             }
             Drag::ResizeGroup { originals, handle, bounds, key } => {
-                let p = self.maybe_snap(pos, mods, &originals.iter().map(|o| o.id).collect::<Vec<_>>());
+                let p =
+                    self.maybe_snap(pos, mods, &originals.iter().map(|o| o.id).collect::<Vec<_>>());
                 let (anchor, sx, sy) = geometry::group_scale(bounds, handle, p, mods);
                 let after: Vec<Object> = originals
                     .iter()
@@ -893,7 +885,8 @@ impl EditorSession {
             }
             Drag::Rotate { original, pivot, start_angle, key } => {
                 let now = (pos - pivot).y.atan2((pos - pivot).x);
-                let mut rot = crate::object::normalize_angle(original.kind.rotation() + now - start_angle);
+                let mut rot =
+                    crate::object::normalize_angle(original.kind.rotation() + now - start_angle);
                 if mods.shift {
                     let step = 15f32.to_radians();
                     rot = crate::object::normalize_angle((rot / step).round() * step);
@@ -1066,7 +1059,7 @@ impl EditorSession {
                 if mods.shift {
                     *points = vec![start, geometry::constrain_45(start, cur)];
                 }
-                h.points = points.clone();
+                h.points.clone_from(points);
             }
             ObjectKind::Step(s) => s.center = cur,
             ObjectKind::Cursor(c) => c.pos = cur,
@@ -1263,10 +1256,10 @@ impl EditorSession {
         if self.text.is_some() && self.text_key(key, mods) {
             return true;
         }
-        if mods.ctrl {
-            if let Key::Char(c) = key {
-                return self.shortcut(c.to_ascii_lowercase(), mods);
-            }
+        if mods.ctrl
+            && let Key::Char(c) = key
+        {
+            return self.shortcut(c.to_ascii_lowercase(), mods);
         }
         match key {
             Key::Escape => {
@@ -1326,7 +1319,13 @@ impl EditorSession {
             'z' => self.undo(),
             'y' => self.redo(),
             'a' => {
-                let ids = self.doc.objects().iter().filter(|o| o.visible && !o.locked).map(|o| o.id).collect();
+                let ids = self
+                    .doc
+                    .objects()
+                    .iter()
+                    .filter(|o| o.visible && !o.locked)
+                    .map(|o| o.id)
+                    .collect();
                 self.set_selection(ids);
             }
             'c' => self.copy(),
@@ -1378,7 +1377,8 @@ impl EditorSession {
             }
             return;
         }
-        let before: Vec<Object> = self.selection.iter().filter_map(|i| self.obj(*i).cloned()).collect();
+        let before: Vec<Object> =
+            self.selection.iter().filter_map(|i| self.obj(*i).cloned()).collect();
         let after: Vec<Object> = before
             .iter()
             .map(|o| {
@@ -1411,6 +1411,18 @@ impl EditorSession {
         self.add_object(Object::new(self.doc.peek_next_id(), style, kind));
     }
 
+    /// Decodes an image file (PNG/JPEG/WebP/BMP/GIF bytes, e.g. from the clipboard or a file
+    /// dialog) and inserts it as an image object.
+    pub fn insert_image_bytes(
+        &mut self,
+        bytes: &[u8],
+        at: Option<PointF>,
+    ) -> Result<(), crate::DocError> {
+        let frame = Frame::decode(bytes)?;
+        self.insert_image(frame, at);
+        Ok(())
+    }
+
     /// Inserts a sticker (built-in, glyph or bitmap) centred at `at`.
     pub fn insert_sticker(&mut self, source: StickerSource, at: PointF, size: f32) {
         let Some(Preset { style, mut kind }) = self.styles.get(Tool::Sticker) else { return };
@@ -1428,10 +1440,7 @@ impl EditorSession {
         let id = obj.id;
         obj.sanitize();
         self.sync_text(&mut obj);
-        let cmd = Command::Add {
-            items: vec![(self.doc.objects().len(), obj)],
-            prev_next_id: id.0,
-        };
+        let cmd = Command::Add { items: vec![(self.doc.objects().len(), obj)], prev_next_id: id.0 };
         self.exec(cmd, None);
         self.set_selection(vec![id]);
         id
@@ -1446,11 +1455,7 @@ fn sane(p: PointF) -> Option<PointF> {
 }
 
 fn line_ends(start: PointF, end: PointF, mods: Modifiers) -> (PointF, PointF) {
-    if mods.alt {
-        (start - (end - start), end)
-    } else {
-        (start, end)
-    }
+    if mods.alt { (start - (end - start), end) } else { (start, end) }
 }
 
 fn rect_intersection(a: RectF, b: RectF) -> Option<RectF> {

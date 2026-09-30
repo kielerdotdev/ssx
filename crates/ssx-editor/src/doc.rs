@@ -231,10 +231,10 @@ impl Document {
             }
         }
         for id in order {
-            if let Some(&i) = map.get(id) {
-                if let Some(o) = taken[i].take() {
-                    rest.push(o);
-                }
+            if let Some(&i) = map.get(id)
+                && let Some(o) = taken[i].take()
+            {
+                rest.push(o);
             }
         }
         self.objects = rest;
@@ -470,9 +470,15 @@ impl Document {
         self.set_base(out);
         let p = self.canvas.padding;
         self.canvas.padding = match o {
-            Orient::Rotate90 => Padding { left: p.bottom, top: p.left, right: p.top, bottom: p.right },
-            Orient::Rotate180 => Padding { left: p.right, top: p.bottom, right: p.left, bottom: p.top },
-            Orient::Rotate270 => Padding { left: p.top, top: p.right, right: p.bottom, bottom: p.left },
+            Orient::Rotate90 => {
+                Padding { left: p.bottom, top: p.left, right: p.top, bottom: p.right }
+            }
+            Orient::Rotate180 => {
+                Padding { left: p.right, top: p.bottom, right: p.left, bottom: p.top }
+            }
+            Orient::Rotate270 => {
+                Padding { left: p.top, top: p.right, right: p.bottom, bottom: p.left }
+            }
             Orient::FlipH => Padding { left: p.right, right: p.left, ..p },
             Orient::FlipV => Padding { top: p.bottom, bottom: p.top, ..p },
         };
@@ -499,8 +505,12 @@ impl Document {
         }
         let p = self.canvas.padding;
         let sc = |v: u32, s: f32| (v as f32 * s).round() as u32;
-        self.canvas.padding =
-            Padding { left: sc(p.left, sx), top: sc(p.top, sy), right: sc(p.right, sx), bottom: sc(p.bottom, sy) };
+        self.canvas.padding = Padding {
+            left: sc(p.left, sx),
+            top: sc(p.top, sy),
+            right: sc(p.right, sx),
+            bottom: sc(p.bottom, sy),
+        };
         Ok(())
     }
 
@@ -567,6 +577,7 @@ fn paste(dst: &mut Frame, src: &Frame, at: Point) -> Result<(), DocError> {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // exact geometry values are what these tests assert
 mod tests {
     use super::*;
     use crate::object::{BoxShape, LineShape, StepShape};
@@ -587,7 +598,11 @@ mod tests {
         let id = d.alloc_id();
         d.insert_object(
             usize::MAX,
-            Object::new(id, Style::default(), ObjectKind::Rectangle(BoxShape { rect: r, rotation: 0.0 })),
+            Object::new(
+                id,
+                Style::default(),
+                ObjectKind::Rectangle(BoxShape { rect: r, rotation: 0.0 }),
+            ),
         );
         id
     }
@@ -759,11 +774,17 @@ mod tests {
                 Object::new(
                     id,
                     Style::default(),
-                    ObjectKind::Step(StepShape { center: PointF::new(i as f32, 0.0), ..StepShape::default() }),
+                    ObjectKind::Step(StepShape {
+                        center: PointF::new(i as f32, 0.0),
+                        ..StepShape::default()
+                    }),
                 ),
             );
         }
-        assert_eq!(ids.iter().map(|&i| d.step_number(i).unwrap()).collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(
+            ids.iter().map(|&i| d.step_number(i).unwrap()).collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
         d.remove_object(ids[0]);
         assert_eq!(d.step_number(ids[1]), Some(1));
         assert_eq!(d.step_number(ids[2]), Some(2));
@@ -795,7 +816,10 @@ mod tests {
             Object::new(
                 blur,
                 Style::default(),
-                ObjectKind::Blur(crate::object::EffectBox { rect: RectF::new(40.0, 40.0, 20.0, 20.0), amount: 5.0 }),
+                ObjectKind::Blur(crate::object::EffectBox {
+                    rect: RectF::new(40.0, 40.0, 20.0, 20.0),
+                    amount: 5.0,
+                }),
             ),
         );
         let hit = d.dirty_region(RectF::new(45.0, 45.0, 2.0, 2.0));

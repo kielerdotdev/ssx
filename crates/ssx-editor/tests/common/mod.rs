@@ -73,7 +73,7 @@ pub fn assert_golden(name: &str, frame: &Frame) {
         return;
     }
     let bytes = std::fs::read(&path).unwrap_or_else(|_| {
-        panic!("missing golden {path:?}; run with UPDATE_GOLDEN=1 to create it")
+        panic!("missing golden {}; run with UPDATE_GOLDEN=1 to create it", path.display())
     });
     let want = Frame::decode(&bytes).expect("golden decodes");
     assert_eq!(
@@ -99,5 +99,8 @@ pub fn assert_golden(name: &str, frame: &Frame) {
         let out = std::env::temp_dir().join(format!("golden-actual-{name}.png"));
         let _ = frame.save(&out);
     }
-    assert!(ok, "golden {name}: max diff {max}, mean {mean:.4}, {bad} channels differ by >4 (actual saved to temp dir)");
+    assert!(
+        ok,
+        "golden {name}: max diff {max}, mean {mean:.4}, {bad} channels differ by >4 (actual saved to temp dir)"
+    );
 }

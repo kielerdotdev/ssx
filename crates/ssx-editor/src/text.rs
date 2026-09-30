@@ -41,7 +41,10 @@ pub const DEFAULT_FAMILY: &str = "Liberation Sans";
 const CACHE_LIMIT: usize = 2048;
 
 /// Top-left of a balloon's text block: padded from the left, vertically centred when it fits.
-pub fn balloon_text_origin(b: &crate::object::BalloonShape, layout_height: f32) -> crate::geom::PointF {
+pub fn balloon_text_origin(
+    b: &crate::object::BalloonShape,
+    layout_height: f32,
+) -> crate::geom::PointF {
     let pad = b.content.padding.max(0.0);
     let y = b.rect.y + ((b.rect.h - layout_height) / 2.0).max(pad.min(b.rect.h / 2.0));
     crate::geom::PointF::new(b.rect.x + pad, y)
@@ -185,6 +188,17 @@ impl Default for TextEngine {
     }
 }
 
+/// One visual line as produced by the shaper, before alignment and byte ranges are resolved.
+struct RawRun {
+    line_i: usize,
+    top: f32,
+    height: f32,
+    baseline: f32,
+    width: f32,
+    rtl: bool,
+    glyphs: Vec<GlyphPos>,
+}
+
 impl TextEngine {
     /// Creates an engine with only the bundled fonts.
     pub fn new() -> Self {
@@ -232,11 +246,7 @@ impl TextEngine {
     }
 
     /// Convenience: layout of a [`TextContent`].
-    pub fn layout_content(
-        &mut self,
-        c: &TextContent,
-        wrap_width: Option<f32>,
-    ) -> Arc<TextLayout> {
+    pub fn layout_content(&mut self, c: &TextContent, wrap_width: Option<f32>) -> Arc<TextLayout> {
         self.layout(&LayoutRequest::from_content(c, wrap_width))
     }
 
@@ -255,7 +265,10 @@ impl TextEngine {
             .style(if req.font.italic { FontStyle::Italic } else { FontStyle::Normal });
         let wrap_width = req.wrap_width.filter(|w| w.is_finite()).map(|w| w.max(1.0));
         let mut buf = Buffer::new(&mut self.fs, Metrics::new(size, line_h));
-        buf.set_wrap(&mut self.fs, if wrap_width.is_some() { Wrap::WordOrGlyph } else { Wrap::None });
+        buf.set_wrap(
+            &mut self.fs,
+            if wrap_width.is_some() { Wrap::WordOrGlyph } else { Wrap::None },
+        );
         buf.set_size(&mut self.fs, wrap_width, None);
         buf.set_text(&mut self.fs, req.text, &attrs, Shaping::Advanced);
         buf.shape_until_scroll(&mut self.fs, false);
@@ -270,15 +283,6 @@ impl TextEngine {
             off += l.len() + 1;
         }
 
-        struct RawRun {
-            line_i: usize,
-            top: f32,
-            height: f32,
-            baseline: f32,
-            width: f32,
-            rtl: bool,
-            glyphs: Vec<GlyphPos>,
-        }
         let mut raw: Vec<RawRun> = Vec::new();
         for run in buf.layout_runs() {
             let base = starts.get(run.line_i).copied().unwrap_or(0);
@@ -416,11 +420,12 @@ impl TextEngine {
         let mut pb = PathBuilder::new();
         let mut any = false;
         for g in &layout.glyphs {
-            if let Some(p) = self.glyph_path(g) {
-                if let Some(moved) = p.as_ref().clone().transform(Transform::from_translate(g.x, g.y)) {
-                    pb.push_path(&moved);
-                    any = true;
-                }
+            if let Some(p) = self.glyph_path(g)
+                && let Some(moved) =
+                    p.as_ref().clone().transform(Transform::from_translate(g.x, g.y))
+            {
+                pb.push_path(&moved);
+                any = true;
             }
         }
         let path = if any { pb.finish().map(Arc::new) } else { None };
@@ -469,13 +474,20 @@ impl TextLayout {
         }
         match gl.last() {
             Some(last) if byte >= line.end || byte >= last.end => {
-                if last.rtl { last.x } else { last.x + last.w }
+                if last.rtl {
+                    last.x
+                } else {
+                    last.x + last.w
+                }
             }
             Some(first) if byte <= line.start => {
-                if line.rtl { first.x + first.w } else { line.x_offset }
+                if line.rtl {
+                    first.x + first.w
+                } else {
+                    line.x_offset
+                }
             }
-            Some(_) => line.x_offset,
-            None => line.x_offset,
+            _ => line.x_offset,
         }
     }
 
@@ -504,11 +516,7 @@ impl TextLayout {
         }
         // Past either end of the line.
         let last = &gl[gl.len() - 1];
-        if x > last.x + last.w {
-            if last.rtl { line.start } else { line.end }
-        } else {
-            line.start
-        }
+        if x > last.x + last.w { if last.rtl { line.start } else { line.end } } else { line.start }
     }
 
     fn snap_to_char(&self, mut b: usize) -> usize {
@@ -576,6 +584,7 @@ impl TextLayout {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // exact geometry values are what these tests assert
 mod tests {
     use super::*;
 
