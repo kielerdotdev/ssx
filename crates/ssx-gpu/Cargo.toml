@@ -1,0 +1,25 @@
+[package]
+name = "ssx-gpu"
+description = "wgpu compute pipeline for HDR to SDR tonemapping and video frame conversion."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+ssx-types.workspace = true
+ssx-hdr.workspace = true
+wgpu = { version = "30", default-features = false, features = ["std", "parking_lot", "wgsl", "vulkan", "metal", "dx12", "gles"] }
+bytemuck = { version = "1", features = ["derive"] }
+pollster = "1"
+thiserror.workspace = true
+half.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+naga = { version = "30", features = ["wgsl-in"] }
+
+[lints]
+workspace = true

@@ -64,6 +64,7 @@ opt-level = 2
 
 [profile.dev]
 opt-level = 1
+debug = "line-tables-only"
 
 [profile.release]
 lto = "thin"
