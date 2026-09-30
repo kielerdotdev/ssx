@@ -2,7 +2,7 @@
 //!
 //! Installing and removing go through `ssx_shell::Integrations` exactly as `ssx shell
 //! install` does (idempotent, marker files, nothing of anyone else's touched) and the
-//! per-file-manager [`Report`] is shown as it comes back. The diagnostics are the CLI's
+//! per-file-manager `ssx_shell::Report` is shown as it comes back. The diagnostics are the CLI's
 //! `doctor` report, gathered on a worker thread (probing the clipboard, the notification
 //! service and the credential store can take seconds), with a *Copy report* button that puts
 //! the same text `ssx doctor` prints on the clipboard.
