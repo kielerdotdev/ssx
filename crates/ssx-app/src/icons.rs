@@ -95,10 +95,13 @@ fn layers(kind: IconKind) -> Vec<(Shape, Color)> {
     let mut v = vec![(Shape::RoundRect(0.04, 0.04, 0.96, 0.96, 0.22), SLATE)];
     // Viewfinder brackets: an L in each corner of a square inset from the edge.
     let (lo, hi, arm, t) = (0.20_f32, 0.80_f32, 0.17_f32, 0.075_f32);
-    for (x, y, dx, dy) in [(lo, lo, 1.0, 1.0), (hi, lo, -1.0, 1.0), (lo, hi, 1.0, -1.0), (hi, hi, -1.0, -1.0)]
+    for (x, y, dx, dy) in
+        [(lo, lo, 1.0, 1.0), (hi, lo, -1.0, 1.0), (lo, hi, 1.0, -1.0), (hi, hi, -1.0, -1.0)]
     {
-        let horizontal = (x.min(x + dx * arm), (y.min(y + dy * t)), x.max(x + dx * arm), y.max(y + dy * t));
-        let vertical = (x.min(x + dx * t), y.min(y + dy * arm), x.max(x + dx * t), y.max(y + dy * arm));
+        let horizontal =
+            (x.min(x + dx * arm), (y.min(y + dy * t)), x.max(x + dx * arm), y.max(y + dy * t));
+        let vertical =
+            (x.min(x + dx * t), y.min(y + dy * arm), x.max(x + dx * t), y.max(y + dy * arm));
         v.push((Shape::Rect(horizontal.0, horizontal.1, horizontal.2, horizontal.3), WHITE));
         v.push((Shape::Rect(vertical.0, vertical.1, vertical.2, vertical.3), WHITE));
     }
@@ -196,7 +199,11 @@ mod tests {
             for size in [16, 32, 48] {
                 let img = render(kind, size);
                 for (x, y) in [(0, 0), (size - 1, 0), (0, size - 1), (size - 1, size - 1)] {
-                    assert_eq!(img.pixel(x, y)[3], 0, "{kind:?}@{size} corner ({x},{y}) must be transparent");
+                    assert_eq!(
+                        img.pixel(x, y)[3],
+                        0,
+                        "{kind:?}@{size} corner ({x},{y}) must be transparent"
+                    );
                 }
                 // Inside the rounded square, away from the glyph: fully opaque slate.
                 let p = img.pixel(size / 2, (size as f32 * 0.14) as u32);
@@ -210,9 +217,15 @@ mod tests {
         for size in [16, 24, 32, 48] {
             let c = size / 2;
             let rec = render(IconKind::Recording, size).pixel(c, c);
-            assert!(rec[0] > 200 && rec[1] < 110 && rec[2] < 100, "recording centre {rec:?} @ {size}");
+            assert!(
+                rec[0] > 200 && rec[1] < 110 && rec[2] < 100,
+                "recording centre {rec:?} @ {size}"
+            );
             let idle = render(IconKind::Idle, size).pixel(c, c);
-            assert!(idle[0] > 200 && idle[1] > 200 && idle[2] > 200, "idle centre {idle:?} @ {size}");
+            assert!(
+                idle[0] > 200 && idle[1] > 200 && idle[2] > 200,
+                "idle centre {idle:?} @ {size}"
+            );
         }
     }
 
@@ -262,7 +275,11 @@ mod tests {
             let share = |s: u32| render(kind, s).coverage();
             let base = share(16);
             for s in [32, 48, 64] {
-                assert!((share(s) - base).abs() < 0.02, "{kind:?}: {base} at 16 vs {} at {s}", share(s));
+                assert!(
+                    (share(s) - base).abs() < 0.02,
+                    "{kind:?}: {base} at 16 vs {} at {s}",
+                    share(s)
+                );
             }
         }
     }

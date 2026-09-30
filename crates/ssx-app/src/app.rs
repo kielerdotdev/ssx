@@ -50,7 +50,7 @@ use crate::{
     coalesce::CoalesceConfig,
     daemon::{Limits, Origin, ShutdownGrace, Supervisor},
     events::UiSink,
-    hotkeys_glue::{HotkeyControl, HotkeyRunner, HotkeyStatus, HotkeyTarget, HotkeyThread, plan},
+    hotkeys_glue::{HotkeyControl, HotkeyStatus, HotkeyTarget, plan},
     ids::RunIds,
     ipc_server::{AppControl, FilesCoalescer, IpcHandler, files_coalescer},
     logging,
@@ -60,7 +60,7 @@ use crate::{
     reload::{ReloadOutcome, ReloadState, SettingsWatcher, read_settings_text},
     requests::job_for_workflow,
     runtime::{EngineRunner, Runtime, RuntimeOptions, describe_paths},
-    tray::{ActionSink, NoTray, TrayHandle},
+    tray::{ActionSink, TrayHandle},
     ui::{TrayCell, UiDeps, UiHandle, UiInner, build_view},
 };
 
@@ -85,7 +85,11 @@ pub enum AppError {
 pub fn resolve_paths(config_dir: Option<&Path>) -> Result<Paths, AppError> {
     let over = config_dir.map(|d| d.as_os_str().to_owned());
     Paths::discover_with(|k| {
-        if k == CONFIG_DIR_ENV { over.clone().or_else(|| std::env::var_os(k)) } else { std::env::var_os(k) }
+        if k == CONFIG_DIR_ENV {
+            over.clone().or_else(|| std::env::var_os(k))
+        } else {
+            std::env::var_os(k)
+        }
     })
     .map_err(|e| AppError::Paths(format!("{e} (pass --config-dir DIR or set SSX_CONFIG_DIR)")))
 }
@@ -95,7 +99,9 @@ pub fn resolve_backend(flag: Option<&str>) -> Option<BackendKind> {
     let name = flag.map(str::to_owned).or_else(|| std::env::var("SSX_BACKEND").ok())?;
     let kind = BackendKind::from_name(name.trim());
     if kind.is_none() {
-        tracing::warn!("unknown capture backend {name:?} ignored (use windows, wayland, portal or x11)");
+        tracing::warn!(
+            "unknown capture backend {name:?} ignored (use windows, wayland, portal or x11)"
+        );
     }
     kind
 }
@@ -204,16 +210,14 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 
 /// Starts a helper program detached from us (its exit is reaped by a tiny thread).
 fn spawn_helper(path: &Path, args: &[&str]) -> std::io::Result<()> {
-    let mut child = std::process::Command::new(path)
-        .args(args)
-        .stdin(std::process::Stdio::null())
-        .spawn()?;
+    let mut child =
+        std::process::Command::new(path).args(args).stdin(std::process::Stdio::null()).spawn()?;
     let name = path.display().to_string();
-    let _ = std::thread::Builder::new().name("ssx-helper-reaper".into()).spawn(move || {
-        match child.wait() {
-            Ok(s) if !s.success() => tracing::debug!("{name} ended with {s}"),
-            _ => {}
-        }
+    let _ = std::thread::Builder::new().name("ssx-helper-reaper".into()).spawn(move || match child
+        .wait()
+    {
+        Ok(s) if !s.success() => tracing::debug!("{name} ended with {s}"),
+        _ => {}
     });
     Ok(())
 }
@@ -224,7 +228,9 @@ impl App {
         let settings_file = paths.settings_file();
         std::fs::create_dir_all(&paths.config_dir)
             .and_then(|()| std::fs::create_dir_all(&paths.data_dir))
-            .map_err(|e| AppError::Paths(format!("cannot create the config/data directories: {e}")))?;
+            .map_err(|e| {
+                AppError::Paths(format!("cannot create the config/data directories: {e}"))
+            })?;
         let loaded = Settings::load_or_recover(&settings_file)
             .map_err(|e| AppError::Settings(e.to_string()))?;
         for w in &loaded.warnings {
@@ -334,6 +340,16 @@ impl App {
         &self.paths
     }
 
+    /// `--no-tray` was given.
+    pub fn no_tray(&self) -> bool {
+        self.args.no_tray
+    }
+
+    /// `--no-hotkeys` was given.
+    pub fn no_hotkeys(&self) -> bool {
+        self.args.no_hotkeys
+    }
+
     /// The supervisor.
     pub fn supervisor(&self) -> &Arc<Supervisor> {
         &self.sup
@@ -376,7 +392,11 @@ impl App {
             Action::RunWorkflow(id) => {
                 let settings = self.rt.settings();
                 let Some(wf) = settings.workflow_by_id(&id).cloned() else {
-                    self.say(NotificationLevel::Warning, "ssx", &format!("the workflow {id:?} no longer exists"));
+                    self.say(
+                        NotificationLevel::Warning,
+                        "ssx",
+                        &format!("the workflow {id:?} no longer exists"),
+                    );
                     return;
                 };
                 if wf.input == ssx_core::settings::InputKind::Files {
@@ -430,7 +450,9 @@ impl App {
     /// Handles a pressed hotkey.
     pub fn handle_hotkey(self: &Arc<Self>, target: HotkeyTarget) {
         match target {
-            HotkeyTarget::Workflow(id) => self.handle_action(Action::RunWorkflow(id), Origin::Hotkey),
+            HotkeyTarget::Workflow(id) => {
+                self.handle_action(Action::RunWorkflow(id), Origin::Hotkey)
+            }
             HotkeyTarget::OpenHistory => self.handle_action(Action::OpenHistory, Origin::Hotkey),
             HotkeyTarget::OpenSettings => self.handle_action(Action::OpenSettings, Origin::Hotkey),
         }
@@ -444,7 +466,11 @@ impl App {
         match helpers::discover(base, env).into_path() {
             Some(p) => {
                 if let Err(e) = spawn_helper(&p, args) {
-                    self.say(NotificationLevel::Error, "ssx", &format!("cannot start {}: {e}", p.display()));
+                    self.say(
+                        NotificationLevel::Error,
+                        "ssx",
+                        &format!("cannot start {}: {e}", p.display()),
+                    );
                 }
             }
             None => self.say(NotificationLevel::Warning, "ssx", missing),
@@ -740,7 +766,8 @@ fn pick_files() -> Result<Vec<PathBuf>, String> {
 
 #[cfg(not(feature = "file-dialog"))]
 fn pick_files() -> Result<Vec<PathBuf>, String> {
-    Err("this build has no file chooser; use `ssx upload FILE...` or the file manager entry".to_owned())
+    Err("this build has no file chooser; use `ssx upload FILE...` or the file manager entry"
+        .to_owned())
 }
 
 /// A second `ssx-app` launch: tell the running one to show its settings and leave.
@@ -858,6 +885,10 @@ pub fn run(args: Args) -> ExitCode {
 /// own threads and the main thread only waits.
 #[cfg(not(any(windows, target_os = "macos")))]
 fn park(app: &Arc<App>) -> ExitCode {
+    use crate::{
+        hotkeys_glue::{HotkeyRunner, HotkeyThread},
+        tray::NoTray,
+    };
     // Hotkeys: the manager lives on its own thread.
     let hk = {
         let weak = Arc::downgrade(app);

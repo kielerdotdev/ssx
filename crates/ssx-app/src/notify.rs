@@ -168,15 +168,14 @@ impl Toast for NotifyRustToast {
                 let clicks = Arc::clone(&self.clicks);
                 // `wait_for_action` blocks until the notification is closed or clicked; the
                 // server closes it after the timeout, so the thread is short-lived.
-                let _ = std::thread::Builder::new().name("ssx-notify-click".into()).spawn(
-                    move || {
+                let _ =
+                    std::thread::Builder::new().name("ssx-notify-click".into()).spawn(move || {
                         handle.wait_for_action(|action| {
                             if action == "default" {
                                 clicks.handle(&click);
                             }
                         });
-                    },
-                );
+                    });
             }
             Ok(())
         }
@@ -290,7 +289,9 @@ impl NoticeStore {
         if let Some(p) = &self.path {
             let text = serde_json::to_string(&seen.iter().collect::<Vec<_>>()).unwrap_or_default();
             if let Err(e) = atomic_write(p, text.as_bytes()) {
-                tracing::warn!("cannot remember that {key:?} was shown ({e}); it may be shown again");
+                tracing::warn!(
+                    "cannot remember that {key:?} was shown ({e}); it may be shown again"
+                );
             }
         }
         true
@@ -344,7 +345,9 @@ mod tests {
 
     #[test]
     fn only_web_urls_become_click_targets() {
-        for bad in ["file:///etc/passwd", "javascript:alert(1)", "smb://h/s", "not a url", "https://", ""] {
+        for bad in
+            ["file:///etc/passwd", "javascript:alert(1)", "smb://h/s", "not a url", "https://", ""]
+        {
             let s = prepare(&note("x", Some(bad), None), true);
             assert_eq!(s.click, None, "{bad:?}");
         }
@@ -357,7 +360,9 @@ mod tests {
     fn control_characters_are_stripped_and_long_text_is_cut() {
         let n = note(&format!("a\u{1b}[31mb\0{}", "x".repeat(2000)), None, None);
         let s = prepare(&n, true);
-        assert!(s.body.starts_with("a[31mb") && !s.body.contains('\u{1b}') && !s.body.contains('\0'));
+        assert!(
+            s.body.starts_with("a[31mb") && !s.body.contains('\u{1b}') && !s.body.contains('\0')
+        );
         assert!(s.body.chars().count() <= MAX_BODY_CHARS + 1 && s.body.ends_with('\u{2026}'));
         let t = Notification { title: "T\u{7}itle\nline".into(), ..note("", None, None) };
         assert_eq!(prepare(&t, true).title, "Title\nline");
@@ -430,7 +435,8 @@ mod tests {
                 std::thread::spawn(move || s.first_time("race"))
             })
             .collect();
-        let firsts = handles.into_iter().filter(|_| true).map(|h| h.join().unwrap()).filter(|b| *b).count();
+        let firsts =
+            handles.into_iter().filter(|_| true).map(|h| h.join().unwrap()).filter(|b| *b).count();
         assert_eq!(firsts, 1);
     }
 }

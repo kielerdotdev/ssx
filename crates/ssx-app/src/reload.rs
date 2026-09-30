@@ -178,11 +178,7 @@ fn mtime_and_len(path: &Path) -> Option<(SystemTime, u64)> {
 impl SettingsWatcher {
     /// Starts watching `file`. `force_polling` skips the notify backend (tests, odd file
     /// systems).
-    pub fn start(
-        file: &Path,
-        force_polling: bool,
-        on_change: impl Fn() + Send + 'static,
-    ) -> Self {
+    pub fn start(file: &Path, force_polling: bool, on_change: impl Fn() + Send + 'static) -> Self {
         let (tx, rx) = mpsc::channel::<()>();
         let stop = Arc::new(AtomicBool::new(false));
         let dir: PathBuf = file.parent().map_or_else(|| PathBuf::from("."), Path::to_path_buf);
@@ -205,7 +201,9 @@ impl SettingsWatcher {
                     let _ = std::fs::create_dir_all(&dir);
                     match w.watch(&dir, RecursiveMode::NonRecursive) {
                         Ok(()) => watcher = Some(w),
-                        Err(e) => tracing::warn!("cannot watch {}: {e}; polling instead", dir.display()),
+                        Err(e) => {
+                            tracing::warn!("cannot watch {}: {e}; polling instead", dir.display())
+                        }
                     }
                 }
                 Err(e) => tracing::warn!("no file watcher available ({e}); polling instead"),
@@ -309,7 +307,11 @@ mod tests {
         let cur = Settings::default();
         let mut st = state_for(&cur);
         assert_eq!(st.evaluate(Some(&text(&cur)), &cur), ReloadOutcome::Unchanged);
-        assert_eq!(st.evaluate(None, &cur), ReloadOutcome::Unchanged, "deleted file keeps the old config");
+        assert_eq!(
+            st.evaluate(None, &cur),
+            ReloadOutcome::Unchanged,
+            "deleted file keeps the old config"
+        );
     }
 
     #[test]
@@ -341,12 +343,17 @@ mod tests {
         let cur = Settings::default();
         let mut st = state_for(&cur);
         let broken = "version = 1\n[general\nimage_quality = ";
-        let ReloadOutcome::Reject { first_issue, all_issues } = st.evaluate(Some(broken), &cur) else {
+        let ReloadOutcome::Reject { first_issue, all_issues } = st.evaluate(Some(broken), &cur)
+        else {
             panic!("expected reject")
         };
         assert!(!first_issue.is_empty() && !first_issue.contains('\n'), "{first_issue:?}");
         assert!(!all_issues.is_empty());
-        assert_eq!(st.evaluate(Some(broken), &cur), ReloadOutcome::Unchanged, "no notification storm");
+        assert_eq!(
+            st.evaluate(Some(broken), &cur),
+            ReloadOutcome::Unchanged,
+            "no notification storm"
+        );
         // Fixing it works, and going back to the broken text is reported again.
         let mut fixed = cur.clone();
         fixed.general.image_quality = 61;
@@ -395,7 +402,10 @@ mod tests {
         let p = d.path().join("s.toml");
         std::fs::write(&p, "a = 1").unwrap();
         assert_eq!(read_settings_text(&p).unwrap().as_deref(), Some("a = 1"));
-        assert!(read_settings_text(d.path()).is_err(), "a directory is an I/O error, not 'missing'");
+        assert!(
+            read_settings_text(d.path()).is_err(),
+            "a directory is an I/O error, not 'missing'"
+        );
     }
 
     // ---- the watcher -----------------------------------------------------------------------

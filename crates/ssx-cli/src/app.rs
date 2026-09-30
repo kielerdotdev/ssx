@@ -3,7 +3,7 @@
 use std::{
     ffi::OsString,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 use ssx_core::{
@@ -13,7 +13,9 @@ use ssx_core::{
     workflow::{CancelToken, Engine, Naming, Services},
 };
 use ssx_platform::BackendKind;
-use ssx_services::{ProductionOptions, ProductionServices};
+use ssx_services::{
+    OverlaySelector, PickMode, ProductionOptions, ProductionServices, RegionSelector,
+};
 
 use crate::{
     cli::GlobalArgs,
@@ -30,6 +32,9 @@ pub struct App {
     pub paths: Paths,
     /// Cancelled by Ctrl-C.
     pub cancel: CancelToken,
+    /// When set, the *first* Ctrl-C cancels this token instead of `cancel` (a standalone
+    /// recording stops gracefully and keeps its file); the second cancels `cancel`.
+    pub first_interrupt: Arc<Mutex<Option<CancelToken>>>,
     /// Styling for stdout.
     pub out: Style,
     /// Styling for stderr.
@@ -55,7 +60,13 @@ impl App {
         let paths = resolve_paths(global.config_dir.as_deref(), |k| std::env::var_os(k))?;
         let out = Style::for_stream(global.color, false);
         let err = Style::for_stream(global.color, true);
-        Ok(Self { global, paths, cancel, out, err })
+        Ok(Self { global, paths, cancel, first_interrupt: Arc::default(), out, err })
+    }
+
+    /// Makes the next Ctrl-C cancel `token` instead of the whole command.
+    pub fn stop_on_first_interrupt(&self, token: CancelToken) {
+        *self.first_interrupt.lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some(token);
     }
 
     /// The forced capture backend, if any.
@@ -82,16 +93,43 @@ impl App {
         Ok(loaded.settings)
     }
 
-    /// The real services for `settings`.
+    /// The real services for `settings` (region selection with the default rectangle mode).
     pub fn services(&self, settings: &Settings) -> CliResult<ProductionServices> {
+        self.services_with_mode(settings, PickMode::Rect)
+    }
+
+    /// The real services, with the selection overlay asking for `mode`.
+    pub fn services_with_mode(
+        &self,
+        settings: &Settings,
+        mode: PickMode,
+    ) -> CliResult<ProductionServices> {
+        let backend = self.backend()?;
+        let selector = OverlaySelector::discover().map(|s| {
+            s.set_mode(mode);
+            Arc::new(s)
+        });
+        #[cfg(feature = "record")]
+        let recorder: Option<Arc<dyn ssx_core::workflow::Recorder>> = {
+            use ssx_services::record::{RecorderOptions, ServiceRecorder};
+            Some(Arc::new(ServiceRecorder::new(RecorderOptions {
+                backend,
+                selector: selector.clone(),
+                ..RecorderOptions::default()
+            })))
+        };
+        #[cfg(not(feature = "record"))]
+        let recorder = None;
         Ok(ProductionServices::new(
             settings,
             &self.paths,
             ProductionOptions {
-                backend: self.backend()?,
+                backend,
                 // A CLI process exits right after copying: hand the data to a process that
                 // keeps serving the clipboard (wl-copy / xclip) when there is one.
                 prefer_external_clipboard: true,
+                selector: selector.map(|s| s as Arc<dyn RegionSelector>),
+                recorder,
                 ..ProductionOptions::default()
             },
         ))
@@ -129,7 +167,12 @@ impl Session {
     /// Builds the session. A history that cannot be opened is a warning, not an error: an
     /// upload must not fail because of a locked or damaged database.
     pub fn new(app: &App, settings: Settings) -> CliResult<Self> {
-        let services = app.services(&settings)?;
+        Self::with_mode(app, settings, PickMode::Rect)
+    }
+
+    /// Like [`new`](Self::new), with the selection overlay asking for `mode`.
+    pub fn with_mode(app: &App, settings: Settings, mode: PickMode) -> CliResult<Self> {
+        let services = app.services_with_mode(&settings, mode)?;
         let history = if settings.history.enabled {
             match app.open_history() {
                 Ok(h) => Some(h),
@@ -221,6 +264,7 @@ mod tests {
             global: global(b),
             paths: Paths::rooted_at("/x"),
             cancel: CancelToken::new(),
+            first_interrupt: Arc::default(),
             out: Style::plain(),
             err: Style::plain(),
         };

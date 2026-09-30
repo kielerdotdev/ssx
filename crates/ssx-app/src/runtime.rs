@@ -191,10 +191,7 @@ impl Runtime {
                 selector: selector.clone(),
                 ..RecorderOptions::default()
             }));
-            (
-                Arc::new(TrackedRecorder::new(real.clone(), Arc::clone(&controller))),
-                Some(real),
-            )
+            (Arc::new(TrackedRecorder::new(real.clone(), Arc::clone(&controller))), Some(real))
         };
         #[cfg(not(feature = "record"))]
         let recorder: Arc<dyn ssx_core::workflow::Recorder> = Arc::new(TrackedRecorder::new(
@@ -321,14 +318,13 @@ pub fn summarize(run_id: u64, report: &RunReport) -> RunSummary {
         .items
         .iter()
         .map(|i| {
-            let error = i
-                .steps
-                .iter()
-                .filter(|s| s.kind.importance() != Importance::Optional)
-                .find_map(|s| match &s.status {
-                    StepStatus::Failed(f) => Some(format!("{}: {}", s.kind, f.message)),
-                    _ => None,
-                });
+            let error =
+                i.steps.iter().filter(|s| s.kind.importance() != Importance::Optional).find_map(
+                    |s| match &s.status {
+                        StepStatus::Failed(f) => Some(format!("{}: {}", s.kind, f.message)),
+                        _ => None,
+                    },
+                );
             ItemSummary {
                 path: i.local_path.clone(),
                 url: i.short_url.clone().or_else(|| i.url.clone()),

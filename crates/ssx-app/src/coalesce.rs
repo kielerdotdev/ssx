@@ -463,14 +463,10 @@ mod tests {
         let clock = Arc::new(FakeClock::new());
         let (tx, out) = mpsc::channel();
         let tx = Mutex::new(tx);
-        let co = Coalescer::new(
-            CoalesceConfig::default(),
-            RunIds::new(),
-            clock.clone(),
-            move |b| {
+        let co =
+            Coalescer::new(CoalesceConfig::default(), RunIds::new(), clock.clone(), move |b| {
                 let _ = tx.lock().unwrap().send(b);
-            },
-        );
+            });
         Fixture { clock, co, out }
     }
 
@@ -548,15 +544,11 @@ mod tests {
         let (tx, rx) = mpsc::channel::<u64>();
         let tx = Mutex::new(tx);
         let first = AtomicBool::new(true);
-        let co: Coalescer<()> = Coalescer::new(
-            CoalesceConfig::default(),
-            RunIds::new(),
-            clock.clone(),
-            move |b| {
+        let co: Coalescer<()> =
+            Coalescer::new(CoalesceConfig::default(), RunIds::new(), clock.clone(), move |b| {
                 assert!(!first.swap(false, Ordering::SeqCst), "boom");
                 let _ = tx.lock().unwrap().send(b.id);
-            },
-        );
+            });
         co.add(&PostAction::Upload, paths(&["/a"]), None);
         clock.advance(ms(400));
         co.poke();

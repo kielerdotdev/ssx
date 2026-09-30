@@ -19,7 +19,10 @@ EXIT CODES:
 ENVIRONMENT:
   SSX_CONFIG_DIR     relocate settings and data (config in DIR, data in DIR/data)
   SSX_BACKEND        force the capture backend: windows, wayland, portal or x11
-  SSX_EDITOR_UI      path of the ssx-editor-ui helper used by `edit` and --edit
+  SSX_EDITOR_UI      path of the ssx-editor-ui helper used by `edit` and --edit (or `none`)
+  SSX_OVERLAY        path of the ssx-overlay helper used by `capture region` (or `none`)
+  SSX_APP            path of the ssx-app daemon that `ssx daemon start` launches
+  SSX_NO_DAEMON      set to 1 to never hand work to a running ssx-app
   SSX_SECRET_<NAME>  supply an uploader secret without a keyring (NAME upper-cased)
   RUST_LOG           log filter (overrides -v), e.g. RUST_LOG=ssx_services=debug
   NO_COLOR           disable coloured output
@@ -101,6 +104,14 @@ pub enum Command {
     },
     /// Run a workflow from settings.toml
     Run(RunArgs),
+    /// Record the screen (MP4 or GIF), or control the running ssx app's recording
+    Record(RecordArgs),
+    /// Start, stop and inspect the ssx background app (tray icon, hotkeys, right-click uploads)
+    Daemon {
+        /// What to do.
+        #[command(subcommand)]
+        cmd: DaemonCmd,
+    },
     /// Browse and maintain the capture and upload history
     History {
         /// What to do.
@@ -183,16 +194,63 @@ pub enum CaptureTarget {
         #[arg(long)]
         id: Option<String>,
     },
-    /// A region: an exact rectangle with --rect (interactive selection needs the overlay,
-    /// which is not available yet)
+    /// A region: pick it on the selection overlay, or give an exact rectangle with --rect
     Region {
         /// Rectangle in desktop pixels: X,Y,WIDTH,HEIGHT (X and Y may be negative)
-        #[arg(long, value_name = "X,Y,W,H", value_parser = parse_rect, allow_hyphen_values = true)]
+        #[arg(
+            long,
+            value_name = "X,Y,W,H",
+            value_parser = parse_rect,
+            allow_hyphen_values = true,
+            conflicts_with = "mode"
+        )]
         rect: Option<Rect>,
+        /// What the overlay asks for: rect (default), ellipse, freeform, window or monitor
+        #[arg(long, value_enum)]
+        mode: Option<ModeArg>,
     },
     /// The region captured last time
     #[command(name = "last-region")]
     LastRegion,
+}
+
+/// How the selection overlay picks (`ssx capture region --mode`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ModeArg {
+    /// Drag a rectangle.
+    Rect,
+    /// Drag an ellipse; pixels outside it become transparent.
+    Ellipse,
+    /// Draw a free-hand outline; pixels outside it become transparent.
+    Freeform,
+    /// Click a window.
+    Window,
+    /// Click a monitor.
+    Monitor,
+}
+
+impl ModeArg {
+    /// The overlay mode.
+    pub fn pick_mode(self) -> ssx_services::PickMode {
+        match self {
+            Self::Rect => ssx_services::PickMode::Rect,
+            Self::Ellipse => ssx_services::PickMode::Ellipse,
+            Self::Freeform => ssx_services::PickMode::Freeform,
+            Self::Window => ssx_services::PickMode::Window,
+            Self::Monitor => ssx_services::PickMode::Monitor,
+        }
+    }
+
+    /// The IPC region mode.
+    pub fn region_mode(self) -> ssx_core::ipc::RegionMode {
+        match self {
+            Self::Rect => ssx_core::ipc::RegionMode::Rect,
+            Self::Ellipse => ssx_core::ipc::RegionMode::Ellipse,
+            Self::Freeform => ssx_core::ipc::RegionMode::Freeform,
+            Self::Window => ssx_core::ipc::RegionMode::Window,
+            Self::Monitor => ssx_core::ipc::RegionMode::Monitor,
+        }
+    }
 }
 
 /// Options of `ssx capture`. They are `global` so they may follow the target
@@ -659,6 +717,127 @@ pub enum ShellCmd {
     },
 }
 
+// ---- record ------------------------------------------------------------------------------
+
+/// Audio for `--audio`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum AudioArg {
+    /// No audio.
+    None,
+    /// The default microphone.
+    Mic,
+    /// What the system plays.
+    System,
+    /// Microphone and system audio.
+    Both,
+}
+
+impl AudioArg {
+    /// The IPC audio choice.
+    pub fn record_audio(self) -> ssx_core::ipc::RecordAudio {
+        match self {
+            Self::None => ssx_core::ipc::RecordAudio::None,
+            Self::Mic => ssx_core::ipc::RecordAudio::Mic,
+            Self::System => ssx_core::ipc::RecordAudio::System,
+            Self::Both => ssx_core::ipc::RecordAudio::Both,
+        }
+    }
+}
+
+/// What to record and how (shared by standalone recording and `record start|toggle`).
+#[derive(Debug, Clone, Default, Args)]
+pub struct RecordOpts {
+    /// Record an animated GIF instead of a video
+    #[arg(long)]
+    pub gif: bool,
+    /// Pick the region on the selection overlay
+    #[arg(long, conflicts_with_all = ["rect", "monitor"])]
+    pub region: bool,
+    /// Record this rectangle: X,Y,WIDTH,HEIGHT in desktop pixels
+    #[arg(long, value_name = "X,Y,W,H", value_parser = parse_rect, allow_hyphen_values = true, conflicts_with = "monitor")]
+    pub rect: Option<Rect>,
+    /// Record this monitor (id from `ssx monitors`)
+    #[arg(long, value_name = "ID")]
+    pub monitor: Option<String>,
+    /// Which audio to record (default: none)
+    #[arg(long, value_enum)]
+    pub audio: Option<AudioArg>,
+}
+
+/// `ssx record`.
+#[derive(Debug, Args)]
+#[command(args_conflicts_with_subcommands = true)]
+pub struct RecordArgs {
+    /// Options of a standalone recording.
+    #[command(flatten)]
+    pub opts: RecordOpts,
+    /// Stop after this many seconds (default: until Ctrl-C)
+    #[arg(long, value_name = "N")]
+    pub seconds: Option<f64>,
+    /// Write the recording here (`.mp4` or `.gif`; an existing file is never overwritten)
+    #[arg(short, long, value_name = "PATH")]
+    pub output: Option<PathBuf>,
+    /// Print the result as JSON
+    #[arg(long)]
+    pub json: bool,
+    /// Control the running ssx app instead of recording here
+    #[command(subcommand)]
+    pub cmd: Option<RecordCmd>,
+}
+
+/// `ssx record start|stop|toggle|status`: they talk to the running ssx app.
+#[derive(Debug, Subcommand)]
+pub enum RecordCmd {
+    /// Start a recording in the ssx app (without a target: like the hotkey, pick a region)
+    Start(RecordOpts),
+    /// Stop the recording; the workflow (upload, copy the link) then carries on
+    Stop,
+    /// Start a recording, or stop the running one
+    Toggle(RecordOpts),
+    /// Show what is being recorded
+    Status {
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+// ---- daemon ------------------------------------------------------------------------------
+
+/// `ssx daemon`.
+#[derive(Debug, Subcommand)]
+pub enum DaemonCmd {
+    /// Start the ssx app in the background and wait until it answers
+    Start,
+    /// Ask the ssx app to exit (it finishes a recording first)
+    Stop,
+    /// Show whether the ssx app runs and what it is doing
+    Status {
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Stop, then start
+    Restart,
+    /// Start the ssx app at login
+    Autostart {
+        /// What to do.
+        #[command(subcommand)]
+        cmd: AutostartCmd,
+    },
+}
+
+/// `ssx daemon autostart`.
+#[derive(Debug, Subcommand)]
+pub enum AutostartCmd {
+    /// Start ssx-app at login (XDG autostart entry, `HKCU` Run value, or LaunchAgent)
+    Enable,
+    /// Remove what `enable` added
+    Disable,
+    /// Show whether autostart is set up
+    Status,
+}
+
 // ---- doctor ------------------------------------------------------------------------------
 
 /// `ssx doctor`.
@@ -726,7 +905,7 @@ mod tests {
         let cli = parse(&["capture", "-o", "y.png", "region", "--rect", "-10,5,20,30"]).unwrap();
         let Command::Capture(c) = cli.command else { panic!() };
         assert!(
-            matches!(c.target, CaptureTarget::Region { rect: Some(r) } if r == Rect::new(-10, 5, 20, 30))
+            matches!(c.target, CaptureTarget::Region { rect: Some(r), .. } if r == Rect::new(-10, 5, 20, 30))
         );
         assert_eq!(c.opts.output.as_deref(), Some(std::path::Path::new("y.png")));
     }
@@ -750,6 +929,85 @@ mod tests {
         assert_eq!(a.paths[0], PathBuf::from("-rf"));
         assert!(parse(&["post-file"]).is_err(), "at least one path");
         assert!(parse(&["upload"]).is_err());
+    }
+
+    #[test]
+    fn region_takes_a_rectangle_or_a_mode_but_not_both() {
+        let cli = parse(&["capture", "region", "--mode", "window"]).unwrap();
+        let Command::Capture(c) = cli.command else { panic!() };
+        assert!(matches!(
+            c.target,
+            CaptureTarget::Region { rect: None, mode: Some(ModeArg::Window) }
+        ));
+        for m in ["rect", "ellipse", "freeform", "window", "monitor"] {
+            assert!(parse(&["capture", "region", "--mode", m]).is_ok(), "{m}");
+        }
+        assert!(parse(&["capture", "region", "--mode", "triangle"]).is_err());
+        assert!(parse(&["capture", "region", "--rect", "1,2,3,4", "--mode", "rect"]).is_err());
+        assert_eq!(ModeArg::Freeform.pick_mode(), ssx_services::PickMode::Freeform);
+        assert_eq!(ModeArg::Monitor.region_mode(), ssx_core::ipc::RegionMode::Monitor);
+    }
+
+    #[test]
+    fn record_grammar_covers_standalone_and_app_control() {
+        let cli = parse(&[
+            "record",
+            "--gif",
+            "--rect",
+            "-10,5,640,480",
+            "--seconds",
+            "2.5",
+            "--audio",
+            "both",
+            "-o",
+            "out.gif",
+        ])
+        .unwrap();
+        let Command::Record(r) = cli.command else { panic!() };
+        assert!(r.cmd.is_none() && r.opts.gif);
+        assert_eq!(r.opts.rect, Some(Rect::new(-10, 5, 640, 480)));
+        assert_eq!((r.seconds, r.opts.audio), (Some(2.5), Some(AudioArg::Both)));
+        assert_eq!(r.output.as_deref(), Some(std::path::Path::new("out.gif")));
+
+        let cli = parse(&["record", "--region"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::Record(RecordArgs { opts: RecordOpts { region: true, .. }, .. })
+        ));
+        assert!(parse(&["record", "--region", "--rect", "1,2,3,4"]).is_err());
+        assert!(parse(&["record", "--region", "--monitor", "DP-1"]).is_err());
+        assert!(parse(&["record", "--rect", "1,2,3,4", "--monitor", "DP-1"]).is_err());
+
+        for (args, ok) in [
+            (vec!["record", "start"], true),
+            (vec!["record", "start", "--region", "--gif"], true),
+            (vec!["record", "toggle", "--monitor", "HDMI-1"], true),
+            (vec!["record", "stop"], true),
+            (vec!["record", "status", "--json"], true),
+            (vec!["record", "stop", "--gif"], false),
+            (vec!["record", "start", "-o", "x.mp4"], false),
+            (vec!["record", "--seconds", "3", "stop"], false),
+        ] {
+            assert_eq!(parse(&args).is_ok(), ok, "{args:?}");
+        }
+    }
+
+    #[test]
+    fn daemon_grammar() {
+        for args in [
+            vec!["daemon", "start"],
+            vec!["daemon", "stop"],
+            vec!["daemon", "restart"],
+            vec!["daemon", "status", "--json"],
+            vec!["daemon", "autostart", "enable"],
+            vec!["daemon", "autostart", "disable"],
+            vec!["daemon", "autostart", "status"],
+        ] {
+            assert!(parse(&args).is_ok(), "{args:?}");
+        }
+        assert!(parse(&["daemon"]).is_err());
+        assert!(parse(&["daemon", "autostart"]).is_err());
+        assert!(parse(&["daemon", "explode"]).is_err());
     }
 
     #[test]

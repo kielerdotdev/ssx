@@ -185,7 +185,11 @@ impl Default for UiState {
             overlay_available: true,
             record_supported: true,
             settings_ui_available: true,
-            hotkeys: HotkeyView { enabled: true, backend: Some("global-hotkey".into()), problems: 0 },
+            hotkeys: HotkeyView {
+                enabled: true,
+                backend: Some("global-hotkey".into()),
+                problems: 0,
+            },
         }
     }
 }
@@ -341,10 +345,9 @@ pub fn build_menu(settings: &Settings, ui: &UiState) -> Menu {
     }));
     let (hk_label, hk_enabled) = match (&ui.hotkeys.backend, ui.hotkeys.enabled) {
         (None, _) => ("Hotkeys: not available here (see ssx hotkeys install)".to_owned(), false),
-        (Some(_), true) if ui.hotkeys.problems > 0 => (
-            format!("Hotkeys on ({} could not be registered)", ui.hotkeys.problems),
-            true,
-        ),
+        (Some(_), true) if ui.hotkeys.problems > 0 => {
+            (format!("Hotkeys on ({} could not be registered)", ui.hotkeys.problems), true)
+        }
         (Some(_), true) => ("Hotkeys on".to_owned(), true),
         (Some(_), false) => ("Hotkeys off".to_owned(), true),
     };
@@ -456,7 +459,10 @@ mod tests {
         assert_eq!(monitor.shortcut, None, "no hotkey, no shortcut text");
         let rec = m.entry(&Action::RunWorkflow("record-screen".into())).unwrap();
         assert_eq!(rec.shortcut.as_deref(), Some("Shift+PrintScreen"));
-        assert!(m.entry(&Action::UploadFiles).is_some(), "the files workflow becomes Upload files...");
+        assert!(
+            m.entry(&Action::UploadFiles).is_some(),
+            "the files workflow becomes Upload files..."
+        );
         assert!(
             m.entry(&Action::RunWorkflow("upload-files".into())).is_none(),
             "and does not appear twice"
@@ -535,7 +541,8 @@ mod tests {
         assert_eq!((on.label.as_str(), on.checked, on.enabled), ("Hotkeys on", Some(true), true));
         let off = toggle(HotkeyView { enabled: false, backend: Some("x".into()), problems: 0 });
         assert_eq!((off.label.as_str(), off.checked), ("Hotkeys off", Some(false)));
-        let some_failed = toggle(HotkeyView { enabled: true, backend: Some("x".into()), problems: 2 });
+        let some_failed =
+            toggle(HotkeyView { enabled: true, backend: Some("x".into()), problems: 2 });
         assert!(some_failed.label.contains("2 could not be registered"));
         let none = toggle(HotkeyView { enabled: true, backend: None, problems: 0 });
         assert!(!none.enabled && none.checked.is_none());
@@ -598,11 +605,17 @@ mod tests {
             },
         ];
         let m = build_menu(&s, &UiState::default());
-        assert_eq!(m.entry(&Action::RunWorkflow("mine".into())).unwrap().shortcut.as_deref(), Some("Ctrl+Alt+M"));
+        assert_eq!(
+            m.entry(&Action::RunWorkflow("mine".into())).unwrap().shortcut.as_deref(),
+            Some("Ctrl+Alt+M")
+        );
         assert_eq!(m.entry(&Action::RunWorkflow("blank".into())).unwrap().shortcut, None);
         let bulk = m.entry(&Action::RunWorkflow("bulk".into())).unwrap();
         assert_eq!(bulk.label, "Upload to my server...");
-        assert!(m.entry(&Action::UploadFiles).is_none(), "no default file workflow, no default entry");
+        assert!(
+            m.entry(&Action::UploadFiles).is_none(),
+            "no default file workflow, no default entry"
+        );
     }
 
     #[test]

@@ -124,12 +124,10 @@ impl ksni::Tray for SsxTray {
             .iter()
             .map(|item| match item {
                 Item::Separator => ksni::MenuItem::Separator,
-                Item::Header(text) => StandardItem {
-                    label: text.clone(),
-                    enabled: false,
-                    ..StandardItem::default()
+                Item::Header(text) => {
+                    StandardItem { label: text.clone(), enabled: false, ..StandardItem::default() }
+                        .into()
                 }
-                .into(),
                 Item::Entry(e) => {
                     let action = e.action.clone();
                     let shortcut = e.shortcut.as_deref().map(dbusmenu_shortcut).unwrap_or_default();
@@ -199,11 +197,8 @@ pub enum Started {
 
 /// Starts the tray with an initial `view`. `desktop` is `XDG_CURRENT_DESKTOP`.
 pub fn start(view: &TrayView, sink: &ActionSink, desktop: &str) -> Started {
-    let make = || SsxTray {
-        view: view.clone(),
-        icons: icons_for(view.icon),
-        sink: Arc::clone(sink),
-    };
+    let make =
+        || SsxTray { view: view.clone(), icons: icons_for(view.icon), sink: Arc::clone(sink) };
     match make().spawn() {
         Ok(handle) => Started::Running(Arc::new(KsniHandle { handle })),
         Err(ksni::Error::Dbus(e)) => {
@@ -212,9 +207,10 @@ pub fn start(view: &TrayView, sink: &ActionSink, desktop: &str) -> Started {
         Err(e @ (ksni::Error::Watcher(_) | ksni::Error::WontShow)) => {
             tracing::info!("no tray yet: {e}");
             match make().assume_sni_available(true).spawn() {
-                Ok(handle) => {
-                    Started::Waiting(Arc::new(KsniHandle { handle }), missing_watcher_advice(desktop))
-                }
+                Ok(handle) => Started::Waiting(
+                    Arc::new(KsniHandle { handle }),
+                    missing_watcher_advice(desktop),
+                ),
                 Err(e2) => Started::Unavailable(format!("cannot show a tray icon: {e2}")),
             }
         }
@@ -237,17 +233,16 @@ mod tests {
             tooltip: tooltip(ui),
             icon: icon_kind(ui),
         };
-        SsxTray {
-            icons: icons_for(view.icon),
-            view,
-            sink: Arc::new(|_| {}),
-        }
+        SsxTray { icons: icons_for(view.icon), view, sink: Arc::new(|_| {}) }
     }
 
     #[test]
     fn shortcuts_use_dbusmenu_names() {
         assert_eq!(dbusmenu_shortcut("Ctrl+PrintScreen"), [["Control", "Print"]]);
-        assert_eq!(dbusmenu_shortcut("Ctrl+Shift+Alt+PrintScreen"), [["Control", "Shift", "Alt", "Print"]]);
+        assert_eq!(
+            dbusmenu_shortcut("Ctrl+Shift+Alt+PrintScreen"),
+            [["Control", "Shift", "Alt", "Print"]]
+        );
         assert_eq!(dbusmenu_shortcut("Super+E"), [["Super", "E"]]);
         assert_eq!(dbusmenu_shortcut("F9"), [["F9"]]);
         assert!(dbusmenu_shortcut("").is_empty());
@@ -311,7 +306,8 @@ mod tests {
         assert!(t.icon_pixmap().iter().all(|i| i.data.len() == (i.width * i.height * 4) as usize));
         ui.last_error = Some("boom".into());
         assert_eq!(tray_for(&ui).status(), Status::NeedsAttention);
-        ui.recording = crate::events::RecordingView::Recording { elapsed: std::time::Duration::from_secs(3) };
+        ui.recording =
+            crate::events::RecordingView::Recording { elapsed: std::time::Duration::from_secs(3) };
         let rec = tray_for(&ui);
         assert_eq!(rec.status(), Status::Active);
         assert!(rec.tool_tip().title.contains("Recording 0:03"));
@@ -326,7 +322,8 @@ mod tests {
         idle.activate(0, 0);
         assert!(sent.lock().unwrap().is_empty());
         let mut ui = UiState::default();
-        ui.recording = crate::events::RecordingView::Recording { elapsed: std::time::Duration::ZERO };
+        ui.recording =
+            crate::events::RecordingView::Recording { elapsed: std::time::Duration::ZERO };
         let mut rec = tray_for(&ui);
         let sent3 = Arc::clone(&sent);
         rec.sink = Arc::new(move |a| sent3.lock().unwrap().push(a));

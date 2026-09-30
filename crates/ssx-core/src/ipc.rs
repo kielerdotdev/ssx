@@ -949,8 +949,7 @@ mod tests {
     fn old_peers_reject_new_requests_as_invalid_not_as_a_crash() {
         // What an old daemon does with a request it has never heard of: a clean
         // `InvalidRequest`, so a newer CLI can fall back to running in-process.
-        let e =
-            decode_line::<RequestEnvelope>(r#"{"v":1,"seq":1,"type":"hologram"}"#).unwrap_err();
+        let e = decode_line::<RequestEnvelope>(r#"{"v":1,"seq":1,"type":"hologram"}"#).unwrap_err();
         assert_eq!(e.error_code(), Some(ErrorCode::InvalidRequest));
     }
 

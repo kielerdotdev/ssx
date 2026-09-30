@@ -396,11 +396,14 @@ mod tests {
                 body: "finish the overlay".into(),
             },
         );
-        assert_eq!(says, [Say {
-            level: NotificationLevel::Warning,
-            title: "ssx is busy".into(),
-            body: "finish the overlay".into()
-        }]);
+        assert_eq!(
+            says,
+            [Say {
+                level: NotificationLevel::Warning,
+                title: "ssx is busy".into(),
+                body: "finish the overlay".into()
+            }]
+        );
         assert!(reduce(&mut s, &UiEvent::Recording(RecordingView::Idle)).is_empty());
     }
 
@@ -415,7 +418,8 @@ mod tests {
     fn the_view_reflects_state_and_settings() {
         let settings = Settings::default();
         let mut s = UiInner::default();
-        s.hotkeys = HotkeyView { enabled: true, backend: Some("global-hotkey".into()), problems: 0 };
+        s.hotkeys =
+            HotkeyView { enabled: true, backend: Some("global-hotkey".into()), problems: 0 };
         let v = build_view(&settings, &s, RecordingView::Idle);
         assert_eq!(v.tooltip, "ssx: Ready");
         assert_eq!(v.icon, crate::menu::IconKind::Idle);

@@ -53,4 +53,4 @@ pub mod tray_ksni;
 #[cfg(any(windows, target_os = "macos"))]
 pub mod tray_native;
 
-pub use app::{App, APP_ID, run};
+pub use app::{APP_ID, App, run};

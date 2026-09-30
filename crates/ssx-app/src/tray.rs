@@ -104,7 +104,11 @@ mod tests {
     #[test]
     fn no_tray_accepts_everything() {
         let t = NoTray;
-        t.refresh(&TrayView { menu: Menu::default(), tooltip: String::new(), icon: IconKind::Idle });
+        t.refresh(&TrayView {
+            menu: Menu::default(),
+            tooltip: String::new(),
+            icon: IconKind::Idle,
+        });
         t.shutdown();
     }
 }

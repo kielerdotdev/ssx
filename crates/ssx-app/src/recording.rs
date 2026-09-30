@@ -143,8 +143,11 @@ impl RecordingMachine {
     /// Returns `false` (and changes nothing) unless the machine was selecting.
     pub fn started(&mut self, now: Duration) -> bool {
         if let RecState::Selecting { run_id, workflow_id } = &self.state {
-            self.state =
-                RecState::Recording { run_id: *run_id, workflow_id: workflow_id.clone(), since: now };
+            self.state = RecState::Recording {
+                run_id: *run_id,
+                workflow_id: workflow_id.clone(),
+                since: now,
+            };
             true
         } else {
             false
@@ -401,7 +404,10 @@ impl Recorder for TrackedRecorder {
         match self.inner.start(req) {
             Ok(session) => {
                 self.controller.mark_started();
-                Ok(Box::new(TrackedSession { inner: Some(session), controller: Arc::clone(&self.controller) }))
+                Ok(Box::new(TrackedSession {
+                    inner: Some(session),
+                    controller: Arc::clone(&self.controller),
+                }))
             }
             Err(e) => {
                 self.controller.mark_finished();
@@ -500,7 +506,10 @@ mod tests {
         assert_eq!(m.request_stop(), StopAction::NotRunning);
         m.begin(1, "a").unwrap();
         assert_eq!(m.request_stop(), StopAction::AbortSelection);
-        assert!(matches!(m.state(), RecState::Selecting { .. }), "still selecting until the run reports back");
+        assert!(
+            matches!(m.state(), RecState::Selecting { .. }),
+            "still selecting until the run reports back"
+        );
         assert!(m.finished());
         assert!(!m.started(ms(1)), "started() outside selecting is ignored");
     }
@@ -614,7 +623,12 @@ mod tests {
             if self.fail {
                 Err(ServiceError::failed("disk full"))
             } else {
-                Ok(RecordedVideo { path: "/x.mp4".into(), width: None, height: None, duration: None })
+                Ok(RecordedVideo {
+                    path: "/x.mp4".into(),
+                    width: None,
+                    height: None,
+                    duration: None,
+                })
             }
         }
         fn abort(self: Box<Self>) {
@@ -649,11 +663,19 @@ mod tests {
         }
     }
 
-    fn tracked(fail_start: bool, fail_stop: bool) -> (TrackedRecorder, Arc<RecordingController>, Arc<AtomicUsize>, Arc<AtomicUsize>) {
+    fn tracked(
+        fail_start: bool,
+        fail_stop: bool,
+    ) -> (TrackedRecorder, Arc<RecordingController>, Arc<AtomicUsize>, Arc<AtomicUsize>) {
         let (c, ..) = controller();
         let (stopped, aborted) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0)));
         let r = TrackedRecorder::new(
-            Arc::new(FakeRecorder { fail_start, fail_stop, stopped: stopped.clone(), aborted: aborted.clone() }),
+            Arc::new(FakeRecorder {
+                fail_start,
+                fail_stop,
+                stopped: stopped.clone(),
+                aborted: aborted.clone(),
+            }),
             c.clone(),
         );
         (r, c, stopped, aborted)

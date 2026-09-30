@@ -16,6 +16,13 @@ path = "src/lib.rs"
 name = "ssx"
 path = "src/main.rs"
 
+[features]
+default = ["record", "ffmpeg"]
+# `ssx record` (GIF only without `ffmpeg`), recording workflows in `ssx run`, encoder probe in `ssx doctor`.
+record = ["ssx-services/record"]
+# MP4 encoding through the system FFmpeg.
+ffmpeg = ["record", "ssx-services/ffmpeg"]
+
 [dependencies]
 ssx-types.workspace = true
 ssx-core.workspace = true
@@ -37,6 +44,10 @@ toml = "0.9"
 toml_edit = "0.23"
 ctrlc = { version = "3", features = ["termination"] }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+
+# `ssx daemon autostart` writes the HKCU Run value.
+[target.'cfg(windows)'.dependencies]
+windows-registry = "0.6"
 
 [dev-dependencies]
 tempfile = "3"

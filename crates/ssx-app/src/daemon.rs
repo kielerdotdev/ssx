@@ -259,9 +259,9 @@ impl Submitted {
     /// The run id the caller should follow.
     pub fn run_id(self) -> u64 {
         match self {
-            Self::Started { run_id } | Self::Queued { run_id } | Self::StoppedRecording { run_id } => {
-                run_id
-            }
+            Self::Started { run_id }
+            | Self::Queued { run_id }
+            | Self::StoppedRecording { run_id } => run_id,
         }
     }
 }
@@ -472,19 +472,12 @@ impl Supervisor {
     fn admission(&self, inner: &Inner) -> AdmissionState {
         AdmissionState {
             active_regular: inner.active.values().filter(|a| a.class == Class::Regular).count(),
-            active_interactive: inner
-                .active
-                .values()
-                .filter(|a| a.interactive())
-                .count()
+            active_interactive: inner.active.values().filter(|a| a.interactive()).count()
                 + usize::from(matches!(
                     self.recording.view(),
                     crate::events::RecordingView::Selecting
                 )),
-            recording: self
-                .recording
-                .run_id()
-                .zip(self.recording.workflow_id()),
+            recording: self.recording.run_id().zip(self.recording.workflow_id()),
             shutting_down: inner.shutting_down,
         }
     }
@@ -547,12 +540,7 @@ impl Supervisor {
         }
         inner.active.insert(
             run_id,
-            ActiveRun {
-                name,
-                class,
-                started: self.clock.now(),
-                cancel: job.cancel.clone(),
-            },
+            ActiveRun { name, class, started: self.clock.now(), cancel: job.cancel.clone() },
         );
         drop(inner);
         self.spawn(job);
@@ -589,8 +577,7 @@ impl Supervisor {
             name: job.name.clone(),
             interactive,
         });
-        let result =
-            std::panic::catch_unwind(AssertUnwindSafe(|| self.runner.run(job, &*self.ui)));
+        let result = std::panic::catch_unwind(AssertUnwindSafe(|| self.runner.run(job, &*self.ui)));
         let output = result.unwrap_or_else(|payload| {
             let what = payload
                 .downcast_ref::<&str>()
@@ -638,8 +625,7 @@ impl Supervisor {
                 if inner.shutting_down {
                     return;
                 }
-                let regular =
-                    inner.active.values().filter(|a| a.class == Class::Regular).count();
+                let regular = inner.active.values().filter(|a| a.class == Class::Regular).count();
                 if regular >= self.limits.max_concurrent {
                     return;
                 }
@@ -720,9 +706,9 @@ impl Supervisor {
 
     /// Stops the running recording gracefully (the file is kept and the workflow continues).
     pub fn stop_recording(&self) -> Result<(), Rejection> {
-        self.recording
-            .stop()
-            .map_err(|StopError::NotRunning| Rejection::NotRunning("no recording is running".to_owned()))
+        self.recording.stop().map_err(|StopError::NotRunning| {
+            Rejection::NotRunning("no recording is running".to_owned())
+        })
     }
 
     /// Waits for a run to finish. `None` waits without limit.
@@ -744,10 +730,7 @@ impl Supervisor {
                     let Some(left) = d.checked_duration_since(Instant::now()) else {
                         return Waited::TimedOut;
                     };
-                    self.changed
-                        .wait_timeout(inner, left)
-                        .unwrap_or_else(PoisonError::into_inner)
-                        .0
+                    self.changed.wait_timeout(inner, left).unwrap_or_else(PoisonError::into_inner).0
                 }
             };
         }
@@ -785,11 +768,8 @@ impl Supervisor {
             let Some(left) = deadline.checked_duration_since(Instant::now()) else {
                 return false;
             };
-            inner = self
-                .changed
-                .wait_timeout(inner, left)
-                .unwrap_or_else(PoisonError::into_inner)
-                .0;
+            inner =
+                self.changed.wait_timeout(inner, left).unwrap_or_else(PoisonError::into_inner).0;
         }
         true
     }
@@ -928,7 +908,11 @@ mod tests {
     #[test]
     fn nothing_is_accepted_while_shutting_down() {
         let s = AdmissionState { shutting_down: true, ..st() };
-        for c in [Class::Regular, Class::Interactive, Class::Record { toggle: true, workflow_id: "r".into() }] {
+        for c in [
+            Class::Regular,
+            Class::Interactive,
+            Class::Record { toggle: true, workflow_id: "r".into() },
+        ] {
             assert_eq!(decide(&s, &c, 4), Decision::Reject(Rejection::ShuttingDown));
         }
         assert_eq!(Rejection::ShuttingDown.code(), ErrorCode::Busy);
@@ -939,8 +923,16 @@ mod tests {
     #[test]
     fn workflows_are_classified_by_what_they_show() {
         assert!(workflow_is_interactive(&region("r")));
-        assert!(workflow_is_interactive(&wf("e", InputKind::CaptureFullscreen, &[AfterCapture::OpenEditor])));
-        assert!(workflow_is_interactive(&wf("d", InputKind::CaptureWindow, &[AfterCapture::SaveAsDialog])));
+        assert!(workflow_is_interactive(&wf(
+            "e",
+            InputKind::CaptureFullscreen,
+            &[AfterCapture::OpenEditor]
+        )));
+        assert!(workflow_is_interactive(&wf(
+            "d",
+            InputKind::CaptureWindow,
+            &[AfterCapture::SaveAsDialog]
+        )));
         assert!(!workflow_is_interactive(&shot("s")));
         assert!(!workflow_is_interactive(&wf("f", InputKind::Files, &[AfterCapture::Upload])));
         let edit = JobSpec::Files { workflow: shot("s"), paths: vec![], edit_first: true };
@@ -1001,6 +993,10 @@ mod tests {
     }
 
     fn rig(max_concurrent: usize) -> Rig {
+        rig_remembering(max_concurrent, 64)
+    }
+
+    fn rig_remembering(max_concurrent: usize, remember_finished: usize) -> Rig {
         let clock = Arc::new(FakeClock::new());
         let ui = Arc::new(CollectingUi::new());
         let recording = Arc::new(RecordingController::new(clock.clone(), ui.clone()));
@@ -1018,7 +1014,7 @@ mod tests {
             clock.clone(),
             RunIds::new(),
             recording,
-            Limits { max_concurrent, remember_finished: 3 },
+            Limits { max_concurrent, remember_finished },
         );
         Rig { sup, runner, started, ui, clock }
     }
@@ -1028,7 +1024,10 @@ mod tests {
             self.started.recv_timeout(Duration::from_secs(5)).expect("a run started")
         }
         fn nothing_started(&self) {
-            assert!(self.started.recv_timeout(Duration::from_millis(80)).is_err(), "no run may start");
+            assert!(
+                self.started.recv_timeout(Duration::from_millis(80)).is_err(),
+                "no run may start"
+            );
         }
         fn release(&self, run_id: u64, outcome: Outcome) {
             let gate = self.runner.gates.lock().unwrap().get(&run_id).cloned();
@@ -1060,7 +1059,8 @@ mod tests {
     #[test]
     fn extra_regular_runs_queue_in_order_and_start_as_slots_free_up() {
         let r = rig(2);
-        let ids: Vec<Submitted> = (0..4).map(|i| r.sup.submit(files(shot("f"), &[&format!("/{i}")])).unwrap()).collect();
+        let ids: Vec<Submitted> =
+            (0..4).map(|i| r.sup.submit(files(shot("f"), &[&format!("/{i}")])).unwrap()).collect();
         assert_eq!(ids[2], Submitted::Queued { run_id: 3 });
         assert_eq!(ids[3], Submitted::Queued { run_id: 4 });
         r.started();
@@ -1090,7 +1090,9 @@ mod tests {
         let e = r.sup.submit(again).unwrap_err();
         assert!(matches!(e, Rejection::Busy(_)));
         assert!(
-            r.ui.events().iter().any(|e| matches!(e, UiEvent::Notice { level: NotificationLevel::Warning, .. })),
+            r.ui.events()
+                .iter()
+                .any(|e| matches!(e, UiEvent::Notice { level: NotificationLevel::Warning, .. })),
             "a hotkey press that is refused says so"
         );
         // An IPC caller gets the error response instead of a notification.
@@ -1143,7 +1145,11 @@ mod tests {
         r.sup.submit(run(shot("a"))).unwrap();
         let s = r.finish(1);
         assert_eq!(s.outcome, Outcome::Failed);
-        assert!(s.message.contains("internal error") && s.message.contains("still running"), "{}", s.message);
+        assert!(
+            s.message.contains("internal error") && s.message.contains("still running"),
+            "{}",
+            s.message
+        );
         r.sup.submit(run(shot("b"))).unwrap();
         assert_eq!(r.started(), 2);
         r.release(2, Outcome::Success);
@@ -1152,7 +1158,7 @@ mod tests {
 
     #[test]
     fn wait_handles_finished_unknown_and_slow_runs() {
-        let r = rig(4);
+        let r = rig_remembering(4, 3);
         assert_eq!(r.sup.wait(42, Some(Duration::from_millis(10))), Waited::Unknown);
         r.sup.submit(run(shot("a"))).unwrap();
         r.started();
@@ -1270,7 +1276,11 @@ mod tests {
         std::thread::sleep(Duration::from_millis(50));
         r.release(1, Outcome::Success);
         assert!(t.join().unwrap());
-        assert_eq!(r.finish(1).outcome, Outcome::Success, "not cancelled: it finished within the grace");
+        assert_eq!(
+            r.finish(1).outcome,
+            Outcome::Success,
+            "not cancelled: it finished within the grace"
+        );
     }
 
     #[test]

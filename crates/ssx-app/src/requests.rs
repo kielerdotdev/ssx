@@ -189,7 +189,9 @@ pub fn plan_of(spec: &RecordSpec) -> Result<RecordPlanSpec, Rejection> {
     if let RecordTarget::Rect { width, height, .. } = &target
         && (*width == 0 || *height == 0)
     {
-        return Err(Rejection::Invalid("the recording region needs a width and a height".to_owned()));
+        return Err(Rejection::Invalid(
+            "the recording region needs a width and a height".to_owned(),
+        ));
     }
     Ok(RecordPlanSpec { target, audio: spec.audio })
 }
@@ -219,10 +221,9 @@ pub fn job_for_request(
     Ok(Some(match req {
         Request::RunWorkflow { wait, .. } => {
             let wf = match req.workflow_ref().map_err(Rejection::Invalid)? {
-                ssx_core::ipc::WorkflowRef::Id(id) => settings
-                    .workflow_by_id(id)
-                    .cloned()
-                    .map_or_else(|| find(settings, id), Ok)?,
+                ssx_core::ipc::WorkflowRef::Id(id) => {
+                    settings.workflow_by_id(id).cloned().map_or_else(|| find(settings, id), Ok)?
+                }
                 ssx_core::ipc::WorkflowRef::Name(n) => find(settings, n)?,
             };
             (job_for_workflow(wf, Origin::Ipc)?, *wait)
@@ -341,7 +342,8 @@ mod tests {
     fn recording_workflows_toggle_when_run_and_start_when_asked_to() {
         let (j, _) = job(&run(Some("record-screen"), None));
         assert!(matches!(j.spec, JobSpec::Record { toggle: true, .. }));
-        let (j, wait) = job(&Request::StartRecording(RecordSpec { wait: true, ..RecordSpec::default() }));
+        let (j, wait) =
+            job(&Request::StartRecording(RecordSpec { wait: true, ..RecordSpec::default() }));
         assert!(wait);
         let JobSpec::Record { workflow, plan, toggle } = j.spec else { panic!() };
         assert_eq!(workflow.id, "record-screen");
@@ -476,7 +478,8 @@ mod tests {
 
     #[test]
     fn a_files_job_carries_the_batch_id_and_paths() {
-        let j = job_for_files(&s(), &PostAction::Upload, vec!["/a".into(), "/b".into()], 41).unwrap();
+        let j =
+            job_for_files(&s(), &PostAction::Upload, vec!["/a".into(), "/b".into()], 41).unwrap();
         assert_eq!(j.run_id, Some(41));
         let JobSpec::Files { paths, edit_first, .. } = j.spec else { panic!() };
         assert_eq!(paths.len(), 2);

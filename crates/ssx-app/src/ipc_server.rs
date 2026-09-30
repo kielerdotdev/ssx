@@ -27,8 +27,8 @@ use ssx_core::{
 };
 
 use crate::{
-    coalesce::{Batch, CoalesceConfig, Coalescer},
     clock::Clock,
+    coalesce::{Batch, CoalesceConfig, Coalescer},
     daemon::{Rejection, Submitted, Supervisor, Waited, plain_summary},
     events::{UiEvent, UiSink},
     ids::RunIds,
@@ -79,17 +79,18 @@ pub fn files_coalescer(
                 // coalescer's thread.
                 let sup = Arc::clone(&sup);
                 let run_id = sub.run_id();
-                let spawned = std::thread::Builder::new().name("ssx-batch-wait".into()).spawn(move || {
-                    let result = match sup.wait(run_id, None) {
-                        Waited::Finished(s) => Ok(s),
-                        Waited::TimedOut | Waited::Unknown => Err(Rejection::NotRunning(
-                            "the run ended without a result".to_owned(),
-                        )),
-                    };
-                    for w in waiters {
-                        let _ = w.send(result.clone());
-                    }
-                });
+                let spawned =
+                    std::thread::Builder::new().name("ssx-batch-wait".into()).spawn(move || {
+                        let result = match sup.wait(run_id, None) {
+                            Waited::Finished(s) => Ok(s),
+                            Waited::TimedOut | Waited::Unknown => Err(Rejection::NotRunning(
+                                "the run ended without a result".to_owned(),
+                            )),
+                        };
+                        for w in waiters {
+                            let _ = w.send(result.clone());
+                        }
+                    });
                 if let Err(e) = spawned {
                     tracing::error!("cannot start a waiter thread: {e}");
                 }
@@ -233,7 +234,10 @@ impl IpcHandler {
 
     fn post_files(&self, paths: &[PathBuf], action: &PostAction, wait: bool) -> Response {
         if paths.is_empty() {
-            return Response::error(ErrorCode::InvalidRequest, "post_files needs at least one path");
+            return Response::error(
+                ErrorCode::InvalidRequest,
+                "post_files needs at least one path",
+            );
         }
         if let Some(p) = paths.iter().find(|p| !p.is_absolute()) {
             return Response::error(
@@ -466,7 +470,11 @@ mod tests {
             mode: Some(ssx_core::ipc::RegionMode::Window),
         };
         let Response::Finished(s) = ask(&r, &cap) else { panic!() };
-        assert!(s.message.contains("delay=Some(10)") && s.message.contains("Window"), "{}", s.message);
+        assert!(
+            s.message.contains("delay=Some(10)") && s.message.contains("Window"),
+            "{}",
+            s.message
+        );
         assert_eq!(s.outcome, Outcome::Success);
     }
 
@@ -474,9 +482,16 @@ mod tests {
     fn errors_carry_the_right_codes() {
         let r = rig(50);
         let unknown = Request::RunWorkflow { id: None, name: Some("zzz".into()), wait: false };
-        assert!(matches!(ask(&r, &unknown), Response::Error { code: ErrorCode::UnknownWorkflow, .. }));
-        let files_wf = Request::RunWorkflow { id: Some("upload-files".into()), name: None, wait: false };
-        assert!(matches!(ask(&r, &files_wf), Response::Error { code: ErrorCode::InvalidRequest, .. }));
+        assert!(matches!(
+            ask(&r, &unknown),
+            Response::Error { code: ErrorCode::UnknownWorkflow, .. }
+        ));
+        let files_wf =
+            Request::RunWorkflow { id: Some("upload-files".into()), name: None, wait: false };
+        assert!(matches!(
+            ask(&r, &files_wf),
+            Response::Error { code: ErrorCode::InvalidRequest, .. }
+        ));
         assert!(matches!(
             ask(&r, &Request::CancelRun { run_id: 999 }),
             Response::Error { code: ErrorCode::NotRunning, .. }
@@ -560,7 +575,10 @@ mod tests {
             Response::Error { code: ErrorCode::InvalidRequest, .. }
         ));
         let rel = ask(&r, &post(vec!["relative.png"], PostAction::Upload));
-        assert!(matches!(&rel, Response::Error { message, .. } if message.contains("absolute")), "{rel:?}");
+        assert!(
+            matches!(&rel, Response::Error { message, .. } if message.contains("absolute")),
+            "{rel:?}"
+        );
         assert!(matches!(
             ask(&r, &post(vec!["/a"], PostAction::Workflow { workflow: "zzz".into() })),
             Response::Error { code: ErrorCode::UnknownWorkflow, .. }
@@ -573,11 +591,8 @@ mod tests {
         let r = rig(30);
         // Shut the supervisor down so every submission is refused.
         r.h.sup.shutdown(crate::daemon::ShutdownGrace::default());
-        let post = Request::PostFiles {
-            paths: vec!["/a".into()],
-            action: PostAction::Upload,
-            wait: true,
-        };
+        let post =
+            Request::PostFiles { paths: vec!["/a".into()], action: PostAction::Upload, wait: true };
         let resp = ask(&r, &post);
         assert!(matches!(resp, Response::Error { code: ErrorCode::Busy, .. }), "{resp:?}");
         assert!(r.ui.events().iter().any(|e| matches!(e, UiEvent::Notice { .. })));

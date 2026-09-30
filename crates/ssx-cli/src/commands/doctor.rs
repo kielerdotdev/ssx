@@ -10,21 +10,28 @@ use std::path::PathBuf;
 use std::fmt::Write as _;
 
 use serde::Serialize;
+use ssx_core::ipc::{Request, Response};
 use ssx_core::settings::Settings;
 use ssx_hotkeys::detect::{Environment, Platform, detect};
-use ssx_services::{ClipboardDiagnosis, ExternalEditor, UploaderInfo, probe_notifications};
+use ssx_services::{
+    ClipboardDiagnosis, Discovery, ExternalEditor, OverlaySelector, UploaderInfo,
+    probe_notifications,
+};
 use ssx_shell::{Context, Integrations};
 
 use crate::{
     app::App,
+    autostart,
     cli::DoctorArgs,
     commands::{
         config::findings_for,
+        daemon::find_app,
         hotkeys::{bindings_from_settings, describe_detection, strategy_text},
         list::rect_text,
         shell::{IntegrationState, states},
     },
     error::{CliError, CliResult},
+    forward::Daemon,
     output::{Style, out_line, out_text},
 };
 
@@ -240,6 +247,86 @@ pub struct HotkeyInfo {
     pub bound_workflows: usize,
 }
 
+/// The ssx background app.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DaemonInfo {
+    /// The `ssx-app` program, if found.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub program: Option<PathBuf>,
+    /// It answers a ping.
+    pub running: bool,
+    /// Its version.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// A tray icon is showing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tray: Option<bool>,
+    /// The hotkey mechanism it uses.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hotkey_backend: Option<String>,
+    /// Hotkeys registered.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hotkeys_registered: Option<usize>,
+    /// Hotkeys that could not be registered.
+    pub hotkey_problems: Vec<String>,
+    /// `enabled`, `disabled` or why it cannot be told.
+    pub autostart: String,
+}
+
+/// A helper program.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct HelperInfo {
+    /// Found.
+    pub found: bool,
+    /// Switched off with `none`.
+    pub disabled: bool,
+    /// Where.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<PathBuf>,
+}
+
+impl HelperInfo {
+    fn of(d: &Discovery) -> Self {
+        Self {
+            found: d.path().is_some(),
+            disabled: *d == Discovery::Disabled,
+            path: d.path().map(std::path::Path::to_path_buf),
+        }
+    }
+}
+
+/// The region selector (the overlay) and the settings window.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct HelpersInfo {
+    /// `ssx-overlay`: what interactive region selection runs.
+    pub overlay: HelperInfo,
+    /// `ssx-settings-ui`.
+    pub settings_ui: HelperInfo,
+}
+
+/// One video encoder candidate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EncoderState {
+    /// Encoder name.
+    pub name: String,
+    /// It works here.
+    pub usable: bool,
+    /// Why not.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub detail: String,
+}
+
+/// The screen recorder.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RecorderInfo {
+    /// This build can record at all.
+    pub built_in: bool,
+    /// This build can encode MP4 (FFmpeg linked).
+    pub ffmpeg: bool,
+    /// The H.264 encoder chain, best first.
+    pub encoders: Vec<EncoderState>,
+}
+
 /// Uploader listing entry (name, kind, error).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct UploaderState {
@@ -284,6 +371,12 @@ pub struct Report {
     pub editor: EditorInfo,
     /// File-manager integrations.
     pub shell_integrations: Vec<IntegrationState>,
+    /// The background app.
+    pub daemon: DaemonInfo,
+    /// The overlay and settings helpers.
+    pub helpers: HelpersInfo,
+    /// The recorder.
+    pub recorder: RecorderInfo,
     /// Hotkeys.
     pub hotkeys: HotkeyInfo,
     /// What to fix, worst first.
@@ -421,11 +514,75 @@ pub fn derive_problems(r: &Report) -> Vec<Problem> {
             "install it next to ssx or on PATH, or set SSX_EDITOR_UI to its path",
         ));
     }
-    p.push(Problem::new(
-        Info,
-        "interactive region selection is not available in this build",
-        "capture exact regions with `ssx capture region --rect x,y,w,h`, or repeat one with `ssx capture last-region`",
-    ));
+    if !r.helpers.overlay.found {
+        let sev = if r.helpers.overlay.disabled { Info } else { Warning };
+        p.push(Problem::new(
+            sev,
+            "the selection overlay `ssx-overlay` is not available: interactive region capture (`ssx capture region`, the region hotkeys) does not work",
+            "install it next to ssx or on PATH, or set SSX_OVERLAY; capture exact regions with `ssx capture region --rect x,y,w,h` meanwhile",
+        ));
+    }
+    if !r.helpers.settings_ui.found {
+        p.push(Problem::new(
+            Info,
+            "the settings window `ssx-settings-ui` was not found: the tray's Settings entry opens settings.toml instead",
+            "install it next to ssx or on PATH, or set SSX_SETTINGS_UI",
+        ));
+    }
+    if r.daemon.running {
+        if r.daemon.hotkey_backend.as_deref() == Some("none") && r.hotkeys.bound_workflows > 0 {
+            p.push(Problem::new(
+                Info,
+                "the ssx app cannot register global hotkeys on this desktop",
+                "run `ssx hotkeys install` to bind them in your desktop's own settings",
+            ));
+        }
+        for problem in &r.daemon.hotkey_problems {
+            p.push(Problem::new(
+                Warning,
+                format!("hotkey not working: {problem}"),
+                "change the hotkey in settings.toml (`ssx config edit`); the app reloads it by itself",
+            ));
+        }
+        if r.daemon.tray == Some(false) {
+            p.push(Problem::new(
+                Info,
+                "the ssx app shows no tray icon",
+                "GNOME needs the AppIndicator extension; KDE and most bars work out of the box. Hotkeys and the command line work without it",
+            ));
+        }
+    } else if r.daemon.program.is_some() {
+        p.push(Problem::new(
+            Info,
+            "the ssx background app is not running: no tray icon, no global hotkeys, and each file-manager upload runs in its own process",
+            "start it with `ssx daemon start`, and at every login with `ssx daemon autostart enable`",
+        ));
+    } else {
+        p.push(Problem::new(
+            Warning,
+            "the ssx background app `ssx-app` was not found: no tray icon or global hotkeys",
+            "install it next to ssx or on PATH, or set SSX_APP",
+        ));
+    }
+    if !r.recorder.built_in {
+        p.push(Problem::new(
+            Info,
+            "this build of ssx cannot record the screen",
+            "use a build with the `record` feature",
+        ));
+    } else if !r.recorder.ffmpeg {
+        p.push(Problem::new(
+            Info,
+            "this build has no FFmpeg: only GIF recordings work",
+            "use a build with the `ffmpeg` feature for MP4",
+        ));
+    } else if !r.recorder.encoders.iter().any(|e| e.usable) {
+        p.push(Problem::new(
+            Warning,
+            "no video encoder works on this machine: MP4 recordings will fail (GIF still works)",
+            "install FFmpeg's libx264 (or a hardware encoder driver); the candidates and their errors are listed under Recorder",
+        ));
+    }
     if !r.shell_integrations.is_empty()
         && r.shell_integrations.iter().any(|s| s.detected)
         && !r.shell_integrations.iter().any(|s| s.installed)
@@ -586,6 +743,15 @@ pub fn gather(app: &App) -> CliResult<Report> {
 
     let det = detect(&env, Platform::current());
     let (bindings, _) = bindings_from_settings(&settings, "ssx");
+    let daemon = daemon_info();
+    let helpers = HelpersInfo {
+        overlay: HelperInfo::of(&OverlaySelector::discovery()),
+        settings_ui: HelperInfo::of(&ssx_services::discover_helper(
+            "ssx-settings-ui",
+            "SSX_SETTINGS_UI",
+        )),
+    };
+    let recorder = recorder_info();
     let hotkeys = HotkeyInfo {
         recommended: strategy_text(det.primary()).to_owned(),
         strategies: det.candidates.iter().map(|s| strategy_text(*s).to_owned()).collect(),
@@ -614,11 +780,63 @@ pub fn gather(app: &App) -> CliResult<Report> {
         uploaders,
         editor,
         shell_integrations,
+        daemon,
+        helpers,
+        recorder,
         hotkeys,
         problems: Vec::new(),
     };
     report.problems = derive_problems(&report);
     Ok(report)
+}
+
+fn daemon_info() -> DaemonInfo {
+    let autostart = match autostart::Context::system().and_then(|c| autostart::status(&c)) {
+        Ok(autostart::State::Enabled { .. }) => "enabled".to_owned(),
+        Ok(autostart::State::Disabled) => "disabled".to_owned(),
+        Ok(autostart::State::Foreign { path }) => {
+            format!("disabled (a file of your own is in the way: {})", path.display())
+        }
+        Err(e) => format!("unknown ({e})"),
+    };
+    let mut info = DaemonInfo {
+        program: find_app().into_path(),
+        running: false,
+        version: None,
+        tray: None,
+        hotkey_backend: None,
+        hotkeys_registered: None,
+        hotkey_problems: Vec::new(),
+        autostart,
+    };
+    let Some(d) = Daemon::connect_always() else { return info };
+    let Some(version) = d.ping() else { return info };
+    info.running = true;
+    info.version = Some(version);
+    if let Ok(Response::Status(s)) = d.call(Request::Status) {
+        info.tray = Some(s.tray);
+        info.hotkey_backend = Some(s.hotkey_backend);
+        info.hotkeys_registered = Some(s.hotkeys_registered);
+        info.hotkey_problems = s.hotkey_problems;
+    }
+    info
+}
+
+#[cfg(feature = "record")]
+fn recorder_info() -> RecorderInfo {
+    RecorderInfo {
+        built_in: true,
+        ffmpeg: ssx_services::record::has_ffmpeg(),
+        encoders: ssx_services::record::probe_encoders()
+            .into_iter()
+            .map(|e| EncoderState { name: e.name, usable: e.usable, detail: e.detail })
+            .collect(),
+    }
+}
+
+#[cfg(not(feature = "record"))]
+fn recorder_info() -> RecorderInfo {
+    RecorderInfo { built_in: false, ffmpeg: false, encoders: Vec::new() }
 }
 
 fn monitor_info(m: &ssx_types::Monitor) -> MonitorInfo {
@@ -767,6 +985,13 @@ pub fn render(r: &Report, style: Style) -> String {
         "  editor helper: {}",
         r.editor.path.as_ref().map_or_else(|| "not found".to_owned(), |p| p.display().to_string())
     );
+    let helper = |h: &HelperInfo| match (&h.path, h.disabled) {
+        (Some(p), _) => p.display().to_string(),
+        (None, true) => "switched off".to_owned(),
+        (None, false) => "not found".to_owned(),
+    };
+    let _ = writeln!(o, "  region selector (ssx-overlay): {}", helper(&r.helpers.overlay));
+    let _ = writeln!(o, "  settings window (ssx-settings-ui): {}", helper(&r.helpers.settings_ui));
     for s in &r.shell_integrations {
         let _ = writeln!(
             o,
@@ -775,6 +1000,51 @@ pub fn render(r: &Report, style: Style) -> String {
             if s.detected { "found" } else { "not found" },
             if s.installed { "entries installed" } else { "no entries" }
         );
+    }
+
+    h(&mut o, "Background app");
+    match (&r.daemon.running, &r.daemon.program) {
+        (true, _) => {
+            let _ = writeln!(
+                o,
+                "  ssx-app {}: {}, tray {}, hotkeys via {} ({} registered)",
+                r.daemon.version.as_deref().unwrap_or("?"),
+                style.green("running"),
+                match r.daemon.tray {
+                    Some(true) => "showing",
+                    Some(false) => "not showing",
+                    None => "unknown",
+                },
+                r.daemon.hotkey_backend.as_deref().unwrap_or("unknown"),
+                r.daemon.hotkeys_registered.unwrap_or(0),
+            );
+        }
+        (false, Some(p)) => {
+            let _ = writeln!(o, "  not running (program: {})", p.display());
+        }
+        (false, None) => {
+            let _ = writeln!(o, "  not running, and the ssx-app program was not found");
+        }
+    }
+    let _ = writeln!(o, "  start at login: {}", r.daemon.autostart);
+    for p in &r.daemon.hotkey_problems {
+        let _ = writeln!(o, "  hotkey problem: {p}");
+    }
+
+    h(&mut o, "Recorder");
+    if !r.recorder.built_in {
+        let _ = writeln!(o, "  not built into this ssx");
+    } else if !r.recorder.ffmpeg {
+        let _ = writeln!(o, "  GIF only (built without FFmpeg)");
+    } else {
+        for e in &r.recorder.encoders {
+            let _ = writeln!(
+                o,
+                "  {}: {}",
+                e.name,
+                if e.usable { "works".to_owned() } else { format!("unavailable ({})", e.detail) }
+            );
+        }
     }
 
     h(&mut o, "Hotkeys");
@@ -911,6 +1181,37 @@ mod tests {
             }],
             editor: EditorInfo { found: true, path: Some("/usr/bin/ssx-editor-ui".into()) },
             shell_integrations: vec![],
+            daemon: DaemonInfo {
+                program: Some("/usr/bin/ssx-app".into()),
+                running: true,
+                version: Some("0.1.0".into()),
+                tray: Some(true),
+                hotkey_backend: Some("global-hotkey".into()),
+                hotkeys_registered: Some(4),
+                hotkey_problems: vec![],
+                autostart: "enabled".into(),
+            },
+            helpers: HelpersInfo {
+                overlay: HelperInfo {
+                    found: true,
+                    disabled: false,
+                    path: Some("/usr/bin/ssx-overlay".into()),
+                },
+                settings_ui: HelperInfo {
+                    found: true,
+                    disabled: false,
+                    path: Some("/usr/bin/ssx-settings-ui".into()),
+                },
+            },
+            recorder: RecorderInfo {
+                built_in: true,
+                ffmpeg: true,
+                encoders: vec![EncoderState {
+                    name: "libx264".into(),
+                    usable: true,
+                    detail: String::new(),
+                }],
+            },
             hotkeys: HotkeyInfo {
                 recommended: "sway bindsym include file".into(),
                 strategies: vec!["sway bindsym include file".into()],
@@ -925,11 +1226,70 @@ mod tests {
     }
 
     #[test]
-    fn a_healthy_system_only_gets_the_region_overlay_note() {
+    fn a_healthy_system_has_nothing_to_fix() {
         let m = messages(&healthy());
-        assert_eq!(m.len(), 1, "{m:?}");
-        assert_eq!(m[0].0, Severity::Info);
-        assert!(m[0].1.contains("interactive region"));
+        assert!(m.is_empty(), "{m:?}");
+    }
+
+    #[test]
+    fn a_missing_overlay_is_a_warning_and_a_disabled_one_is_a_note() {
+        let mut r = healthy();
+        r.helpers.overlay = HelperInfo { found: false, disabled: false, path: None };
+        let m = messages(&r);
+        assert_eq!(m.len(), 1);
+        assert_eq!(m[0].0, Severity::Warning);
+        assert!(m[0].1.contains("ssx-overlay") && m[0].1.contains("region"));
+        r.helpers.overlay.disabled = true;
+        assert_eq!(messages(&r)[0].0, Severity::Info);
+        r.helpers.settings_ui = HelperInfo { found: false, disabled: false, path: None };
+        assert!(messages(&r).iter().any(|(_, t)| t.contains("ssx-settings-ui")));
+    }
+
+    #[test]
+    fn the_background_app_is_explained_in_each_state() {
+        let mut r = healthy();
+        r.daemon.running = false;
+        let m = messages(&r);
+        assert!(m.iter().any(|(s, t)| *s == Severity::Info && t.contains("not running")), "{m:?}");
+        let hint = derive_problems(&r).into_iter().find_map(|p| p.hint).unwrap();
+        assert!(hint.contains("ssx daemon start") && hint.contains("autostart"));
+
+        r.daemon.program = None;
+        assert!(
+            messages(&r)
+                .iter()
+                .any(|(s, t)| *s == Severity::Warning && t.contains("was not found"))
+        );
+
+        let mut r = healthy();
+        r.daemon.hotkey_problems = vec!["Ctrl+Print: already used".into()];
+        r.daemon.tray = Some(false);
+        let m = messages(&r);
+        assert!(m.iter().any(|(s, t)| *s == Severity::Warning && t.contains("Ctrl+Print")));
+        assert!(m.iter().any(|(_, t)| t.contains("no tray icon")));
+
+        let mut r = healthy();
+        r.daemon.hotkey_backend = Some("none".into());
+        assert!(messages(&r).iter().any(|(_, t)| t.contains("cannot register global hotkeys")));
+    }
+
+    #[test]
+    fn recorder_problems_depend_on_the_build_and_the_encoders() {
+        let mut r = healthy();
+        r.recorder.encoders = vec![EncoderState {
+            name: "libx264".into(),
+            usable: false,
+            detail: "not found".into(),
+        }];
+        assert!(
+            messages(&r)
+                .iter()
+                .any(|(s, t)| *s == Severity::Warning && t.contains("no video encoder"))
+        );
+        r.recorder.ffmpeg = false;
+        assert!(messages(&r).iter().any(|(s, t)| *s == Severity::Info && t.contains("only GIF")));
+        r.recorder.built_in = false;
+        assert!(messages(&r).iter().any(|(_, t)| t.contains("cannot record")));
     }
 
     #[test]
@@ -1033,7 +1393,13 @@ mod tests {
             "clipboard: yes",
             "notifications: mako 1.9",
             "secret store: Secret Service",
-            "Problems (1)",
+            "Background app",
+            "ssx-app 0.1.0: running, tray showing, hotkeys via global-hotkey (4 registered)",
+            "start at login: enabled",
+            "Recorder",
+            "libx264: works",
+            "region selector (ssx-overlay): /usr/bin/ssx-overlay",
+            "Problems (0)",
         ] {
             assert!(text.contains(needle), "{needle} missing from:\n{text}");
         }
@@ -1052,12 +1418,17 @@ mod tests {
             "uploaders",
             "editor",
             "shell_integrations",
+            "daemon",
+            "helpers",
+            "recorder",
             "hotkeys",
             "problems",
         ] {
             assert!(json.get(key).is_some(), "{key} missing from the JSON");
         }
-        assert_eq!(json["problems"][0]["severity"], "info");
+        assert_eq!(json["problems"].as_array().map(Vec::len), Some(0));
+        assert_eq!(json["daemon"]["running"], true);
+        assert_eq!(json["recorder"]["encoders"][0]["usable"], true);
     }
 
     #[test]

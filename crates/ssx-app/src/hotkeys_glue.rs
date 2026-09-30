@@ -98,12 +98,13 @@ pub struct Plan {
 pub fn plan(settings: &Settings, cli: &str) -> Plan {
     let mut out = Plan::default();
     let mut seen: HashMap<Chord, String> = HashMap::new();
-    let mut add = |out: &mut Plan, id: String, label: String, hotkey: &str, target: HotkeyTarget| {
-        let problem = |message: String| Problem {
-            label: label.clone(),
-            hotkey: hotkey.to_owned(),
-            message,
-        };
+    let mut add = |out: &mut Plan,
+                   id: String,
+                   label: String,
+                   hotkey: &str,
+                   target: HotkeyTarget| {
+        let problem =
+            |message: String| Problem { label: label.clone(), hotkey: hotkey.to_owned(), message };
         let chord: Chord = match hotkey.parse() {
             Ok(c) => c,
             Err(e) => {
@@ -391,7 +392,9 @@ pub struct HotkeyThread {
 
 impl std::fmt::Debug for HotkeyThread {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HotkeyThread").field("backend", &self.initial.backend).finish_non_exhaustive()
+        f.debug_struct("HotkeyThread")
+            .field("backend", &self.initial.backend)
+            .finish_non_exhaustive()
     }
 }
 
@@ -434,13 +437,14 @@ impl HotkeyThread {
             })
             .map_err(|e| tracing::error!("cannot start the hotkey thread: {e}"))
             .ok();
-        let initial = ready_rx.recv_timeout(Duration::from_secs(30)).unwrap_or_else(|_| HotkeyStatus {
-            unavailable: Some(Unavailable {
-                reason: "the hotkey thread did not start".to_owned(),
-                alternatives: Vec::new(),
-            }),
-            ..HotkeyStatus::default()
-        });
+        let initial =
+            ready_rx.recv_timeout(Duration::from_secs(30)).unwrap_or_else(|_| HotkeyStatus {
+                unavailable: Some(Unavailable {
+                    reason: "the hotkey thread did not start".to_owned(),
+                    alternatives: Vec::new(),
+                }),
+                ..HotkeyStatus::default()
+            });
         Self { tx, join, initial }
     }
 
@@ -525,7 +529,8 @@ mod tests {
 
     #[test]
     fn workflows_without_hotkeys_are_skipped_silently() {
-        let p = plan(&settings(vec![wf("a", "A", None, None), wf("b", "B", Some("  "), None)]), "ssx");
+        let p =
+            plan(&settings(vec![wf("a", "A", None, None), wf("b", "B", Some("  "), None)]), "ssx");
         assert_eq!(p, Plan::default());
     }
 
@@ -542,7 +547,9 @@ mod tests {
         assert_eq!(p.problems.len(), 3, "{:?}", p.problems);
         let dup = p.problems.iter().find(|p| p.label == "Second").unwrap();
         assert!(dup.message.contains("already bound to First"), "{dup}");
-        assert!(p.problems.iter().any(|p| p.label == "Third" && p.message.contains("not a usable")));
+        assert!(
+            p.problems.iter().any(|p| p.label == "Third" && p.message.contains("not a usable"))
+        );
         // Commands are still listed for every workflow that has a hotkey, so a user on sway
         // can bind them by hand.
         assert_eq!(p.commands.len(), 4);
@@ -637,7 +644,12 @@ mod tests {
         let status = r.apply(&plan(&Settings::default(), "ssx"), true);
         assert_eq!(status.backend.as_deref(), Some("global-hotkey"));
         assert_eq!(status.problems.len(), 1, "{:?}", status.problems);
-        assert!(status.problems[0].contains("Ctrl+Print") && status.problems[0].contains("another application"), "{}", status.problems[0]);
+        assert!(
+            status.problems[0].contains("Ctrl+Print")
+                && status.problems[0].contains("another application"),
+            "{}",
+            status.problems[0]
+        );
         let n = plan(&Settings::default(), "ssx").bindings.len();
         assert_eq!(status.registered, n - 1);
     }
