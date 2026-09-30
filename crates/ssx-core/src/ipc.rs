@@ -57,6 +57,97 @@ pub enum CaptureKind {
     LastRegion,
 }
 
+/// How the region overlay selects (for [`Request::Capture`] with [`CaptureKind::Region`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RegionMode {
+    /// Drag a rectangle.
+    Rect,
+    /// Drag an ellipse (pixels outside it become transparent).
+    Ellipse,
+    /// Draw a free-hand outline (pixels outside it become transparent).
+    Freeform,
+    /// Click a window.
+    Window,
+    /// Click a monitor.
+    Monitor,
+}
+
+/// What a recording captures (for [`Request::StartRecording`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum RecordTarget {
+    /// Ask the user to drag a region on the overlay (the default; falls back to the whole
+    /// desktop when no overlay is available).
+    Interactive,
+    /// The whole virtual desktop.
+    Desktop,
+    /// One monitor by id (`ssx monitors`); `None` means the primary monitor.
+    Monitor {
+        /// Monitor id.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+    },
+    /// An exact rectangle in virtual-desktop physical pixels.
+    Rect {
+        /// Left edge.
+        x: i32,
+        /// Top edge.
+        y: i32,
+        /// Width (> 0).
+        width: u32,
+        /// Height (> 0).
+        height: u32,
+    },
+}
+
+/// Which audio a recording captures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordAudio {
+    /// Video only.
+    None,
+    /// The default microphone.
+    Mic,
+    /// What the system plays.
+    System,
+    /// Microphone and system audio mixed.
+    Both,
+}
+
+/// Parameters of [`Request::StartRecording`] / [`Request::ToggleRecording`].
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecordSpec {
+    /// Recording workflow to run (id, CLI name or display name). Default: `record-gif` when
+    /// `gif` is set, else `record-screen`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<String>,
+    /// Record a GIF instead of a video (chooses the default workflow).
+    #[serde(default)]
+    pub gif: bool,
+    /// What to capture. Default: [`RecordTarget::Interactive`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<RecordTarget>,
+    /// Which audio to capture. Default: the recorder's setting.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audio: Option<RecordAudio>,
+    /// Reply only when the recording has stopped and the workflow has finished.
+    #[serde(default)]
+    pub wait: bool,
+}
+
+/// What [`Request::Show`] asks the app to open.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ShowTarget {
+    /// The settings window (or the config file when there is no settings UI).
+    Settings,
+    /// The history window.
+    History,
+    /// An empty editor canvas.
+    Editor,
+}
+
 /// What to do with files handed over from a file manager.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -114,6 +205,9 @@ pub enum Request {
         /// Reply only when finished.
         #[serde(default)]
         wait: bool,
+        /// How the region overlay selects (only for [`CaptureKind::Region`]); default rect.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mode: Option<RegionMode>,
     },
     /// List configured workflows.
     ListWorkflows,
@@ -126,6 +220,28 @@ pub enum Request {
     StopRecording,
     /// Ask the instance to exit.
     Quit,
+    /// Reply (with [`Response::Finished`]) when run `run_id` has finished. Lets a client
+    /// start a run without waiting, learn its id, and still be able to cancel it while it
+    /// waits. Recently finished runs are remembered, so asking late is fine.
+    WaitRun {
+        /// The id from [`Response::Accepted`].
+        run_id: u64,
+    },
+    /// Describe the running instance ([`Response::Status`]).
+    Status,
+    /// Bring something up in the running instance (a second `ssx-app` launch sends this).
+    Show {
+        /// What to show.
+        target: ShowTarget,
+    },
+    /// Start a recording (the same as pressing a recording workflow's hotkey while idle).
+    StartRecording(RecordSpec),
+    /// Start a recording when idle, stop the running one otherwise.
+    ToggleRecording(RecordSpec),
+    /// Describe the current recording ([`Response::Recording`]).
+    RecordingStatus,
+    /// Re-read `settings.toml` now instead of waiting for the file watcher.
+    ReloadSettings,
 }
 
 /// A workflow reference resolved from [`Request::RunWorkflow`].
@@ -213,6 +329,71 @@ pub struct RunSummary {
     pub items: Vec<ItemSummary>,
 }
 
+/// State of the recording, as [`Response::Recording`] reports it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecordingStatus {
+    /// A recording is running (or being set up).
+    pub active: bool,
+    /// The recording's overlay/selection is still open (no frames are being captured yet).
+    #[serde(default)]
+    pub selecting: bool,
+    /// Workflow id of the recording.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<String>,
+    /// Milliseconds since frames started to be captured.
+    #[serde(default)]
+    pub elapsed_ms: u64,
+    /// Run id (for [`Request::CancelRun`] / [`Request::WaitRun`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<u64>,
+}
+
+/// One run in [`DaemonStatus`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActiveRunInfo {
+    /// Run id.
+    pub run_id: u64,
+    /// Workflow display name.
+    pub name: String,
+    /// Whole seconds since it started.
+    pub running_secs: u64,
+}
+
+/// What [`Request::Status`] reports.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DaemonStatus {
+    /// Application version.
+    pub app_version: String,
+    /// Process id of the instance.
+    pub pid: u32,
+    /// Seconds since the instance started.
+    pub uptime_secs: u64,
+    /// A tray icon is showing.
+    pub tray: bool,
+    /// Hotkey mechanism in use (`global-hotkey`, `xdg-portal`, or `none`).
+    pub hotkey_backend: String,
+    /// Number of hotkeys that are registered.
+    pub hotkeys_registered: usize,
+    /// Hotkeys that could not be registered, each with the reason.
+    #[serde(default)]
+    pub hotkey_problems: Vec<String>,
+    /// Runs in progress.
+    #[serde(default)]
+    pub active_runs: Vec<ActiveRunInfo>,
+    /// Runs waiting for a free slot.
+    #[serde(default)]
+    pub queued_runs: usize,
+    /// The recording, if any.
+    #[serde(default)]
+    pub recording: RecordingStatus,
+    /// Directory the settings were loaded from.
+    #[serde(default)]
+    pub config_dir: String,
+    /// The last reload problem, if the newest `settings.toml` was rejected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settings_problem: Option<String>,
+}
+
 /// The instance's answer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -236,6 +417,10 @@ pub enum Response {
     },
     /// Generic success (cancel, quit, stop).
     Ok,
+    /// Answer to [`Request::Status`].
+    Status(DaemonStatus),
+    /// Answer to [`Request::RecordingStatus`] and to a successful start/toggle.
+    Recording(RecordingStatus),
     /// The request failed.
     Error {
         /// Category.
@@ -510,17 +695,47 @@ mod tests {
                 workflow: None,
                 delay_ms: None,
                 wait: false,
+                mode: None,
             },
             Request::Capture {
                 target: CaptureKind::LastRegion,
                 workflow: Some("w".into()),
                 delay_ms: Some(2500),
                 wait: true,
+                mode: None,
+            },
+            Request::Capture {
+                target: CaptureKind::Region,
+                workflow: None,
+                delay_ms: None,
+                wait: false,
+                mode: Some(RegionMode::Freeform),
             },
             Request::ListWorkflows,
             Request::CancelRun { run_id: u64::MAX },
             Request::StopRecording,
             Request::Quit,
+            Request::WaitRun { run_id: 12 },
+            Request::Status,
+            Request::Show { target: ShowTarget::Settings },
+            Request::StartRecording(RecordSpec::default()),
+            Request::StartRecording(RecordSpec {
+                workflow: Some("record-gif".into()),
+                gif: true,
+                target: Some(RecordTarget::Rect { x: -10, y: 5, width: 640, height: 480 }),
+                audio: Some(RecordAudio::Both),
+                wait: true,
+            }),
+            Request::ToggleRecording(RecordSpec {
+                target: Some(RecordTarget::Monitor { id: Some("DP-1".into()) }),
+                ..RecordSpec::default()
+            }),
+            Request::ToggleRecording(RecordSpec {
+                target: Some(RecordTarget::Interactive),
+                ..RecordSpec::default()
+            }),
+            Request::RecordingStatus,
+            Request::ReloadSettings,
         ]
     }
 
@@ -551,6 +766,32 @@ mod tests {
             },
             Response::Ok,
             Response::error(ErrorCode::UnknownWorkflow, "no workflow named \"x\""),
+            Response::Recording(RecordingStatus {
+                active: true,
+                selecting: false,
+                workflow: Some("record-screen".into()),
+                elapsed_ms: 1234,
+                run_id: Some(8),
+            }),
+            Response::Recording(RecordingStatus::default()),
+            Response::Status(DaemonStatus {
+                app_version: "0.1.0".into(),
+                pid: 42,
+                uptime_secs: 7,
+                tray: true,
+                hotkey_backend: "global-hotkey".into(),
+                hotkeys_registered: 3,
+                hotkey_problems: vec!["Ctrl+A: already grabbed".into()],
+                active_runs: vec![ActiveRunInfo {
+                    run_id: 1,
+                    name: "Capture".into(),
+                    running_secs: 2,
+                }],
+                queued_runs: 1,
+                recording: RecordingStatus::default(),
+                config_dir: "/c".into(),
+                settings_problem: Some("bad".into()),
+            }),
         ]
     }
 
@@ -605,9 +846,53 @@ mod tests {
                         workflow: None,
                         delay_ms: Some(10),
                         wait: false,
+                        mode: None,
                     },
                 ),
                 r#"{"v":1,"seq":3,"type":"capture","target":"last_region","delay_ms":10,"wait":false}"#,
+            ),
+            // Additive variants (protocol 1, added with the daemon).
+            (
+                RequestEnvelope::new(
+                    4,
+                    Request::Capture {
+                        target: CaptureKind::Region,
+                        workflow: None,
+                        delay_ms: None,
+                        wait: true,
+                        mode: Some(RegionMode::Window),
+                    },
+                ),
+                r#"{"v":1,"seq":4,"type":"capture","target":"region","wait":true,"mode":"window"}"#,
+            ),
+            (RequestEnvelope::new(5, Request::Status), r#"{"v":1,"seq":5,"type":"status"}"#),
+            (
+                RequestEnvelope::new(6, Request::WaitRun { run_id: 9 }),
+                r#"{"v":1,"seq":6,"type":"wait_run","run_id":9}"#,
+            ),
+            (
+                RequestEnvelope::new(8, Request::Show { target: ShowTarget::History }),
+                r#"{"v":1,"seq":8,"type":"show","target":"history"}"#,
+            ),
+            (
+                RequestEnvelope::new(
+                    9,
+                    Request::StartRecording(RecordSpec {
+                        gif: true,
+                        target: Some(RecordTarget::Monitor { id: None }),
+                        audio: Some(RecordAudio::System),
+                        ..RecordSpec::default()
+                    }),
+                ),
+                r#"{"v":1,"seq":9,"type":"start_recording","gif":true,"target":{"kind":"monitor"},"audio":"system","wait":false}"#,
+            ),
+            (
+                RequestEnvelope::new(10, Request::ToggleRecording(RecordSpec::default())),
+                r#"{"v":1,"seq":10,"type":"toggle_recording","gif":false,"wait":false}"#,
+            ),
+            (
+                RequestEnvelope::new(11, Request::ReloadSettings),
+                r#"{"v":1,"seq":11,"type":"reload_settings"}"#,
             ),
         ];
         for (env, expected) in cases {
@@ -651,9 +936,22 @@ mod tests {
                 target: CaptureKind::Window,
                 workflow: None,
                 delay_ms: None,
-                wait: false
+                wait: false,
+                mode: None,
             }
         );
+        // A start_recording with only the type is valid: everything has a default.
+        let r: RequestEnvelope = decode_line(r#"{"v":1,"type":"start_recording"}"#).unwrap();
+        assert_eq!(r.request, Request::StartRecording(RecordSpec::default()));
+    }
+
+    #[test]
+    fn old_peers_reject_new_requests_as_invalid_not_as_a_crash() {
+        // What an old daemon does with a request it has never heard of: a clean
+        // `InvalidRequest`, so a newer CLI can fall back to running in-process.
+        let e =
+            decode_line::<RequestEnvelope>(r#"{"v":1,"seq":1,"type":"hologram"}"#).unwrap_err();
+        assert_eq!(e.error_code(), Some(ErrorCode::InvalidRequest));
     }
 
     #[test]
