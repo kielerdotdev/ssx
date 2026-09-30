@@ -84,6 +84,7 @@ impl Integrations {
 }
 
 #[cfg(windows)]
+#[allow(clippy::unnecessary_wraps)] // same signature as the non-Windows variant, which is None
 fn default_registry() -> Option<Arc<dyn RegistryBackend>> {
     Some(Arc::new(windows::registry::WindowsRegistry::new()))
 }

@@ -50,11 +50,6 @@ fn mode_of(path: &Path) -> Option<u32> {
     fs::metadata(path).ok().map(|m| m.permissions().mode() & 0o777)
 }
 
-#[cfg(not(unix))]
-fn mode_of(_path: &Path) -> Option<u32> {
-    None
-}
-
 /// Whether `file` exists with identical content (and mode on Unix).
 fn is_current(file: &ManagedFile) -> Result<bool> {
     let same_content = read_existing(&file.path)?.is_some_and(|c| c == file.content);

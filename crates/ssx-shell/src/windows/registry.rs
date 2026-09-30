@@ -149,13 +149,26 @@ mod real {
         }
     }
 
-    fn to_io(e: windows_registry::Error) -> io::Error {
-        // HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND)
-        let code = e.code().0 as u32;
-        if code == 0x8007_0002 || code == 0x8007_0003 {
-            io::Error::new(io::ErrorKind::NotFound, e.message())
-        } else {
-            io::Error::other(e.message())
+    /// Converts a `windows-registry` result, mapping "not found" HRESULTs to
+    /// `io::ErrorKind::NotFound` (the crate's error type is not nameable, hence the alias).
+    fn conv<T>(r: windows_registry::Result<T>) -> io::Result<T> {
+        r.map_err(|e| {
+            // HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND)
+            let code = e.code().0 as u32;
+            if code == 0x8007_0002 || code == 0x8007_0003 {
+                io::Error::new(io::ErrorKind::NotFound, e.message())
+            } else {
+                io::Error::other(e.message())
+            }
+        })
+    }
+
+    /// `Ok(None)` for "not found", the value otherwise.
+    fn optional<T>(r: windows_registry::Result<T>) -> io::Result<Option<T>> {
+        match conv(r) {
+            Ok(v) => Ok(Some(v)),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
@@ -168,57 +181,41 @@ mod real {
 
     impl RegistryBackend for WindowsRegistry {
         fn get_string(&self, key: &str, name: &str) -> io::Result<Option<String>> {
-            let k = match CURRENT_USER.open(key) {
-                Ok(k) => k,
-                Err(e) if to_io(e.clone()).kind() == io::ErrorKind::NotFound => return Ok(None),
-                Err(e) => return Err(to_io(e)),
-            };
-            match k.get_string(name) {
-                Ok(v) => Ok(Some(v)),
-                Err(e) if to_io(e.clone()).kind() == io::ErrorKind::NotFound => Ok(None),
-                Err(e) => Err(to_io(e)),
-            }
+            let Some(k) = optional(CURRENT_USER.open(key))? else { return Ok(None) };
+            optional(k.get_string(name))
         }
 
         fn set_string(&self, key: &str, name: &str, value: &str) -> io::Result<()> {
-            let k = CURRENT_USER.create(key).map_err(to_io)?;
-            k.set_string(name, value).map_err(to_io)
+            let k = conv(CURRENT_USER.create(key))?;
+            conv(k.set_string(name, value))
         }
 
         fn key_exists(&self, key: &str) -> io::Result<bool> {
-            match CURRENT_USER.open(key) {
-                Ok(_) => Ok(true),
-                Err(e) if to_io(e.clone()).kind() == io::ErrorKind::NotFound => Ok(false),
-                Err(e) => Err(to_io(e)),
-            }
+            Ok(optional(CURRENT_USER.open(key))?.is_some())
         }
 
         fn delete_tree(&self, key: &str) -> io::Result<bool> {
             if !self.key_exists(key)? {
                 return Ok(false);
             }
-            CURRENT_USER.remove_tree(key).map_err(to_io)?;
+            conv(CURRENT_USER.remove_tree(key))?;
             Ok(true)
         }
 
         fn delete_key_if_empty(&self, key: &str) -> io::Result<bool> {
-            let k = match CURRENT_USER.open(key) {
-                Ok(k) => k,
-                Err(e) if to_io(e.clone()).kind() == io::ErrorKind::NotFound => return Ok(false),
-                Err(e) => return Err(to_io(e)),
-            };
-            let empty = k.keys().map_err(to_io)?.next().is_none()
-                && k.values().map_err(to_io)?.next().is_none();
+            let Some(k) = optional(CURRENT_USER.open(key))? else { return Ok(false) };
+            let no_subkeys = conv(k.keys())?.next().is_none();
+            let no_values = conv(k.values())?.next().is_none();
             drop(k);
-            if !empty {
+            if !(no_subkeys && no_values) {
                 return Ok(false);
             }
             let (parent, leaf) = split(key);
             if parent.is_empty() {
-                CURRENT_USER.remove_tree(leaf).map_err(to_io)?;
+                conv(CURRENT_USER.remove_tree(leaf))?;
             } else {
-                let p = CURRENT_USER.options().read().write().open(parent).map_err(to_io)?;
-                p.remove_tree(leaf).map_err(to_io)?;
+                let p = conv(CURRENT_USER.options().read().write().open(parent))?;
+                conv(p.remove_tree(leaf))?;
             }
             Ok(true)
         }
