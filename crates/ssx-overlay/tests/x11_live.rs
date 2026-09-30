@@ -29,7 +29,12 @@ fn run(
     let x = Xvfb::start(W, H)?;
     let dir = tempfile::tempdir().unwrap();
     let helper = x.helper_wrapper(dir.path());
-    let inp = input(coded_desktop(W, H, Point::new(0, 0)), vec![], windows, OverlayOptions { timeout_ms: Some(20_000), ..options });
+    let inp = input(
+        coded_desktop(W, H, Point::new(0, 0)),
+        vec![],
+        windows,
+        OverlayOptions { timeout_ms: Some(20_000), ..options },
+    );
     let out = std::thread::scope(|s| {
         let h = s.spawn(|| select_via_helper(&inp, &helper));
         assert!(x.wait_for_window("ssx-overlay"), "overlay window never appeared");
@@ -40,10 +45,35 @@ fn run(
 }
 
 fn drag(x: &Xvfb, from: (i32, i32), to: (i32, i32)) {
-    let (fx, fy, tx, ty) = (from.0.to_string(), from.1.to_string(), to.0.to_string(), to.1.to_string());
-    let mx = ((from.0 + to.0) / 2).to_string();
-    let my = ((from.1 + to.1) / 2).to_string();
-    assert!(x.xdotool(&["mousemove", &fx, &fy, "sleep", "0.05", "mousedown", "1", "sleep", "0.05", "mousemove", &mx, &my, "sleep", "0.05", "mousemove", &tx, &ty, "sleep", "0.1", "mouseup", "1", "sleep", "0.1"]));
+    let (fx, fy, tx, ty) =
+        (from.0.to_string(), from.1.to_string(), to.0.to_string(), to.1.to_string());
+    let mx = from.0.midpoint(to.0).to_string();
+    let my = from.1.midpoint(to.1).to_string();
+    assert!(x.xdotool(&[
+        "mousemove",
+        &fx,
+        &fy,
+        "sleep",
+        "0.05",
+        "mousedown",
+        "1",
+        "sleep",
+        "0.05",
+        "mousemove",
+        &mx,
+        &my,
+        "sleep",
+        "0.05",
+        "mousemove",
+        &tx,
+        &ty,
+        "sleep",
+        "0.1",
+        "mouseup",
+        "1",
+        "sleep",
+        "0.1"
+    ]));
 }
 
 fn key(x: &Xvfb, k: &str) {
@@ -79,7 +109,19 @@ fn drag_and_enter_returns_the_exact_rectangle() {
 fn reverse_drag_and_double_click_confirm() {
     let Some(out) = run(OverlayOptions::default(), vec![], |x| {
         drag(x, (400, 300), (250, 200));
-        assert!(x.xdotool(&["mousemove", "300", "250", "click", "--repeat", "2", "--delay", "60", "1", "sleep", "0.2"]));
+        assert!(x.xdotool(&[
+            "mousemove",
+            "300",
+            "250",
+            "click",
+            "--repeat",
+            "2",
+            "--delay",
+            "60",
+            "1",
+            "sleep",
+            "0.2"
+        ]));
     }) else {
         return;
     };
@@ -129,7 +171,32 @@ fn arrow_keys_nudge_and_shift_moves_by_ten() {
 #[test]
 fn shift_drag_is_square() {
     let Some(out) = run(OverlayOptions::default(), vec![], |x| {
-        assert!(x.xdotool(&["mousemove", "100", "100", "sleep", "0.05", "mousedown", "1", "sleep", "0.05", "keydown", "shift", "sleep", "0.05", "mousemove", "260", "160", "sleep", "0.1", "mouseup", "1", "keyup", "shift", "sleep", "0.1"]));
+        assert!(x.xdotool(&[
+            "mousemove",
+            "100",
+            "100",
+            "sleep",
+            "0.05",
+            "mousedown",
+            "1",
+            "sleep",
+            "0.05",
+            "keydown",
+            "shift",
+            "sleep",
+            "0.05",
+            "mousemove",
+            "260",
+            "160",
+            "sleep",
+            "0.1",
+            "mouseup",
+            "1",
+            "keyup",
+            "shift",
+            "sleep",
+            "0.1"
+        ]));
         key(x, "Return");
     }) else {
         return;
@@ -139,9 +206,27 @@ fn shift_drag_is_square() {
 
 #[test]
 fn hover_snap_selects_the_window_rectangle() {
-    let wins = vec![window("front", Rect::new(50, 60, 300, 200)), window("back", Rect::new(0, 0, 700, 500))];
+    let wins = vec![
+        window("front", Rect::new(50, 60, 300, 200)),
+        window("back", Rect::new(0, 0, 700, 500)),
+    ];
     let Some(out) = run(OverlayOptions::default(), wins, |x| {
-        assert!(x.xdotool(&["mousemove", "500", "400", "sleep", "0.1", "mousemove", "120", "120", "sleep", "0.1", "click", "1", "sleep", "0.2"]));
+        assert!(x.xdotool(&[
+            "mousemove",
+            "500",
+            "400",
+            "sleep",
+            "0.1",
+            "mousemove",
+            "120",
+            "120",
+            "sleep",
+            "0.1",
+            "click",
+            "1",
+            "sleep",
+            "0.2"
+        ]));
     }) else {
         return;
     };
@@ -156,10 +241,23 @@ fn hover_snap_selects_the_window_rectangle() {
 
 #[test]
 fn window_mode_returns_the_window() {
-    let wins = vec![window("front", Rect::new(50, 60, 300, 200)), window("back", Rect::new(0, 0, 700, 500))];
+    let wins = vec![
+        window("front", Rect::new(50, 60, 300, 200)),
+        window("back", Rect::new(0, 0, 700, 500)),
+    ];
     let opts = OverlayOptions { mode: SelectMode::Window, ..OverlayOptions::default() };
     let Some(out) = run(opts, wins, |x| {
-        assert!(x.xdotool(&["mousemove", "600", "450", "sleep", "0.1", "click", "1", "sleep", "0.2"]));
+        assert!(x.xdotool(&[
+            "mousemove",
+            "600",
+            "450",
+            "sleep",
+            "0.1",
+            "click",
+            "1",
+            "sleep",
+            "0.2"
+        ]));
     }) else {
         return;
     };
@@ -190,9 +288,34 @@ fn ellipse_and_freeform_modes() {
     let opts = OverlayOptions { mode: SelectMode::Freeform, ..OverlayOptions::default() };
     let Some(out) = run(opts, vec![], |x| {
         assert!(x.xdotool(&[
-            "mousemove", "100", "100", "sleep", "0.05", "mousedown", "1", "sleep", "0.05",
-            "mousemove", "200", "100", "sleep", "0.05", "mousemove", "220", "180", "sleep", "0.05",
-            "mousemove", "120", "200", "sleep", "0.1", "mouseup", "1", "sleep", "0.2",
+            "mousemove",
+            "100",
+            "100",
+            "sleep",
+            "0.05",
+            "mousedown",
+            "1",
+            "sleep",
+            "0.05",
+            "mousemove",
+            "200",
+            "100",
+            "sleep",
+            "0.05",
+            "mousemove",
+            "220",
+            "180",
+            "sleep",
+            "0.05",
+            "mousemove",
+            "120",
+            "200",
+            "sleep",
+            "0.1",
+            "mouseup",
+            "1",
+            "sleep",
+            "0.2",
         ]));
     }) else {
         return;
@@ -229,18 +352,41 @@ fn colour_pick_reports_the_pixel_under_the_pointer() {
 
 #[test]
 fn tab_cycles_monitors_and_enter_confirms() {
-    let x = match Xvfb::start(W, H) {
-        Some(x) => x,
-        None => return,
-    };
+    let Some(x) = Xvfb::start(W, H) else { return };
     let dir = tempfile::tempdir().unwrap();
     let helper = x.helper_wrapper(dir.path());
-    let mons = vec![monitor("L", Rect::new(0, 0, 500, 600), 1.0), monitor("R", Rect::new(500, 0, 300, 600), 1.0)];
-    let inp = input(coded_desktop(W, H, Point::new(0, 0)), mons, vec![], OverlayOptions { mode: SelectMode::Monitor, timeout_ms: Some(20_000), ..OverlayOptions::default() });
+    let mons = vec![
+        monitor("L", Rect::new(0, 0, 500, 600), 1.0),
+        monitor("R", Rect::new(500, 0, 300, 600), 1.0),
+    ];
+    let inp = input(
+        coded_desktop(W, H, Point::new(0, 0)),
+        mons,
+        vec![],
+        OverlayOptions {
+            mode: SelectMode::Monitor,
+            timeout_ms: Some(20_000),
+            ..OverlayOptions::default()
+        },
+    );
     let out = std::thread::scope(|s| {
         let h = s.spawn(|| select_via_helper(&inp, &helper));
         assert!(x.wait_for_window("ssx-overlay"));
-        assert!(x.xdotool(&["mousemove", "100", "100", "sleep", "0.1", "key", "Tab", "sleep", "0.1", "key", "Return", "sleep", "0.1"]));
+        assert!(x.xdotool(&[
+            "mousemove",
+            "100",
+            "100",
+            "sleep",
+            "0.1",
+            "key",
+            "Tab",
+            "sleep",
+            "0.1",
+            "key",
+            "Return",
+            "sleep",
+            "0.1"
+        ]));
         h.join().unwrap()
     })
     .unwrap();
@@ -252,7 +398,8 @@ fn tab_cycles_monitors_and_enter_confirms() {
 
 #[test]
 fn initial_region_is_restored_and_confirmed() {
-    let opts = OverlayOptions { initial: Some(Rect::new(10, 20, 30, 40)), ..OverlayOptions::default() };
+    let opts =
+        OverlayOptions { initial: Some(Rect::new(10, 20, 30, 40)), ..OverlayOptions::default() };
     let Some(out) = run(opts, vec![], |x| {
         key(x, "Return");
     }) else {
@@ -300,7 +447,12 @@ fn timeout_reports_cancelled_and_the_window_goes_away() {
     let Some(x) = Xvfb::start(W, H) else { return };
     let dir = tempfile::tempdir().unwrap();
     let helper = x.helper_wrapper(dir.path());
-    let inp = input(coded_desktop(W, H, Point::new(0, 0)), vec![], vec![], OverlayOptions { timeout_ms: Some(700), ..OverlayOptions::default() });
+    let inp = input(
+        coded_desktop(W, H, Point::new(0, 0)),
+        vec![],
+        vec![],
+        OverlayOptions { timeout_ms: Some(700), ..OverlayOptions::default() },
+    );
     let out = select_via_helper(&inp, &helper).unwrap();
     assert_eq!(out, OverlayOutcome::Cancelled);
     assert!(!x.xdotool(&["search", "--name", "ssx-overlay"]), "overlay window must be destroyed");
@@ -313,7 +465,12 @@ fn window_origin_offset_maps_pointer_to_desktop_pixels() {
     let Some(x) = Xvfb::start(W, H) else { return };
     let dir = tempfile::tempdir().unwrap();
     let helper = x.helper_wrapper(dir.path());
-    let inp = input(coded_desktop(500, 400, Point::new(120, 90)), vec![], vec![], OverlayOptions { timeout_ms: Some(20_000), ..OverlayOptions::default() });
+    let inp = input(
+        coded_desktop(500, 400, Point::new(120, 90)),
+        vec![],
+        vec![],
+        OverlayOptions { timeout_ms: Some(20_000), ..OverlayOptions::default() },
+    );
     let out = std::thread::scope(|s| {
         let h = s.spawn(|| select_via_helper(&inp, &helper));
         assert!(x.wait_for_window("ssx-overlay"));
@@ -336,7 +493,12 @@ fn script(dir: &std::path::Path, body: &str) -> std::path::PathBuf {
 }
 
 fn tiny_input(timeout_ms: Option<u64>) -> ssx_overlay::OverlayInput {
-    input(coded_desktop(16, 16, Point::new(0, 0)), vec![], vec![], OverlayOptions { timeout_ms, ..OverlayOptions::default() })
+    input(
+        coded_desktop(16, 16, Point::new(0, 0)),
+        vec![],
+        vec![],
+        OverlayOptions { timeout_ms, ..OverlayOptions::default() },
+    )
 }
 
 #[test]
@@ -359,7 +521,9 @@ fn a_wedged_helper_is_killed_on_timeout() {
     let h = script(dir.path(), &format!("echo $$ > '{}'; exec sleep 300", pidfile.display()));
     let t = std::time::Instant::now();
     match select_via_helper(&tiny_input(Some(600)), &h) {
-        Err(OverlayError::Helper(HelperError::Timeout(d))) => assert_eq!(d, Duration::from_millis(600) + ssx_overlay::helper::HELPER_KILL_GRACE),
+        Err(OverlayError::Helper(HelperError::Timeout(d))) => {
+            assert_eq!(d, Duration::from_millis(600) + ssx_overlay::helper::HELPER_KILL_GRACE);
+        }
         other => panic!("{other:?}"),
     }
     assert!(t.elapsed() < Duration::from_secs(8));
@@ -376,7 +540,10 @@ fn garbage_and_error_answers_are_distinguished() {
         select_via_helper(&tiny_input(Some(5_000)), &h),
         Err(OverlayError::Helper(HelperError::BadAnswer(_)))
     ));
-    let h = script(dir.path(), "cat >/dev/null; echo '{\"Error\":{\"message\":\"no display\"}}'; exit 2");
+    let h = script(
+        dir.path(),
+        "cat >/dev/null; echo '{\"Error\":{\"message\":\"no display\"}}'; exit 2",
+    );
     match select_via_helper(&tiny_input(Some(5_000)), &h) {
         Err(OverlayError::Helper(HelperError::Reported(m))) => assert_eq!(m, "no display"),
         other => panic!("{other:?}"),
@@ -393,7 +560,8 @@ fn helper_with_no_display_reports_an_actionable_error() {
         return;
     }
     let dir = tempfile::tempdir().unwrap();
-    let h = common::wrapper(dir.path(), &[], &["DISPLAY", "WAYLAND_DISPLAY"], &common::helper_bin());
+    let h =
+        common::wrapper(dir.path(), &[], &["DISPLAY", "WAYLAND_DISPLAY"], &common::helper_bin());
     match select_via_helper(&tiny_input(Some(5_000)), &h) {
         Err(OverlayError::Helper(HelperError::Reported(m))) => {
             assert!(m.contains("DISPLAY") && m.contains("WAYLAND_DISPLAY"), "{m}");
@@ -404,7 +572,11 @@ fn helper_with_no_display_reports_an_actionable_error() {
 
 #[test]
 fn hdr_frames_are_refused_before_spawning_anything() {
-    let f = ssx_types::Frame::new(ssx_types::Size::new(4, 4), ssx_types::PixelFormat::Rgba16F, ssx_types::ColorSpace::ScRgbLinear);
+    let f = ssx_types::Frame::new(
+        ssx_types::Size::new(4, 4),
+        ssx_types::PixelFormat::Rgba16F,
+        ssx_types::ColorSpace::ScRgbLinear,
+    );
     let inp = input(f, vec![], vec![], OverlayOptions::default());
     match select_via_helper(&inp, std::path::Path::new("/definitely/missing")) {
         Err(OverlayError::InvalidInput(m)) => assert!(m.contains("tone-map"), "{m}"),

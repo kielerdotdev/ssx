@@ -11,7 +11,7 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use ssx_types::{Monitor, Point, PixelFormat, WindowInfo};
+use ssx_types::{Monitor, PixelFormat, Point, WindowInfo};
 
 use crate::types::{OverlayOptions, OverlayOutcome};
 

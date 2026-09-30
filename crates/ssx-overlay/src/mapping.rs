@@ -111,7 +111,12 @@ fn find_at_scale(o: &LogicalOutput, s: f64, monitors: &[Monitor], taken: &[bool]
 /// selection model clamps to the whole desktop.
 pub fn surface_to_desktop(monitor: Rect, surface: (u32, u32), local: (f64, f64)) -> Point {
     const LIMIT: f64 = 1.0e7;
-    let (sw, sh) = (f64::from(surface.0.max(1)), f64::from(surface.1.max(1)));
+    // An unconfigured (0x0) surface has no meaningful ratio: assume 1:1.
+    let (sw, sh) = if surface.0 == 0 || surface.1 == 0 {
+        (f64::from(monitor.width.max(1)), f64::from(monitor.height.max(1)))
+    } else {
+        (f64::from(surface.0), f64::from(surface.1))
+    };
     let px = (local.0 * f64::from(monitor.width) / sw).floor().clamp(-LIMIT, LIMIT);
     let py = (local.1 * f64::from(monitor.height) / sh).floor().clamp(-LIMIT, LIMIT);
     Point::new(monitor.x.saturating_add(px as i32), monitor.y.saturating_add(py as i32))
@@ -169,7 +174,8 @@ mod tests {
     #[test]
     fn names_win_and_negative_origins_work() {
         let monitors = [mon("HDMI-A-1", -1920, 0, 1920, 1080), mon("DP-1", 0, 0, 2560, 1440)];
-        let outputs = [out(Some("DP-1"), 0, 0, 2560, 1440), out(Some("HDMI-A-1"), -1920, 0, 1920, 1080)];
+        let outputs =
+            [out(Some("DP-1"), 0, 0, 2560, 1440), out(Some("HDMI-A-1"), -1920, 0, 1920, 1080)];
         assert_eq!(match_outputs(&outputs, &monitors), vec![Some(1), Some(0)]);
         // Same layout, no names, negative logical origin.
         let outputs = [out(None, 0, 0, 2560, 1440), out(None, -1920, 0, 1920, 1080)];

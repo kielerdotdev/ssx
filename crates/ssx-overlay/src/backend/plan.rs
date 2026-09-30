@@ -2,9 +2,9 @@
 //!
 //! The choice is made from what the session *offers*, not from the desktop's name:
 //! `wlr-layer-shell` is used wherever the compositor advertises it (wlroots compositors,
-//! KWin), the fullscreen-toplevel technique wherever only `xdg_wm_base` exists (Mutter), and
+//! `KWin`), the fullscreen-toplevel technique wherever only `xdg_wm_base` exists (Mutter), and
 //! X11 only when there is no usable Wayland session or as a last resort. Preferring native
-//! Wayland over XWayland matters: an X11 override-redirect window under XWayland covers
+//! Wayland over `XWayland` matters: an X11 override-redirect window under `XWayland` covers
 //! only other X clients, not native Wayland windows.
 
 use crate::{error::OverlayError, types::BackendPreference};
@@ -125,7 +125,9 @@ pub fn plan(
                     out.push(Choice::WaylandFullscreen);
                 }
                 if out.is_empty() {
-                    notes.push("wayland: neither zwlr_layer_shell_v1 nor xdg_wm_base advertised".into());
+                    notes.push(
+                        "wayland: neither zwlr_layer_shell_v1 nor xdg_wm_base advertised".into(),
+                    );
                 }
             }
             Ok(_) => notes.push("wayland: wl_shm, wl_compositor or wl_seat missing".into()),
@@ -151,21 +153,46 @@ mod tests {
 
     /// Interfaces advertised by typical compositors (trimmed to relevant + noise).
     const SWAY: &[&str] = &[
-        "wl_compositor", "wl_shm", "wl_seat", "wl_output", "xdg_wm_base", "zwlr_layer_shell_v1",
-        "wp_viewporter", "wp_cursor_shape_manager_v1", "zxdg_output_manager_v1",
+        "wl_compositor",
+        "wl_shm",
+        "wl_seat",
+        "wl_output",
+        "xdg_wm_base",
+        "zwlr_layer_shell_v1",
+        "wp_viewporter",
+        "wp_cursor_shape_manager_v1",
+        "zxdg_output_manager_v1",
         "zwlr_virtual_pointer_manager_v1",
     ];
     const HYPRLAND: &[&str] = &[
-        "wl_compositor", "wl_shm", "wl_seat", "xdg_wm_base", "zwlr_layer_shell_v1", "wp_viewporter",
-        "wp_fractional_scale_manager_v1", "wp_cursor_shape_manager_v1",
+        "wl_compositor",
+        "wl_shm",
+        "wl_seat",
+        "xdg_wm_base",
+        "zwlr_layer_shell_v1",
+        "wp_viewporter",
+        "wp_fractional_scale_manager_v1",
+        "wp_cursor_shape_manager_v1",
     ];
     const KWIN: &[&str] = &[
-        "wl_compositor", "wl_shm", "wl_seat", "xdg_wm_base", "zwlr_layer_shell_v1", "wp_viewporter",
-        "org_kde_plasma_shell", "wp_cursor_shape_manager_v1",
+        "wl_compositor",
+        "wl_shm",
+        "wl_seat",
+        "xdg_wm_base",
+        "zwlr_layer_shell_v1",
+        "wp_viewporter",
+        "org_kde_plasma_shell",
+        "wp_cursor_shape_manager_v1",
     ];
     const MUTTER: &[&str] = &[
-        "wl_compositor", "wl_shm", "wl_seat", "xdg_wm_base", "wp_viewporter",
-        "wp_fractional_scale_manager_v1", "zxdg_output_manager_v1", "gtk_shell1",
+        "wl_compositor",
+        "wl_shm",
+        "wl_seat",
+        "xdg_wm_base",
+        "wp_viewporter",
+        "wp_fractional_scale_manager_v1",
+        "zxdg_output_manager_v1",
+        "gtk_shell1",
         "wp_cursor_shape_manager_v1",
     ];
 
@@ -178,7 +205,9 @@ mod tests {
     }
 
     fn auto(env: &SessionEnv, globals: &[&str]) -> Result<Vec<Choice>, OverlayError> {
-        plan(BackendPreference::Auto, env, || Ok(WaylandCaps::from_globals(globals.iter().copied())))
+        plan(BackendPreference::Auto, env, || {
+            Ok(WaylandCaps::from_globals(globals.iter().copied()))
+        })
     }
 
     #[test]
@@ -201,7 +230,8 @@ mod tests {
 
     #[test]
     fn plain_x11_session() {
-        let p = plan(BackendPreference::Auto, &env(false, true), || panic!("must not probe")).unwrap();
+        let p =
+            plan(BackendPreference::Auto, &env(false, true), || panic!("must not probe")).unwrap();
         assert_eq!(p, vec![Choice::X11]);
     }
 
@@ -210,9 +240,10 @@ mod tests {
         let e = env(true, true);
         let p = plan(BackendPreference::Auto, &e, || Err("connection refused".into())).unwrap();
         assert_eq!(p, vec![Choice::X11]);
-        let err = plan(BackendPreference::Auto, &env(true, false), || Err("connection refused".into()))
-            .unwrap_err()
-            .to_string();
+        let err =
+            plan(BackendPreference::Auto, &env(true, false), || Err("connection refused".into()))
+                .unwrap_err()
+                .to_string();
         assert!(err.contains("connection refused") && err.contains("DISPLAY"), "{err}");
     }
 
@@ -232,7 +263,10 @@ mod tests {
     #[test]
     fn explicit_preference_skips_probing() {
         let never = || -> Result<WaylandCaps, String> { panic!("must not probe") };
-        assert_eq!(plan(BackendPreference::X11, &env(true, true), never).unwrap(), vec![Choice::X11]);
+        assert_eq!(
+            plan(BackendPreference::X11, &env(true, true), never).unwrap(),
+            vec![Choice::X11]
+        );
         assert_eq!(
             plan(BackendPreference::WaylandFullscreen, &env(false, false), never).unwrap(),
             vec![Choice::WaylandFullscreen]

@@ -41,7 +41,10 @@ impl Handle {
 
     /// `true` for the four corner handles.
     pub const fn is_corner(self) -> bool {
-        matches!(self, Handle::NorthWest | Handle::NorthEast | Handle::SouthEast | Handle::SouthWest)
+        matches!(
+            self,
+            Handle::NorthWest | Handle::NorthEast | Handle::SouthEast | Handle::SouthWest
+        )
     }
 
     /// Which edges this handle moves: `(left, top, right, bottom)`.
@@ -64,8 +67,8 @@ impl Handle {
         let t = i64::from(rect.y);
         let r = rect.right();
         let b = rect.bottom();
-        let mx = (l + r) / 2;
-        let my = (t + b) / 2;
+        let mx = l.midpoint(r);
+        let my = t.midpoint(b);
         match self {
             Handle::NorthWest => (l, t),
             Handle::North => (mx, t),
@@ -443,7 +446,13 @@ mod tests {
                 assert_eq!(in_ellipse(rect, Point::new(x, y)), want, "ellipse {x},{y}");
             }
         }
-        let poly = [Point::new(0, 0), Point::new(30, 5), Point::new(10, 20), Point::new(25, 30), Point::new(-5, 12)];
+        let poly = [
+            Point::new(0, 0),
+            Point::new(30, 5),
+            Point::new(10, 20),
+            Point::new(25, 30),
+            Point::new(-5, 12),
+        ];
         for y in -3..35 {
             for x in -10..40 {
                 let (px, py) = (f64::from(x) + 0.5, f64::from(y) + 0.5);

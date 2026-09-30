@@ -84,7 +84,9 @@ impl Sway {
     /// cannot start headless here; panics instead when `CI` is set.
     pub fn start(outputs: &[OutputCfg]) -> Option<Sway> {
         if !super::have("sway") {
-            eprintln!("SKIP: `sway` is not installed (CI installs it with `apt install sway grim`)");
+            eprintln!(
+                "SKIP: `sway` is not installed (CI installs it with `apt install sway grim`)"
+            );
             return None;
         }
         match Self::try_start(outputs) {
@@ -98,12 +100,17 @@ impl Sway {
     }
 
     fn try_start(outputs: &[OutputCfg]) -> Result<Sway, String> {
-        let dir = tempfile::Builder::new().prefix("ssx-ov-sway").tempdir().map_err(|e| e.to_string())?;
+        let dir =
+            tempfile::Builder::new().prefix("ssx-ov-sway").tempdir().map_err(|e| e.to_string())?;
         let mut cfg = String::from(
             "xwayland disable\ndefault_border none\ndefault_floating_border none\nfocus_follows_mouse no\n",
         );
         for o in outputs {
-            let _ = writeln!(cfg, "output {} resolution {}x{} position {} {} scale {}", o.name, o.w, o.h, o.x, o.y, o.scale);
+            let _ = writeln!(
+                cfg,
+                "output {} resolution {}x{} position {} {} scale {}",
+                o.name, o.w, o.h, o.x, o.y, o.scale
+            );
         }
         let cfg_path = dir.path().join("sway.conf");
         std::fs::write(&cfg_path, cfg).map_err(|e| e.to_string())?;
@@ -126,7 +133,13 @@ impl Sway {
             .stderr(log)
             .spawn()
             .map_err(|e| format!("spawn sway: {e}"))?;
-        let mut sway = Sway { child, wayland_socket: PathBuf::new(), ipc_socket: PathBuf::new(), dir, input: None };
+        let mut sway = Sway {
+            child,
+            wayland_socket: PathBuf::new(),
+            ipc_socket: PathBuf::new(),
+            dir,
+            input: None,
+        };
         let deadline = Instant::now() + Duration::from_secs(15);
         loop {
             if let Ok(Some(status)) = sway.child.try_wait() {
@@ -139,9 +152,11 @@ impl Sway {
             if let Ok(rd) = std::fs::read_dir(sway.dir.path()) {
                 for e in rd.flatten() {
                     let n = e.file_name().to_string_lossy().into_owned();
-                    if n.starts_with("wayland-") && !n.ends_with(".lock") {
+                    let ext = e.path().extension().map(std::ffi::OsStr::to_ascii_lowercase);
+                    if n.starts_with("wayland-") && ext.as_deref() != Some("lock".as_ref()) {
                         wl = Some(e.path());
-                    } else if n.starts_with("sway-ipc.") && n.ends_with(".sock") {
+                    } else if n.starts_with("sway-ipc.") && ext.as_deref() == Some("sock".as_ref())
+                    {
                         ipc = Some(e.path());
                     }
                 }
@@ -158,10 +173,16 @@ impl Sway {
         // Outputs at their configured geometry.
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
-            let v: serde_json::Value = serde_json::from_slice(&ipc_request(&sway.ipc_socket, 3, b"")?).map_err(|e| e.to_string())?;
+            let v: serde_json::Value =
+                serde_json::from_slice(&ipc_request(&sway.ipc_socket, 3, b"")?)
+                    .map_err(|e| e.to_string())?;
             let ok = outputs.iter().all(|w| {
                 v.as_array().is_some_and(|a| {
-                    a.iter().any(|o| o["name"] == w.name && o["current_mode"]["width"] == w.w && o["current_mode"]["height"] == w.h)
+                    a.iter().any(|o| {
+                        o["name"] == w.name
+                            && o["current_mode"]["width"] == w.w
+                            && o["current_mode"]["height"] == w.h
+                    })
                 })
             });
             if ok {
@@ -178,7 +199,14 @@ impl Sway {
 
     fn log_tail(&self) -> String {
         let s = std::fs::read_to_string(self.dir.path().join("sway.log")).unwrap_or_default();
-        s.lines().rev().take(8).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join(" | ")
+        s.lines()
+            .rev()
+            .take(8)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join(" | ")
     }
 
     /// `WAYLAND_DISPLAY` value (socket file name) for clients.
@@ -190,7 +218,10 @@ impl Sway {
     pub fn helper_wrapper(&self, dir: &Path) -> PathBuf {
         super::wrapper(
             dir,
-            &[("WAYLAND_DISPLAY", &self.wayland_display()), ("XDG_RUNTIME_DIR", self.dir.path().to_str().unwrap())],
+            &[
+                ("WAYLAND_DISPLAY", &self.wayland_display()),
+                ("XDG_RUNTIME_DIR", self.dir.path().to_str().unwrap()),
+            ],
             &["DISPLAY"],
             &super::helper_bin(),
         )
@@ -220,7 +251,10 @@ impl Sway {
 
     /// Runs a sway command over IPC.
     pub fn command(&self, cmd: &str) -> String {
-        String::from_utf8_lossy(&ipc_request(&self.ipc_socket, 0, cmd.as_bytes()).unwrap_or_default()).into_owned()
+        String::from_utf8_lossy(
+            &ipc_request(&self.ipc_socket, 0, cmd.as_bytes()).unwrap_or_default(),
+        )
+        .into_owned()
     }
 }
 
@@ -252,7 +286,15 @@ pub struct Injector {
 
 struct St;
 impl Dispatch<WlRegistry, GlobalListContents> for St {
-    fn event(_: &mut Self, _: &WlRegistry, _: <WlRegistry as wayland_client::Proxy>::Event, _: &GlobalListContents, _: &Connection, _: &QueueHandle<Self>) {}
+    fn event(
+        _: &mut Self,
+        _: &WlRegistry,
+        _: <WlRegistry as wayland_client::Proxy>::Event,
+        _: &GlobalListContents,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+    }
 }
 delegate_noop!(St: ignore WlSeat);
 delegate_noop!(St: ignore ZwlrVirtualPointerManagerV1);
@@ -269,12 +311,15 @@ impl Injector {
         let (globals, mut queue) = registry_queue_init::<St>(&conn).map_err(|e| e.to_string())?;
         let qh = queue.handle();
         let seat: WlSeat = globals.bind(&qh, 1..=7, ()).map_err(|e| format!("wl_seat: {e}"))?;
-        let pm: ZwlrVirtualPointerManagerV1 = globals.bind(&qh, 1..=2, ()).map_err(|e| format!("virtual pointer manager: {e}"))?;
-        let km: ZwpVirtualKeyboardManagerV1 = globals.bind(&qh, 1..=1, ()).map_err(|e| format!("virtual keyboard manager: {e}"))?;
+        let pm: ZwlrVirtualPointerManagerV1 =
+            globals.bind(&qh, 1..=2, ()).map_err(|e| format!("virtual pointer manager: {e}"))?;
+        let km: ZwpVirtualKeyboardManagerV1 =
+            globals.bind(&qh, 1..=1, ()).map_err(|e| format!("virtual keyboard manager: {e}"))?;
         let pointer = pm.create_virtual_pointer(Some(&seat), &qh, ());
         let keyboard = km.create_virtual_keyboard(&seat, &qh, ());
         // Keymap: any valid xkb keymap; the overlay reads raw evdev codes.
-        let fd = rustix::fs::memfd_create("keymap", rustix::fs::MemfdFlags::CLOEXEC).map_err(|e| e.to_string())?;
+        let fd = rustix::fs::memfd_create("keymap", rustix::fs::MemfdFlags::CLOEXEC)
+            .map_err(|e| e.to_string())?;
         rustix::fs::ftruncate(&fd, KEYMAP.len() as u64).map_err(|e| e.to_string())?;
         let mut f = File::from(fd);
         f.write_all(KEYMAP.as_bytes()).map_err(|e| e.to_string())?;
@@ -298,11 +343,23 @@ impl Injector {
                         pointer.frame();
                     }
                     Cmd::Button { code, pressed } => {
-                        pointer.button(t, code, if pressed { wayland_client::protocol::wl_pointer::ButtonState::Pressed } else { wayland_client::protocol::wl_pointer::ButtonState::Released });
+                        pointer.button(
+                            t,
+                            code,
+                            if pressed {
+                                wayland_client::protocol::wl_pointer::ButtonState::Pressed
+                            } else {
+                                wayland_client::protocol::wl_pointer::ButtonState::Released
+                            },
+                        );
                         pointer.frame();
                     }
                     Cmd::Axis { value } => {
-                        pointer.axis(t, wayland_client::protocol::wl_pointer::Axis::VerticalScroll, value);
+                        pointer.axis(
+                            t,
+                            wayland_client::protocol::wl_pointer::Axis::VerticalScroll,
+                            value,
+                        );
                         pointer.frame();
                     }
                     Cmd::Key { code, pressed } => {

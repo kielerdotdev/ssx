@@ -22,6 +22,7 @@ mod wayland;
 #[cfg(target_os = "linux")]
 mod x11;
 
+mod win_input;
 #[cfg(windows)]
 mod windows;
 
@@ -30,6 +31,7 @@ pub use plan::{Choice, SessionEnv, WaylandCaps, plan};
 
 /// How a backend failed.
 #[derive(Debug)]
+#[cfg_attr(not(any(target_os = "linux", windows)), allow(dead_code))] // unused by the macOS stub
 pub(crate) enum Failure {
     /// Could not even get a window up (no display, missing protocol). The next candidate
     /// backend may be tried.
@@ -48,7 +50,6 @@ impl From<OverlayError> for Failure {
 pub fn run(app: &mut OverlayApp) -> Result<(), OverlayError> {
     #[cfg(target_os = "linux")]
     {
-        use crate::types::BackendPreference;
         let env = SessionEnv::from_process();
         let candidates = plan(app.options().backend, &env, wayland::probe)?;
         let mut tried = Vec::new();
@@ -67,7 +68,6 @@ pub fn run(app: &mut OverlayApp) -> Result<(), OverlayError> {
                 }
             }
         }
-        let _ = BackendPreference::Auto;
         Err(OverlayError::NoBackend { tried })
     }
     #[cfg(windows)]

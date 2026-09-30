@@ -134,7 +134,7 @@ impl Keymap {
     fn key(&self, code: u8) -> (Key, bool) {
         let s0 = self.sym(code, 0);
         let (k, extra) = key_from_keysym(s0);
-        if k == Key::Other && extra == false {
+        if k == Key::Other && !extra {
             return key_from_keysym(self.sym(code, 1));
         }
         (k, extra)
@@ -186,7 +186,7 @@ impl Drop for Session {
         let _ = self.conn.ungrab_pointer(CURRENT_TIME);
         let _ = self.conn.destroy_window(self.win);
         let _ = self.conn.flush();
-        let _ = self.conn.get_input_focus().map(|c| c.reply());
+        let _ = self.conn.get_input_focus().map(x11rb::cookie::Cookie::reply);
     }
 }
 
@@ -200,7 +200,8 @@ fn grab_mask() -> EventMask {
 
 impl Session {
     fn connect(app: &OverlayApp) -> Result<Self, Failure> {
-        let (conn, screen_num) = x11rb::connect(None).map_err(|e| setup(format!("cannot connect to the X server: {e}")))?;
+        let (conn, screen_num) = x11rb::connect(None)
+            .map_err(|e| setup(format!("cannot connect to the X server: {e}")))?;
         let setup_info = conn.setup();
         let screen = setup_info.roots.get(screen_num).ok_or_else(|| setup("no such X screen"))?;
         let (root, depth, visual) = (screen.root, screen.root_depth, screen.root_visual);
@@ -210,7 +211,8 @@ impl Session {
             .iter()
             .find(|f| f.depth == depth)
             .ok_or_else(|| setup(format!("no pixmap format for depth {depth}")))?;
-        if fmt.bits_per_pixel != 32 || setup_info.image_byte_order != xproto::ImageOrder::LSB_FIRST {
+        if fmt.bits_per_pixel != 32 || setup_info.image_byte_order != xproto::ImageOrder::LSB_FIRST
+        {
             return Err(setup(format!(
                 "unsupported pixel layout (depth {depth}, {} bpp, {:?}); need 32 bpp little-endian",
                 fmt.bits_per_pixel, setup_info.image_byte_order
@@ -243,11 +245,37 @@ impl Session {
                     | EventMask::STRUCTURE_NOTIFY
                     | EventMask::FOCUS_CHANGE,
             );
-        conn.create_window(depth, win, root, x, y, w, h, 0, WindowClass::INPUT_OUTPUT, visual, &aux)
-            .map_err(setup)?;
+        conn.create_window(
+            depth,
+            win,
+            root,
+            x,
+            y,
+            w,
+            h,
+            0,
+            WindowClass::INPUT_OUTPUT,
+            visual,
+            &aux,
+        )
+        .map_err(setup)?;
         let _ = COPY_FROM_PARENT;
-        conn.change_property8(xproto::PropMode::REPLACE, win, xproto::AtomEnum::WM_NAME, xproto::AtomEnum::STRING, b"ssx-overlay").map_err(setup)?;
-        conn.change_property8(xproto::PropMode::REPLACE, win, xproto::AtomEnum::WM_CLASS, xproto::AtomEnum::STRING, b"ssx-overlay\0ssx-overlay\0").map_err(setup)?;
+        conn.change_property8(
+            xproto::PropMode::REPLACE,
+            win,
+            xproto::AtomEnum::WM_NAME,
+            xproto::AtomEnum::STRING,
+            b"ssx-overlay",
+        )
+        .map_err(setup)?;
+        conn.change_property8(
+            xproto::PropMode::REPLACE,
+            win,
+            xproto::AtomEnum::WM_CLASS,
+            xproto::AtomEnum::STRING,
+            b"ssx-overlay\0ssx-overlay\0",
+        )
+        .map_err(setup)?;
         let gc = conn.generate_id().map_err(setup)?;
         conn.create_gc(gc, win, &CreateGCAux::new().graphics_exposures(0)).map_err(setup)?;
 
@@ -295,7 +323,19 @@ impl Session {
         }
         let id = self.conn.generate_id().map_err(runtime)?;
         self.conn
-            .create_glyph_cursor(id, self.cursor_font, self.cursor_font, glyph, glyph + 1, 0, 0, 0, 0xffff, 0xffff, 0xffff)
+            .create_glyph_cursor(
+                id,
+                self.cursor_font,
+                self.cursor_font,
+                glyph,
+                glyph + 1,
+                0,
+                0,
+                0,
+                0xffff,
+                0xffff,
+                0xffff,
+            )
             .map_err(runtime)?;
         self.cursors.insert(glyph, id);
         Ok(id)
@@ -306,16 +346,33 @@ impl Session {
         self.current_cursor = glyph_for(CursorHint::Crosshair);
         self.conn.map_window(self.win).map_err(runtime)?;
         self.conn
-            .configure_window(self.win, &xproto::ConfigureWindowAux::new().stack_mode(StackMode::ABOVE))
+            .configure_window(
+                self.win,
+                &xproto::ConfigureWindowAux::new().stack_mode(StackMode::ABOVE),
+            )
             .map_err(runtime)?;
-        self.conn.change_window_attributes(self.win, &xproto::ChangeWindowAttributesAux::new().cursor(cross)).map_err(runtime)?;
+        self.conn
+            .change_window_attributes(
+                self.win,
+                &xproto::ChangeWindowAttributesAux::new().cursor(cross),
+            )
+            .map_err(runtime)?;
 
         // A closing menu can still hold a grab for a moment; retry briefly.
         let deadline = Instant::now() + Duration::from_millis(1000);
         loop {
             let st = self
                 .conn
-                .grab_pointer(false, self.win, grab_mask(), GrabMode::ASYNC, GrabMode::ASYNC, x11rb::NONE, cross, CURRENT_TIME)
+                .grab_pointer(
+                    false,
+                    self.win,
+                    grab_mask(),
+                    GrabMode::ASYNC,
+                    GrabMode::ASYNC,
+                    x11rb::NONE,
+                    cross,
+                    CURRENT_TIME,
+                )
                 .map_err(runtime)?
                 .reply()
                 .map_err(runtime)?
@@ -343,7 +400,11 @@ impl Session {
             }
             if Instant::now() >= deadline {
                 tracing::warn!(?st, "could not grab the keyboard; falling back to input focus");
-                let _ = self.conn.set_input_focus(xproto::InputFocus::POINTER_ROOT, self.win, CURRENT_TIME);
+                let _ = self.conn.set_input_focus(
+                    xproto::InputFocus::POINTER_ROOT,
+                    self.win,
+                    CURRENT_TIME,
+                );
                 break;
             }
             std::thread::sleep(Duration::from_millis(20));
@@ -363,7 +424,10 @@ impl Session {
             self.conn.change_active_pointer_grab(c, CURRENT_TIME, grab_mask()).map_err(runtime)?;
         } else {
             self.conn
-                .change_window_attributes(self.win, &xproto::ChangeWindowAttributesAux::new().cursor(c))
+                .change_window_attributes(
+                    self.win,
+                    &xproto::ChangeWindowAttributesAux::new().cursor(c),
+                )
                 .map_err(runtime)?;
         }
         Ok(())
@@ -382,20 +446,36 @@ impl Session {
         match ev {
             Event::MotionNotify(e) => {
                 out.push(InputEvent::Modifiers(modifiers_from_mask(e.state.into())));
-                out.push(InputEvent::Pointer(PointerEvent::Move { pos: self.desktop(e.event_x, e.event_y) }));
+                out.push(InputEvent::Pointer(PointerEvent::Move {
+                    pos: self.desktop(e.event_x, e.event_y),
+                }));
             }
             Event::EnterNotify(e) => {
                 out.push(InputEvent::Modifiers(modifiers_from_mask(e.state.into())));
-                out.push(InputEvent::Pointer(PointerEvent::Move { pos: self.desktop(e.event_x, e.event_y) }));
+                out.push(InputEvent::Pointer(PointerEvent::Move {
+                    pos: self.desktop(e.event_x, e.event_y),
+                }));
             }
             Event::LeaveNotify(_) => out.push(InputEvent::Pointer(PointerEvent::Leave)),
             Event::ButtonPress(e) => {
                 let pos = self.desktop(e.event_x, e.event_y);
                 out.push(InputEvent::Modifiers(modifiers_from_mask(e.state.into())));
                 match e.detail {
-                    1 => out.push(InputEvent::Pointer(PointerEvent::Down { pos, button: PointerButton::Left, time_ms: self.now_ms() })),
-                    2 => out.push(InputEvent::Pointer(PointerEvent::Down { pos, button: PointerButton::Middle, time_ms: self.now_ms() })),
-                    3 => out.push(InputEvent::Pointer(PointerEvent::Down { pos, button: PointerButton::Right, time_ms: self.now_ms() })),
+                    1 => out.push(InputEvent::Pointer(PointerEvent::Down {
+                        pos,
+                        button: PointerButton::Left,
+                        time_ms: self.now_ms(),
+                    })),
+                    2 => out.push(InputEvent::Pointer(PointerEvent::Down {
+                        pos,
+                        button: PointerButton::Middle,
+                        time_ms: self.now_ms(),
+                    })),
+                    3 => out.push(InputEvent::Pointer(PointerEvent::Down {
+                        pos,
+                        button: PointerButton::Right,
+                        time_ms: self.now_ms(),
+                    })),
                     4 => out.push(InputEvent::Pointer(PointerEvent::Wheel { delta: 1 })),
                     5 => out.push(InputEvent::Pointer(PointerEvent::Wheel { delta: -1 })),
                     _ => {}
@@ -450,7 +530,18 @@ impl Session {
                 &tmp
             };
             self.conn
-                .put_image(ImageFormat::Z_PIXMAP, self.win, self.gc, r.width as u16, n as u16, (lx as i32) as i16, (ly + row) as i16, 0, self.depth, data)
+                .put_image(
+                    ImageFormat::Z_PIXMAP,
+                    self.win,
+                    self.gc,
+                    r.width as u16,
+                    n as u16,
+                    (lx as i32) as i16,
+                    (ly + row) as i16,
+                    0,
+                    self.depth,
+                    data,
+                )
                 .map_err(runtime)?;
             row += n;
         }
@@ -550,8 +641,7 @@ pub(super) fn run(app: &mut OverlayApp) -> Result<(), Failure> {
             .map(|d| Timespec { tv_sec: d.as_secs() as i64, tv_nsec: i64::from(d.subsec_nanos()) });
         let mut fds = [PollFd::new(s.conn.stream(), PollFlags::IN)];
         match poll(&mut fds, timeout.as_ref()) {
-            Ok(_) => {}
-            Err(rustix::io::Errno::INTR) => {}
+            Ok(_) | Err(rustix::io::Errno::INTR) => {}
             Err(e) => return Err(runtime(format!("poll failed: {e}"))),
         }
     }

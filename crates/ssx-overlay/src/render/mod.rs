@@ -19,7 +19,9 @@ use ssx_types::{ColorSpace, Frame, PixelFormat, Point, Rect, Size};
 use self::paint::{ACCENT, Canvas, HIGHLIGHT, PANEL, Rgba, TEXT};
 use crate::error::OverlayError;
 use crate::model::geometry::{ellipse_span, handle_rect, polygon_spans, visible_handles};
-use crate::model::scene::{Cutout, LabelScene, LoupeScene, Scene, handle_size, loupe_info, text_scale};
+use crate::model::scene::{
+    Cutout, LabelScene, LoupeScene, Scene, handle_size, loupe_info, text_scale,
+};
 
 /// A BGRA pixel buffer the renderer draws into. `data` is tightly packed
 /// (`stride == width * 4`) and its top-left pixel is desktop position `origin`.
@@ -381,11 +383,12 @@ impl Renderer {
         let (ax, ay) = (i64::from(a.x), i64::from(a.y));
         for y in i64::from(sel.y).max(i64::from(a.y))..sel.bottom().min(a.bottom()) {
             let Some((l, r)) = ellipse_span(sel, y) else { continue };
-            let inner = ellipse_span(sel, y - s).zip(ellipse_span(sel, y + s)).and_then(|(u, d)| {
-                let lo = (l + s).max(u.0).max(d.0);
-                let hi = (r - s).min(u.1).min(d.1);
-                (hi > lo).then_some((lo, hi))
-            });
+            let inner =
+                ellipse_span(sel, y - s).zip(ellipse_span(sel, y + s)).and_then(|(u, d)| {
+                    let lo = (l + s).max(u.0).max(d.0);
+                    let hi = (r - s).min(u.1).min(d.1);
+                    (hi > lo).then_some((lo, hi))
+                });
             let mut run = |x0: i64, x1: i64| {
                 if x1 > x0 {
                     cv.fill_rect(x0 - ax, y - ay, x1 - x0, 1, ACCENT);

@@ -11,8 +11,9 @@ mod common;
 use std::time::{Duration, Instant};
 
 use common::{
-    coded_desktop, input, monitor, pixel, window,
+    coded_desktop, input, monitor, pixel,
     sway::{OutputCfg, Sway, evdev},
+    window,
 };
 use ssx_overlay::{
     BackendPreference, OverlayInput, OverlayOptions, OverlayOutcome, SelectMode, select_via_helper,
@@ -53,12 +54,11 @@ fn opts(backend: BackendPreference) -> OverlayOptions {
 
 /// Ready = grim shows the dimmed desktop at a probe pixel of `output`.
 fn dimmed_at(sway: &Sway, output: &str, at: (u32, u32), want: [u8; 3]) -> bool {
-    match sway.grim(output) {
-        Some(f) => pixel(&f, at.0, at.1) == want,
-        None => {
-            std::thread::sleep(Duration::from_secs(2));
-            true
-        }
+    if let Some(f) = sway.grim(output) {
+        pixel(&f, at.0, at.1) == want
+    } else {
+        std::thread::sleep(Duration::from_secs(2));
+        true
     }
 }
 
@@ -74,7 +74,10 @@ fn layer_shell_two_outputs_cover_drag_across_and_return_exact_pixels() {
     };
     // Desktop in physical px == logical here (both outputs at scale 1), with a gap between.
     let desk = coded_desktop(1540, 600, Point::new(0, 0));
-    let monitors = vec![monitor("HEADLESS-1", Rect::new(0, 0, 800, 600), 1.0), monitor("HEADLESS-2", Rect::new(900, 50, 640, 480), 1.0)];
+    let monitors = vec![
+        monitor("HEADLESS-1", Rect::new(0, 0, 800, 600), 1.0),
+        monitor("HEADLESS-2", Rect::new(900, 50, 640, 480), 1.0),
+    ];
     let inp = input(desk.clone(), monitors, vec![], opts(BackendPreference::WaylandLayerShell));
     sway.input().set_layout(1540, 600);
     let ready = || dimmed_at(&sway, "HEADLESS-1", (790, 590), dim(pixel(&desk, 790, 590)));
@@ -112,7 +115,14 @@ fn layer_shell_two_outputs_cover_drag_across_and_return_exact_pixels() {
 fn escape_right_click_and_keyboard_nudge_on_layer_shell() {
     let Some(sway) = Sway::start(&[OutputCfg::new("HEADLESS-1", 800, 600, 0, 0)]) else { return };
     let desk = coded_desktop(800, 600, Point::new(0, 0));
-    let mk = || input(desk.clone(), vec![monitor("HEADLESS-1", Rect::new(0, 0, 800, 600), 1.0)], vec![], opts(BackendPreference::Auto));
+    let mk = || {
+        input(
+            desk.clone(),
+            vec![monitor("HEADLESS-1", Rect::new(0, 0, 800, 600), 1.0)],
+            vec![],
+            opts(BackendPreference::Auto),
+        )
+    };
     sway.input().set_layout(800, 600);
     let ready = || dimmed_at(&sway, "HEADLESS-1", (790, 590), dim(pixel(&desk, 790, 590)));
 
@@ -195,7 +205,10 @@ fn shift_square_wheel_colour_pick_and_window_snap() {
         other => panic!("{other:?}"),
     }
 
-    let wins = vec![window("front", Rect::new(50, 60, 300, 200)), window("back", Rect::new(0, 0, 700, 500))];
+    let wins = vec![
+        window("front", Rect::new(50, 60, 300, 200)),
+        window("back", Rect::new(0, 0, 700, 500)),
+    ];
     let out = run(&sway, &base(opts(BackendPreference::Auto), wins), ready, |sw| {
         sw.input().move_to(500.0, 400.0);
         sw.input().move_to(120.0, 120.0);
@@ -224,9 +237,13 @@ fn mixed_scale_layout_maps_pointer_to_desktop_pixels() {
     };
     let mut desk = coded_desktop(2240, 1200, Point::new(0, 0));
     desk.scale_factor = 2.0;
-    let monitors = vec![monitor("HEADLESS-1", Rect::new(0, 0, 1600, 1200), 1.0), monitor("HEADLESS-2", Rect::new(1600, 0, 640, 480), 2.0)];
+    let monitors = vec![
+        monitor("HEADLESS-1", Rect::new(0, 0, 1600, 1200), 1.0),
+        monitor("HEADLESS-2", Rect::new(1600, 0, 640, 480), 2.0),
+    ];
     sway.input().set_layout(1120, 600);
-    let inp = input(desk.clone(), monitors.clone(), vec![], opts(BackendPreference::WaylandLayerShell));
+    let inp =
+        input(desk.clone(), monitors.clone(), vec![], opts(BackendPreference::WaylandLayerShell));
     // Output 2 is native resolution, so it can be verified pixel-exactly.
     let ready = || dimmed_at(&sway, "HEADLESS-2", (100, 100), dim(pixel(&desk, 1700, 100)));
     let mut b_shot = None;
@@ -271,7 +288,12 @@ fn fullscreen_toplevel_flavour_used_on_gnome_like_compositors() {
     let Some(sway) = Sway::start(&[OutputCfg::new("HEADLESS-1", 800, 600, 0, 0)]) else { return };
     let desk = coded_desktop(800, 600, Point::new(0, 0));
     sway.input().set_layout(800, 600);
-    let inp = input(desk.clone(), vec![monitor("HEADLESS-1", Rect::new(0, 0, 800, 600), 1.0)], vec![], opts(BackendPreference::WaylandFullscreen));
+    let inp = input(
+        desk.clone(),
+        vec![monitor("HEADLESS-1", Rect::new(0, 0, 800, 600), 1.0)],
+        vec![],
+        opts(BackendPreference::WaylandFullscreen),
+    );
     let ready = || dimmed_at(&sway, "HEADLESS-1", (790, 590), dim(pixel(&desk, 790, 590)));
     let out = run(&sway, &inp, ready, |sw| {
         sw.input().move_to(100.0, 100.0);
@@ -296,7 +318,10 @@ fn monitor_pick_mode_with_tab_on_two_outputs() {
     };
     let desk = coded_desktop(1440, 600, Point::new(0, 0));
     sway.input().set_layout(1440, 600);
-    let monitors = vec![monitor("HEADLESS-1", Rect::new(0, 0, 800, 600), 1.0), monitor("HEADLESS-2", Rect::new(800, 0, 640, 480), 1.0)];
+    let monitors = vec![
+        monitor("HEADLESS-1", Rect::new(0, 0, 800, 600), 1.0),
+        monitor("HEADLESS-2", Rect::new(800, 0, 640, 480), 1.0),
+    ];
     let o = OverlayOptions { mode: SelectMode::Monitor, ..opts(BackendPreference::Auto) };
     let inp = input(desk.clone(), monitors, vec![], o);
     let ready = || dimmed_at(&sway, "HEADLESS-2", (300, 300), dim(pixel(&desk, 1100, 300)));
@@ -317,7 +342,8 @@ fn timeout_closes_the_overlay_and_reports_cancelled() {
     let Some(sway) = Sway::start(&[OutputCfg::new("HEADLESS-1", 800, 600, 0, 0)]) else { return };
     let desk = coded_desktop(800, 600, Point::new(0, 0));
     let o = OverlayOptions { timeout_ms: Some(1500), ..opts(BackendPreference::Auto) };
-    let inp = input(desk.clone(), vec![monitor("HEADLESS-1", Rect::new(0, 0, 800, 600), 1.0)], vec![], o);
+    let inp =
+        input(desk.clone(), vec![monitor("HEADLESS-1", Rect::new(0, 0, 800, 600), 1.0)], vec![], o);
     let dir = tempfile::tempdir().unwrap();
     let helper = sway.helper_wrapper(dir.path());
     let out = select_via_helper(&inp, &helper).unwrap();

@@ -38,7 +38,12 @@ fn opts(mode: SelectMode) -> OverlayOptions {
     OverlayOptions { mode, snap_to_windows: false, ..OverlayOptions::default() }
 }
 
-fn model_with(bounds: Rect, monitors: Vec<Monitor>, windows: Vec<WindowInfo>, o: OverlayOptions) -> SelectionModel {
+fn model_with(
+    bounds: Rect,
+    monitors: Vec<Monitor>,
+    windows: Vec<WindowInfo>,
+    o: OverlayOptions,
+) -> SelectionModel {
     SelectionModel::new(ModelConfig::new(bounds, monitors, windows, o, 1.0))
 }
 
@@ -73,7 +78,7 @@ fn hold(m: &mut SelectionModel, k: Key, pressed: bool) {
 fn drag(m: &mut SelectionModel, from: (i32, i32), to: (i32, i32)) {
     mv(m, from.0, from.1);
     down_at(m, from.0, from.1, 10_000);
-    mv(m, (from.0 + to.0) / 2, (from.1 + to.1) / 2);
+    mv(m, from.0.midpoint(to.0), from.1.midpoint(to.1));
     mv(m, to.0, to.1);
     up(m, to.0, to.1);
 }
@@ -104,7 +109,8 @@ fn drag_creates_exact_rect_and_enter_confirms() {
 
 #[test]
 fn drag_in_every_direction_normalises() {
-    for (from, to) in [((300, 250), (100, 100)), ((100, 250), (300, 100)), ((300, 100), (100, 250))] {
+    for (from, to) in [((300, 250), (100, 100)), ((100, 250), (300, 100)), ((300, 100), (100, 250))]
+    {
         let mut m = model(SelectMode::Rect);
         drag(&mut m, from, to);
         assert_eq!(m.selection(), Some(Rect::new(100, 100, 200, 150)), "{from:?}->{to:?}");
@@ -391,12 +397,14 @@ fn click_outside_selection_keeps_it_and_drag_replaces_it() {
 
 #[test]
 fn initial_region_starts_selected_and_is_clamped() {
-    let o = OverlayOptions { initial: Some(Rect::new(900, 700, 300, 300)), ..opts(SelectMode::Rect) };
+    let o =
+        OverlayOptions { initial: Some(Rect::new(900, 700, 300, 300)), ..opts(SelectMode::Rect) };
     let mut m = model_with(B, vec![], vec![], o);
     assert_eq!(m.selection(), Some(Rect::new(900, 700, 100, 100)));
     key(&mut m, Key::Enter);
     assert_eq!(selected(&m), Rect::new(900, 700, 100, 100));
-    let o = OverlayOptions { initial: Some(Rect::new(5000, 5000, 10, 10)), ..opts(SelectMode::Rect) };
+    let o =
+        OverlayOptions { initial: Some(Rect::new(5000, 5000, 10, 10)), ..opts(SelectMode::Rect) };
     assert_eq!(model_with(B, vec![], vec![], o).selection(), None);
 }
 
@@ -434,7 +442,11 @@ fn hover_highlights_frontmost_window_and_click_selects_its_rect() {
     mv(&mut m, 150, 150);
     assert_eq!(m.scene().highlight, Some(Rect::new(100, 100, 300, 200)));
     mv(&mut m, 500, 500);
-    assert_eq!(m.scene().highlight, Some(Rect::new(50, 50, 600, 500)), "falls through to the back window");
+    assert_eq!(
+        m.scene().highlight,
+        Some(Rect::new(50, 50, 600, 500)),
+        "falls through to the back window"
+    );
     mv(&mut m, 800, 300);
     assert_eq!(m.scene().highlight, None, "minimized windows are ignored");
     mv(&mut m, 150, 150);
@@ -532,7 +544,11 @@ fn monitor_mode_hover_click_and_tab() {
     mv(&mut m, 100, 500);
     assert_eq!(m.scene().highlight, Some(Rect::new(0, 0, 2560, 1440)));
     key(&mut m, Key::Tab);
-    assert_eq!(m.scene().highlight, Some(Rect::new(-1920, 0, 1920, 1080)), "tab wraps to the next monitor");
+    assert_eq!(
+        m.scene().highlight,
+        Some(Rect::new(-1920, 0, 1920, 1080)),
+        "tab wraps to the next monitor"
+    );
     key(&mut m, Key::Enter);
     assert_eq!(m.finished(), Some(&Finish::Monitor(0)));
 }
@@ -603,7 +619,12 @@ fn c_picks_colour_only_when_allowed_and_over_the_overlay() {
     mv(&mut m, 33, 44);
     key(&mut m, Key::Char('c'));
     assert_eq!(m.finished(), Some(&Finish::PickColor(Point::new(33, 44))));
-    let mut m = model_with(B, vec![], vec![], OverlayOptions { allow_color_pick: false, ..opts(SelectMode::Rect) });
+    let mut m = model_with(
+        B,
+        vec![],
+        vec![],
+        OverlayOptions { allow_color_pick: false, ..opts(SelectMode::Rect) },
+    );
     mv(&mut m, 33, 44);
     key(&mut m, Key::Char('c'));
     assert!(m.finished().is_none());
@@ -684,7 +705,11 @@ fn ctrl_snaps_created_edges_to_window_edges() {
     mv(&mut m, 296, 205);
     assert_eq!(m.selection(), Some(Rect::new(100, 100, 200, 100)));
     mv(&mut m, 500, 395);
-    assert_eq!(m.selection(), Some(Rect::new(100, 100, 400, 300)), "snaps to right/bottom of window");
+    assert_eq!(
+        m.selection(),
+        Some(Rect::new(100, 100, 400, 300)),
+        "snaps to right/bottom of window"
+    );
     mv(&mut m, 450, 350);
     assert_eq!(m.selection(), Some(Rect::new(100, 100, 350, 250)), "out of range: no snap");
     hold(&mut m, Key::Control, false);
@@ -808,14 +833,32 @@ fn to_event(op: &Op, t: u64) -> InputEvent {
     };
     match *op {
         Op::Move(x, y) => InputEvent::Pointer(PointerEvent::Move { pos: Point::new(x, y) }),
-        Op::Down(x, y, b) => InputEvent::Pointer(PointerEvent::Down { pos: Point::new(x, y), button: button(b), time_ms: t }),
-        Op::Up(x, y, b) => InputEvent::Pointer(PointerEvent::Up { pos: Point::new(x, y), button: button(b) }),
+        Op::Down(x, y, b) => InputEvent::Pointer(PointerEvent::Down {
+            pos: Point::new(x, y),
+            button: button(b),
+            time_ms: t,
+        }),
+        Op::Up(x, y, b) => {
+            InputEvent::Pointer(PointerEvent::Up { pos: Point::new(x, y), button: button(b) })
+        }
         Op::Wheel(d) => InputEvent::Pointer(PointerEvent::Wheel { delta: d }),
         Op::Leave => InputEvent::Pointer(PointerEvent::Leave),
         Op::Key(k, pressed) => {
             let key = [
-                Key::Escape, Key::Enter, Key::Tab, Key::Space, Key::Left, Key::Right, Key::Up,
-                Key::Down, Key::Shift, Key::Control, Key::Alt, Key::Char('c'), Key::Char('x'), Key::Other,
+                Key::Escape,
+                Key::Enter,
+                Key::Tab,
+                Key::Space,
+                Key::Left,
+                Key::Right,
+                Key::Up,
+                Key::Down,
+                Key::Shift,
+                Key::Control,
+                Key::Alt,
+                Key::Char('c'),
+                Key::Char('x'),
+                Key::Other,
             ][usize::from(k)];
             InputEvent::Key(KeyEvent { key, pressed })
         }

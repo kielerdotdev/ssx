@@ -22,9 +22,7 @@ use super::events::{InputEvent, Key, KeyEvent, Modifiers, PointerButton, Pointer
 use super::geometry::{
     Handle, bounding_points, clamp_inside, handle_at, polygon_area2, rect_from_edges, snap_value,
 };
-use super::scene::{
-    CursorHint, Cutout, Scene, handle_size, layout_loupe, place_label, text_scale,
-};
+use super::scene::{CursorHint, Cutout, Scene, handle_size, layout_loupe, place_label, text_scale};
 use crate::types::{OverlayOptions, SelectMode, UiScale};
 
 /// Pointer travel (desktop pixels) before a press becomes a drag.
@@ -366,7 +364,8 @@ impl SelectionModel {
                 .filter(|&i| i < self.cfg.monitors.len())
                 .map(Hover::Monitor),
             SelectMode::Rect | SelectMode::Ellipse => {
-                let idle = matches!(self.phase, Phase::Idle | Phase::Selected | Phase::Pending { .. });
+                let idle =
+                    matches!(self.phase, Phase::Idle | Phase::Selected | Phase::Pending { .. });
                 let over_sel = self.inside_sel(c) || self.handle_under(c).is_some();
                 if self.cfg.options.snap_to_windows && idle && !over_sel {
                     self.window_at(c).map(Hover::Window)
@@ -409,8 +408,10 @@ impl SelectionModel {
     }
 
     fn reapply(&mut self) {
-        if matches!(self.phase, Phase::Creating { .. } | Phase::Moving { .. } | Phase::Resizing { .. })
-            && let Some(c) = self.cursor
+        if matches!(
+            self.phase,
+            Phase::Creating { .. } | Phase::Moving { .. } | Phase::Resizing { .. }
+        ) && let Some(c) = self.cursor
         {
             self.drag_to(c, false);
         }
@@ -426,8 +427,8 @@ impl SelectionModel {
             }
             PointerEvent::Wheel { delta } => {
                 let z = i64::from(self.zoom) + i64::from(delta.signum());
-                self.zoom = z.clamp(i64::from(LOUPE_ZOOM_RANGE.0), i64::from(LOUPE_ZOOM_RANGE.1))
-                    as u32;
+                self.zoom =
+                    z.clamp(i64::from(LOUPE_ZOOM_RANGE.0), i64::from(LOUPE_ZOOM_RANGE.1)) as u32;
             }
             PointerEvent::Move { pos } => {
                 let pos = self.clamp_point(pos);
@@ -639,11 +640,16 @@ impl SelectionModel {
             i64::from(cur.y),
         );
         let moved = clamp_inside(
-            rect.translate(dx.clamp(-1_000_000, 1_000_000) as i32, dy.clamp(-1_000_000, 1_000_000) as i32),
+            rect.translate(
+                dx.clamp(-1_000_000, 1_000_000) as i32,
+                dy.clamp(-1_000_000, 1_000_000) as i32,
+            ),
             self.cfg.bounds,
         );
-        let (adx, ady) = (i64::from(moved.x) - i64::from(rect.x), i64::from(moved.y) - i64::from(rect.y));
-        let shift = |p: Point| Point::new((i64::from(p.x) + adx) as i32, (i64::from(p.y) + ady) as i32);
+        let (adx, ady) =
+            (i64::from(moved.x) - i64::from(rect.x), i64::from(moved.y) - i64::from(rect.y));
+        let shift =
+            |p: Point| Point::new((i64::from(p.x) + adx) as i32, (i64::from(p.y) + ady) as i32);
         self.phase = Phase::Creating { anchor: shift(anchor), cur: shift(cur) };
         self.sel = Some(moved);
     }
@@ -651,7 +657,10 @@ impl SelectionModel {
     fn drag_move(&mut self, grab: Point, orig: Rect, pos: Point) {
         let (dx, dy) = (i64::from(pos.x - grab.x), i64::from(pos.y - grab.y));
         let mut r = clamp_inside(
-            orig.translate(dx.clamp(-1_000_000, 1_000_000) as i32, dy.clamp(-1_000_000, 1_000_000) as i32),
+            orig.translate(
+                dx.clamp(-1_000_000, 1_000_000) as i32,
+                dy.clamp(-1_000_000, 1_000_000) as i32,
+            ),
             self.cfg.bounds,
         );
         if self.mods.ctrl {
@@ -727,7 +736,11 @@ impl SelectionModel {
         match (ok, bounding_points(&self.points)) {
             (true, Some(rect)) if !rect.is_empty() => {
                 let pts = std::mem::take(&mut self.points);
-                self.end(Finish::Selected { rect, shape: FinishShape::Freeform(pts), window: None });
+                self.end(Finish::Selected {
+                    rect,
+                    shape: FinishShape::Freeform(pts),
+                    window: None,
+                });
             }
             _ => {
                 self.points.clear();
@@ -860,7 +873,11 @@ impl SelectionModel {
         if region {
             s.selection = self.sel;
         }
-        s.handles = region && matches!(self.phase, Phase::Selected | Phase::Moving { .. } | Phase::Resizing { .. });
+        s.handles = region
+            && matches!(
+                self.phase,
+                Phase::Selected | Phase::Moving { .. } | Phase::Resizing { .. }
+            );
         if let Phase::Resizing { handle, .. } = self.phase {
             s.active_handle = Some(handle);
         }
@@ -870,7 +887,9 @@ impl SelectionModel {
         s.highlight = self.hover_rect();
         let dragging = matches!(self.phase, Phase::Moving { .. } | Phase::Resizing { .. });
         let over_sel = self.cursor.is_some_and(|c| {
-            region && matches!(self.phase, Phase::Selected) && (self.inside_sel(c) || self.handle_under(c).is_some())
+            region
+                && matches!(self.phase, Phase::Selected)
+                && (self.inside_sel(c) || self.handle_under(c).is_some())
         });
         let guides_mode = !matches!(opts.mode, SelectMode::Window | SelectMode::Monitor);
         s.crosshair = self.cursor.filter(|_| guides_mode && !dragging && !over_sel);
@@ -880,7 +899,13 @@ impl SelectionModel {
             _ => match self.cursor {
                 Some(c) if region && matches!(self.phase, Phase::Selected) => {
                     self.handle_under(c).map_or_else(
-                        || if self.inside_sel(c) { CursorHint::Move } else { CursorHint::Crosshair },
+                        || {
+                            if self.inside_sel(c) {
+                                CursorHint::Move
+                            } else {
+                                CursorHint::Crosshair
+                            }
+                        },
                         CursorHint::Resize,
                     )
                 }
@@ -894,7 +919,8 @@ impl SelectionModel {
                 s.selection.or(s.highlight)
             };
             if let Some(r) = subject {
-                let lines = vec![format!("{} x {}", r.width, r.height), format!("{}, {}", r.x, r.y)];
+                let lines =
+                    vec![format!("{} x {}", r.width, r.height), format!("{}, {}", r.x, r.y)];
                 let area = self
                     .cursor
                     .and_then(|c| self.monitor_at(c))
@@ -902,11 +928,12 @@ impl SelectionModel {
                 s.label = place_label(r, lines, ui, area);
             }
         }
-        if opts.show_loupe && guides_mode {
-            if let Some(c) = self.cursor {
-                let area = self.monitor_at(c).map_or(self.cfg.bounds, |i| self.cfg.monitors[i].rect);
-                s.loupe = layout_loupe(c, self.zoom, ui, area);
-            }
+        if opts.show_loupe
+            && guides_mode
+            && let Some(c) = self.cursor
+        {
+            let area = self.monitor_at(c).map_or(self.cfg.bounds, |i| self.cfg.monitors[i].rect);
+            s.loupe = layout_loupe(c, self.zoom, ui, area);
         }
         s
     }

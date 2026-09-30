@@ -323,7 +323,9 @@ impl Dispatch<ZxdgOutputV1, usize> for State {
         let Some(o) = st.outputs.get_mut(*idx) else { return };
         match ev {
             zxdg_output_v1::Event::LogicalPosition { x, y } => o.xdg_pos = Some((x, y)),
-            zxdg_output_v1::Event::LogicalSize { width, height } => o.xdg_size = Some((width, height)),
+            zxdg_output_v1::Event::LogicalSize { width, height } => {
+                o.xdg_size = Some((width, height));
+            }
             zxdg_output_v1::Event::Name { name } => o.name = Some(name),
             _ => {}
         }
@@ -459,7 +461,11 @@ impl Dispatch<WlPointer, ()> for State {
                 };
                 st.feed(InputEvent::Pointer(ev));
             }
-            wl_pointer::Event::Axis { axis: WEnum::Value(wl_pointer::Axis::VerticalScroll), value, .. } => {
+            wl_pointer::Event::Axis {
+                axis: WEnum::Value(wl_pointer::Axis::VerticalScroll),
+                value,
+                ..
+            } => {
                 if value != 0.0 {
                     st.feed(InputEvent::Pointer(PointerEvent::Wheel {
                         delta: if value < 0.0 { 1 } else { -1 },
@@ -496,7 +502,11 @@ impl Dispatch<WlKeyboard, ()> for State {
             }
             wl_keyboard::Event::Leave { .. } => st.release_everything(),
             wl_keyboard::Event::RepeatInfo { rate, delay } => {
-                st.repeat_rate_ms = if rate > 0 { (1000 / u64::try_from(rate).unwrap_or(25)).max(10) } else { u64::MAX };
+                st.repeat_rate_ms = if rate > 0 {
+                    (1000 / u64::try_from(rate).unwrap_or(25)).max(10)
+                } else {
+                    u64::MAX
+                };
                 st.repeat_delay_ms = u64::try_from(delay).unwrap_or(400);
             }
             _ => {}
@@ -513,11 +523,11 @@ impl Dispatch<WlBuffer, BufTag> for State {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let wl_buffer::Event::Release = ev {
-            if let Some(b) = st.surfs.get_mut(tag.0).and_then(|s| s.bufs.get_mut(tag.1)) {
-                b.busy = false;
-            }
-            // A frame owed because every buffer was busy is rendered by the main loop.
+        // A frame owed because every buffer was busy is rendered by the main loop.
+        if let wl_buffer::Event::Release = ev
+            && let Some(b) = st.surfs.get_mut(tag.0).and_then(|s| s.bufs.get_mut(tag.1))
+        {
+            b.busy = false;
         }
     }
 }
@@ -591,7 +601,9 @@ impl Dispatch<XdgToplevel, usize> for State {
     ) {
         match ev {
             xdg_toplevel::Event::Configure { width, height, .. } => {
-                if let Some(Surf { role: Role::Toplevel { pending, .. }, .. }) = st.surfs.get_mut(*idx) {
+                if let Some(Surf { role: Role::Toplevel { pending, .. }, .. }) =
+                    st.surfs.get_mut(*idx)
+                {
                     *pending = (width, height);
                 }
             }
@@ -616,11 +628,9 @@ impl State {
         let lh = if size.1 > 0 { size.1 as u32 } else { s.rect.height };
         let rect = s.rect;
         let first = !s.configured;
-        if first {
-            if let Err(e) = self.alloc_buffers(idx) {
-                self.failed = Some(format!("cannot allocate shm buffers: {e}"));
-                return;
-            }
+        if first && let Err(e) = self.alloc_buffers(idx) {
+            self.failed = Some(format!("cannot allocate shm buffers: {e}"));
+            return;
         }
         let has_viewporter = self.viewporter.is_some();
         let s = &mut self.surfs[idx];
@@ -662,7 +672,15 @@ impl State {
         for i in 0..2 {
             let map = ShmMap::new(len).map_err(|e| e.to_string())?;
             let pool = shm.create_pool(map.fd(), len as i32, &self.qh, ());
-            let wl = pool.create_buffer(0, w, h, w * 4, wl_shm::Format::Xrgb8888, &self.qh, BufTag(idx, i));
+            let wl = pool.create_buffer(
+                0,
+                w,
+                h,
+                w * 4,
+                wl_shm::Format::Xrgb8888,
+                &self.qh,
+                BufTag(idx, i),
+            );
             pool.destroy();
             bufs.push(Buf { wl, map, busy: false, stale: Vec::new() });
         }
@@ -728,11 +746,11 @@ impl State {
             self.present(app, i, &local);
         }
         let hint = app.cursor_hint();
-        if self.shown_hint != Some(hint) {
-            if let Some(dev) = &self.cursor_dev {
-                dev.set_shape(self.enter_serial, shape_for(hint));
-                self.shown_hint = Some(hint);
-            }
+        if self.shown_hint != Some(hint)
+            && let Some(dev) = &self.cursor_dev
+        {
+            dev.set_shape(self.enter_serial, shape_for(hint));
+            self.shown_hint = Some(hint);
         }
     }
 
@@ -775,7 +793,8 @@ pub(super) fn probe() -> Result<WaylandCaps, String> {
     let conn = Connection::connect_to_env().map_err(|e| format!("cannot connect: {e}"))?;
     let (globals, _queue) =
         registry_queue_init::<Probe>(&conn).map_err(|e| format!("registry query failed: {e}"))?;
-    let names: Vec<String> = globals.contents().clone_list().into_iter().map(|g| g.interface).collect();
+    let names: Vec<String> =
+        globals.contents().clone_list().into_iter().map(|g| g.interface).collect();
     Ok(WaylandCaps::from_globals(names.iter().map(String::as_str)))
 }
 
@@ -795,7 +814,15 @@ fn bind_outputs(
         if let Some(m) = xdg_mgr {
             m.get_xdg_output(&proxy, qh, idx);
         }
-        outs.push(OutInfo { proxy, name: None, geo: (0, 0), mode: None, scale: 1, xdg_pos: None, xdg_size: None });
+        outs.push(OutInfo {
+            proxy,
+            name: None,
+            geo: (0, 0),
+            mode: None,
+            scale: 1,
+            xdg_pos: None,
+            xdg_size: None,
+        });
     }
     outs
 }
@@ -807,7 +834,8 @@ pub(super) fn run(app: &mut OverlayApp, flavour: Flavour) -> Result<(), Failure>
         registry_queue_init(&conn).map_err(|e| setup(format!("registry query failed: {e}")))?;
     let qh = queue.handle();
 
-    let compositor: WlCompositor = globals.bind(&qh, 1..=6, ()).map_err(|e| setup(format!("wl_compositor: {e}")))?;
+    let compositor: WlCompositor =
+        globals.bind(&qh, 1..=6, ()).map_err(|e| setup(format!("wl_compositor: {e}")))?;
     let shm: WlShm = globals.bind(&qh, 1..=1, ()).map_err(|e| setup(format!("wl_shm: {e}")))?;
     let seat: WlSeat = globals.bind(&qh, 1..=7, ()).map_err(|e| setup(format!("wl_seat: {e}")))?;
     let viewporter: Option<WpViewporter> = globals.bind(&qh, 1..=1, ()).ok();
@@ -816,8 +844,12 @@ pub(super) fn run(app: &mut OverlayApp, flavour: Flavour) -> Result<(), Failure>
     let layer_shell: Option<ZwlrLayerShellV1> = globals.bind(&qh, 1..=4, ()).ok();
     let wm_base: Option<XdgWmBase> = globals.bind(&qh, 1..=6, ()).ok();
     match flavour {
-        Flavour::LayerShell if layer_shell.is_none() => return Err(setup("zwlr_layer_shell_v1 is not advertised")),
-        Flavour::Fullscreen if wm_base.is_none() => return Err(setup("xdg_wm_base is not advertised")),
+        Flavour::LayerShell if layer_shell.is_none() => {
+            return Err(setup("zwlr_layer_shell_v1 is not advertised"));
+        }
+        Flavour::Fullscreen if wm_base.is_none() => {
+            return Err(setup("xdg_wm_base is not advertised"));
+        }
         _ => {}
     }
     let outputs = bind_outputs(&globals, &qh, xdg_mgr.as_ref());
@@ -861,7 +893,15 @@ pub(super) fn run(app: &mut OverlayApp, flavour: Flavour) -> Result<(), Failure>
     let logical: Vec<LogicalOutput> = st
         .outputs
         .iter()
-        .map(|o| o.logical().unwrap_or(LogicalOutput { name: o.name.clone(), x: 0, y: 0, width: 0, height: 0 }))
+        .map(|o| {
+            o.logical().unwrap_or(LogicalOutput {
+                name: o.name.clone(),
+                x: 0,
+                y: 0,
+                width: 0,
+                height: 0,
+            })
+        })
         .collect();
     let mut matched = match_outputs(&logical, &monitors);
     if matched.iter().all(Option::is_none) && logical.len() == 1 && monitors.len() == 1 {
@@ -889,7 +929,14 @@ pub(super) fn run(app: &mut OverlayApp, flavour: Flavour) -> Result<(), Failure>
         let role = match flavour {
             Flavour::LayerShell => {
                 let ls = layer_shell.as_ref().expect("checked above");
-                let l = ls.get_layer_surface(&wl, Some(&st.outputs[oi].proxy), Layer::Overlay, "ssx-overlay".into(), &qh, idx);
+                let l = ls.get_layer_surface(
+                    &wl,
+                    Some(&st.outputs[oi].proxy),
+                    Layer::Overlay,
+                    "ssx-overlay".into(),
+                    &qh,
+                    idx,
+                );
                 l.set_anchor(Anchor::Top | Anchor::Bottom | Anchor::Left | Anchor::Right);
                 l.set_size(0, 0);
                 l.set_exclusive_zone(-1);
@@ -907,7 +954,16 @@ pub(super) fn run(app: &mut OverlayApp, flavour: Flavour) -> Result<(), Failure>
             }
         };
         wl.commit(); // roles are configured by an initial empty commit
-        st.surfs.push(Surf { wl, role, rect, logical: None, viewport: None, bufs: Vec::new(), configured: false, pending: false });
+        st.surfs.push(Surf {
+            wl,
+            role,
+            rect,
+            logical: None,
+            viewport: None,
+            bufs: Vec::new(),
+            configured: false,
+            pending: false,
+        });
     }
     st.seat = Some(seat);
 
@@ -955,7 +1011,8 @@ fn event_loop(
             && Instant::now() >= at
         {
             st.feed(InputEvent::Key(KeyEvent { key, pressed: true }));
-            st.repeat = Some((key, Instant::now() + Duration::from_millis(st.repeat_rate_ms.min(1000))));
+            st.repeat =
+                Some((key, Instant::now() + Duration::from_millis(st.repeat_rate_ms.min(1000))));
         }
         if st.dirty || st.surfs.iter().any(|s| s.pending) {
             st.frame(app);
@@ -967,10 +1024,10 @@ fn event_loop(
             .into_iter()
             .flatten()
             .min()
-            .map(|t| t.saturating_duration_since(now))
-            .unwrap_or(Duration::from_millis(500))
+            .map_or(Duration::from_millis(500), |t| t.saturating_duration_since(now))
             .min(Duration::from_millis(500));
-        let ts = Timespec { tv_sec: wake.as_secs() as i64, tv_nsec: i64::from(wake.subsec_nanos()) };
+        let ts =
+            Timespec { tv_sec: wake.as_secs() as i64, tv_nsec: i64::from(wake.subsec_nanos()) };
         let fd = guard.connection_fd();
         let mut fds = [PollFd::new(&fd, PollFlags::IN)];
         match poll(&mut fds, Some(&ts)) {
@@ -1024,6 +1081,5 @@ mod tests {
         let size = |mode: (i32, i32), scale: i32| (mode.0 / scale.max(1), mode.1 / scale.max(1));
         assert_eq!(size((3840, 2160), 2), (1920, 1080));
         assert_eq!(size((800, 600), 0), (800, 600));
-        let _ = Size::new(1, 1);
     }
 }

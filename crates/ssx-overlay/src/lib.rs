@@ -1,8 +1,12 @@
 //! Region-selection overlay.
 #![deny(unsafe_code)]
+// Pixel and coordinate maths converts between u32 sizes and i32/i64 positions all the time;
+// every value is bounded by screen dimensions (< 2^17) long before a wrap could happen.
+#![allow(clippy::cast_possible_wrap)]
 
 pub mod app;
 pub mod backend;
+pub mod demo;
 pub mod error;
 pub mod helper;
 pub mod mapping;

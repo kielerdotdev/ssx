@@ -117,14 +117,15 @@ impl Drop for Xvfb {
 
 /// Writes an executable `sh` script that sets/unsets environment variables and execs `target`.
 pub fn wrapper(dir: &Path, set: &[(&str, &str)], unset: &[&str], target: &Path) -> PathBuf {
+    use std::fmt::Write as _;
     let mut s = String::from("#!/bin/sh\n");
     for (k, v) in set {
-        s += &format!("export {k}='{v}'\n");
+        let _ = writeln!(s, "export {k}='{v}'");
     }
     for k in unset {
-        s += &format!("unset {k}\n");
+        let _ = writeln!(s, "unset {k}");
     }
-    s += &format!("exec '{}' \"$@\"\n", target.display());
+    let _ = writeln!(s, "exec '{}' \"$@\"", target.display());
     let p = dir.join(format!("helper-{}.sh", set.len() + unset.len()));
     std::fs::write(&p, s).unwrap();
     std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
@@ -137,7 +138,12 @@ pub fn coded_desktop(w: u32, h: u32, origin: Point) -> Frame {
     let mut data = Vec::with_capacity((w * h * 4) as usize);
     for y in 0..h {
         for x in 0..w {
-            data.extend_from_slice(&[(x % 251) as u8 | 1, (y % 241) as u8 | 1, ((x / 7 + y / 5) % 200) as u8 + 30, 255]);
+            data.extend_from_slice(&[
+                (x % 251) as u8 | 1,
+                (y % 241) as u8 | 1,
+                ((x / 7 + y / 5) % 200) as u8 + 30,
+                255,
+            ]);
         }
     }
     let mut f = Frame::from_rgba8(w, h, data).unwrap();
@@ -173,6 +179,11 @@ pub fn window(title: &str, r: Rect) -> WindowInfo {
     }
 }
 
-pub fn input(desktop: Frame, monitors: Vec<Monitor>, windows: Vec<WindowInfo>, options: OverlayOptions) -> OverlayInput {
+pub fn input(
+    desktop: Frame,
+    monitors: Vec<Monitor>,
+    windows: Vec<WindowInfo>,
+    options: OverlayOptions,
+) -> OverlayInput {
     OverlayInput { desktop, monitors, windows, options }
 }

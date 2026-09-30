@@ -75,7 +75,10 @@ impl Drop for ChildGuard {
 /// `input.options.timeout_ms` (default [`DEFAULT_HELPER_TIMEOUT`]) plus [`HELPER_KILL_GRACE`]
 /// elapses, in which case the helper is killed and [`HelperError::Timeout`] returned. Dropping the call (panic, early
 /// return) also kills the helper.
-pub fn select_via_helper(input: &OverlayInput, helper: &Path) -> Result<OverlayOutcome, OverlayError> {
+pub fn select_via_helper(
+    input: &OverlayInput,
+    helper: &Path,
+) -> Result<OverlayOutcome, OverlayError> {
     let (outcome, _) = select_via_helper_timed(input, helper)?;
     Ok(outcome)
 }
@@ -120,7 +123,8 @@ pub fn select_via_helper_timed(
         windows: input.windows.clone(),
         options: input.options.clone(),
     };
-    let json = serde_json::to_vec(&request).map_err(|e| OverlayError::InvalidInput(e.to_string()))?;
+    let json =
+        serde_json::to_vec(&request).map_err(|e| OverlayError::InvalidInput(e.to_string()))?;
 
     let child = Command::new(helper)
         .stdin(Stdio::piped())

@@ -161,7 +161,12 @@ fn golden_hidpi_ui_scale_two() {
     let c = Point::new(320, 220);
     s.crosshair = Some(c);
     s.loupe = crate::model::scene::layout_loupe(c, 8, 2.0, s.bounds);
-    s.label = crate::model::scene::place_label(sel, vec!["240 x 140".into(), "80, 80".into()], 2.0, s.bounds);
+    s.label = crate::model::scene::place_label(
+        sel,
+        vec!["240 x 140".into(), "80, 80".into()],
+        2.0,
+        s.bounds,
+    );
     assert_golden("hidpi_scale2", &r.render_to_frame(&s));
 }
 
@@ -208,7 +213,9 @@ fn bgra_and_rgba_inputs_render_identically_and_alpha_is_forced_opaque() {
         p.swap(0, 2);
         p[3] = 0; // capture backends may leave alpha 0 in gaps
     }
-    let bgra = Frame::from_raw(Size::new(64, 48), 64 * 4, PixelFormat::Bgra8, ColorSpace::Srgb, bgra_data).unwrap();
+    let bgra =
+        Frame::from_raw(Size::new(64, 48), 64 * 4, PixelFormat::Bgra8, ColorSpace::Srgb, bgra_data)
+            .unwrap();
     let mut a = Renderer::new(&rgba, 0.4).unwrap();
     let mut b = Renderer::new(&bgra, 0.4).unwrap();
     let s = base_scene(64, 48);
@@ -232,10 +239,16 @@ fn stride_padded_frames_are_handled() {
     let mut data = vec![7u8; stride * 5];
     for y in 0..5usize {
         for x in 0..w as usize {
-            data[y * stride + x * 4..y * stride + x * 4 + 4].copy_from_slice(&[x as u8 * 10, y as u8 * 10, 3, 255]);
+            data[y * stride + x * 4..y * stride + x * 4 + 4].copy_from_slice(&[
+                x as u8 * 10,
+                y as u8 * 10,
+                3,
+                255,
+            ]);
         }
     }
-    let f = Frame::from_raw(Size::new(w, 5), stride, PixelFormat::Rgba8, ColorSpace::Srgb, data).unwrap();
+    let f = Frame::from_raw(Size::new(w, 5), stride, PixelFormat::Rgba8, ColorSpace::Srgb, data)
+        .unwrap();
     let r = Renderer::new(&f, 0.0).unwrap();
     assert_eq!(r.pixel(Point::new(3, 2)), Some([30, 20, 3]));
     assert_eq!(r.pixel(Point::new(10, 2)), None);
@@ -307,11 +320,22 @@ fn apply(m: &mut SelectionModel, op: &Op, t: u64) {
             button: if right { PointerButton::Right } else { PointerButton::Left },
             time_ms: t,
         }),
-        Op::Up(x, y) => InputEvent::Pointer(PointerEvent::Up { pos: Point::new(x, y), button: PointerButton::Left }),
+        Op::Up(x, y) => InputEvent::Pointer(PointerEvent::Up {
+            pos: Point::new(x, y),
+            button: PointerButton::Left,
+        }),
         Op::Wheel(d) => InputEvent::Pointer(PointerEvent::Wheel { delta: d }),
         Op::Key(k, pressed) => InputEvent::Key(KeyEvent {
-            key: [Key::Shift, Key::Control, Key::Alt, Key::Space, Key::Left, Key::Down, Key::Tab, Key::Other]
-                [usize::from(k)],
+            key: [
+                Key::Shift,
+                Key::Control,
+                Key::Alt,
+                Key::Space,
+                Key::Left,
+                Key::Down,
+                Key::Tab,
+                Key::Other,
+            ][usize::from(k)],
             pressed,
         }),
     };
@@ -322,8 +346,24 @@ fn soundness_run(mode: SelectMode, ui: f32, ops: &[Op]) -> Result<(), TestCaseEr
     let (w, h) = (200u32, 120u32);
     let bounds = Rect::new(0, 0, w, h);
     let monitors = vec![
-        Monitor { id: "a".into(), name: "a".into(), rect: Rect::new(0, 0, 120, 120), scale_factor: 1.0, primary: true, refresh_hz: None, hdr: None },
-        Monitor { id: "b".into(), name: "b".into(), rect: Rect::new(120, 0, 80, 120), scale_factor: 1.0, primary: false, refresh_hz: None, hdr: None },
+        Monitor {
+            id: "a".into(),
+            name: "a".into(),
+            rect: Rect::new(0, 0, 120, 120),
+            scale_factor: 1.0,
+            primary: true,
+            refresh_hz: None,
+            hdr: None,
+        },
+        Monitor {
+            id: "b".into(),
+            name: "b".into(),
+            rect: Rect::new(120, 0, 80, 120),
+            scale_factor: 1.0,
+            primary: false,
+            refresh_hz: None,
+            hdr: None,
+        },
     ];
     let windows = vec![WindowInfo {
         id: "w".into(),
@@ -333,7 +373,8 @@ fn soundness_run(mode: SelectMode, ui: f32, ops: &[Op]) -> Result<(), TestCaseEr
         minimized: false,
         focused: false,
     }];
-    let options = OverlayOptions { mode, snap_to_windows: true, dim: 0.5, ..OverlayOptions::default() };
+    let options =
+        OverlayOptions { mode, snap_to_windows: true, dim: 0.5, ..OverlayOptions::default() };
     let mut cfg = ModelConfig::new(bounds, monitors, windows, options, ui);
     cfg.global_ui_scale = ui;
     let mut m = SelectionModel::new(cfg);
@@ -345,7 +386,8 @@ fn soundness_run(mode: SelectMode, ui: f32, ops: &[Op]) -> Result<(), TestCaseEr
         let scene = m.scene();
         let dirty = damage::between(prev.as_ref(), &scene);
         for d in &dirty {
-            let mut t = TargetBuf { origin: Point::new(0, 0), size: Size::new(w, h), data: &mut inc };
+            let mut t =
+                TargetBuf { origin: Point::new(0, 0), size: Size::new(w, h), data: &mut inc };
             r.render(&scene, *d, &mut t);
         }
         let mut full = vec![0u8; (w * h * 4) as usize];
@@ -355,7 +397,14 @@ fn soundness_run(mode: SelectMode, ui: f32, ops: &[Op]) -> Result<(), TestCaseEr
             let px = pos / 4;
             return Err(TestCaseError::fail(format!(
                 "after op #{i} {op:?}: pixel ({}, {}) channel {} differs (inc {} vs full {}); dirty {:?}\nprev {:?}\nnow  {:?}",
-                px % w as usize, px / w as usize, pos % 4, inc[pos], full[pos], dirty, prev, scene
+                px % w as usize,
+                px / w as usize,
+                pos % 4,
+                inc[pos],
+                full[pos],
+                dirty,
+                prev,
+                scene
             )));
         }
         prev = Some(scene);

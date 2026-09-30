@@ -52,11 +52,8 @@ impl SharedFrame {
                 .map_or(0, |d| d.as_nanos());
             let path = std::env::temp_dir()
                 .join(format!("ssx-overlay-{}-{nanos}.raw", std::process::id()));
-            let mut file = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .read(true)
-                .open(&path)?;
+            let mut file =
+                std::fs::OpenOptions::new().write(true).create_new(true).read(true).open(&path)?;
             file.write_all(frame.data())?;
             file.flush()?;
             Ok(Self { source: FrameSource::Path(path.clone()), _file: file, cleanup: Some(path) })
@@ -124,7 +121,8 @@ impl ShmMap {
     /// Creates a zeroed buffer of `len` bytes.
     pub fn new(len: usize) -> std::io::Result<Self> {
         use rustix::fs::{MemfdFlags, SealFlags, fcntl_add_seals, ftruncate, memfd_create};
-        let fd = memfd_create("ssx-overlay-buffer", MemfdFlags::CLOEXEC | MemfdFlags::ALLOW_SEALING)?;
+        let fd =
+            memfd_create("ssx-overlay-buffer", MemfdFlags::CLOEXEC | MemfdFlags::ALLOW_SEALING)?;
         ftruncate(&fd, len as u64)?;
         // The compositor must not be able to shrink the file under our mapping (SIGBUS);
         // sealing the size makes that impossible while leaving content writable.
@@ -183,12 +181,10 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn memfd_is_sealed_against_writes() {
-        use std::os::fd::AsRawFd;
-
         let f = Frame::from_rgba8(4, 4, vec![1; 64]).unwrap();
         let shared = SharedFrame::create(&f).unwrap();
-        // Re-opening for write must fail because of F_SEAL_WRITE.
-        let path = format!("/proc/self/fd/{}", shared._file.as_raw_fd());
+        let FrameSource::Fd(fd) = shared.source() else { panic!("memfd expected on Linux") };
+        let path = format!("/proc/self/fd/{fd}");
         let w = std::fs::OpenOptions::new().write(true).open(path);
         // Opening for write succeeds on a sealed memfd, but any write is refused.
         if let Ok(mut w) = w {

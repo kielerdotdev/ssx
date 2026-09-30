@@ -134,11 +134,8 @@ pub fn place_label(
     }
     let gap = 4 * text_scale(ui_scale);
     let above_y = i64::from(subject.y) - i64::from(size.height) - i64::from(gap);
-    let y = if above_y >= i64::from(area.y) {
-        above_y
-    } else {
-        i64::from(subject.y) + i64::from(gap)
-    };
+    let y =
+        if above_y >= i64::from(area.y) { above_y } else { i64::from(subject.y) + i64::from(gap) };
     let raw = super::geometry::rect_from_edges(
         i64::from(subject.x),
         y,
@@ -157,7 +154,7 @@ pub fn layout_loupe(cursor: Point, zoom: u32, ui_scale: f32, area: Rect) -> Opti
     let info_h = label_size(&vec![String::new(); 3], ui_scale).height;
     let max_side = area.width.min(area.height.saturating_sub(info_h));
     let mut cells = (128 / zoom).clamp(3, 65);
-    if cells % 2 == 0 {
+    if cells.is_multiple_of(2) {
         cells -= 1;
     }
     while cells > 1 && cells * cell_px > max_side {
@@ -191,7 +188,11 @@ pub fn layout_loupe(cursor: Point, zoom: u32, ui_scale: f32, area: Rect) -> Opti
 pub fn loupe_info(p: Point, rgb: Option<[u8; 3]>) -> Vec<String> {
     match rgb {
         Some([r, g, b]) => {
-            vec![format!("#{r:02X}{g:02X}{b:02X}"), format!("{r},{g},{b}"), format!("{},{}", p.x, p.y)]
+            vec![
+                format!("#{r:02X}{g:02X}{b:02X}"),
+                format!("{r},{g},{b}"),
+                format!("{},{}", p.x, p.y),
+            ]
         }
         None => vec!["-".into(), "-".into(), format!("{},{}", p.x, p.y)],
     }
@@ -202,7 +203,8 @@ pub fn crosshair_strips(p: Point, ui_scale: f32, bounds: Rect) -> Vec<Rect> {
     let t = i64::from(text_scale(ui_scale)) + 1;
     let (x, y) = (i64::from(p.x), i64::from(p.y));
     let h = super::geometry::rect_from_edges(i64::from(bounds.x), y - t, bounds.right(), y + t + 1);
-    let v = super::geometry::rect_from_edges(x - t, i64::from(bounds.y), x + t + 1, bounds.bottom());
+    let v =
+        super::geometry::rect_from_edges(x - t, i64::from(bounds.y), x + t + 1, bounds.bottom());
     vec![h, v]
 }
 

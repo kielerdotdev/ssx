@@ -37,6 +37,7 @@ pub enum OverlayError {
 }
 
 impl OverlayError {
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))] // only the Linux backends report runtime errors this way
     pub(crate) fn backend(backend: &'static str, err: impl std::fmt::Display) -> Self {
         Self::Backend { backend, message: err.to_string() }
     }

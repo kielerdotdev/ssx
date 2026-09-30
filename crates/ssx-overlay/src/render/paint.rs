@@ -8,7 +8,7 @@
 //! ellipse/freeform selections it is also *truthful*: the bright pixels are exactly the
 //! pixels of the returned mask.
 //!
-//! Buffers are **BGRA byte order** (what X11 ZPixmap 24/32 bit, `wl_shm` ARGB8888/XRGB8888
+//! Buffers are **BGRA byte order** (what X11 `ZPixmap` 24/32 bit, `wl_shm` `ARGB8888`/`XRGB8888`
 //! on little-endian and Win32 DIBs want), so presenting is a plain copy.
 
 use font8x8::legacy::BASIC_LEGACY;
@@ -57,8 +57,8 @@ impl Canvas<'_> {
         }
         let stride = self.w as usize * 4;
         for yy in y0..y1 {
-            let row = &mut self.data[yy as usize * stride + x0 as usize * 4
-                ..yy as usize * stride + x1 as usize * 4];
+            let row = &mut self.data
+                [yy as usize * stride + x0 as usize * 4..yy as usize * stride + x1 as usize * 4];
             if c.3 == 255 {
                 for px in row.chunks_exact_mut(4) {
                     px.copy_from_slice(&[c.2, c.1, c.0, 255]);

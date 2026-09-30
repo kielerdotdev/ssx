@@ -60,7 +60,16 @@ impl OverlayApp {
         let model = SelectionModel::new(cfg);
         let current = model.scene();
         let started = Instant::now();
-        Ok(Self { model, renderer, windows, current, prev: None, options, started, first_frame: None })
+        Ok(Self {
+            model,
+            renderer,
+            windows,
+            current,
+            prev: None,
+            options,
+            started,
+            first_frame: None,
+        })
     }
 
     /// Marks the moment the first frame reached the screen (for start-up timing).

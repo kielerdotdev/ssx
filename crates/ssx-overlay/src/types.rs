@@ -68,7 +68,7 @@ pub struct OverlayOptions {
     pub snap_to_windows: bool,
     /// How dark the area outside the selection is, 0.0 (not at all) to 1.0 (black).
     pub dim: f32,
-    /// A previously used region to start with (ShareX "last region").
+    /// A previously used region to start with (`ShareX` "last region").
     pub initial: Option<Rect>,
     /// What is being selected.
     pub mode: SelectMode,
@@ -167,7 +167,8 @@ impl Selection {
                 SelectionShape::Freeform(pts) => polygon_spans(pts, y),
             };
             for (a, b) in spans {
-                let (a, b) = ((a - x0).clamp(0, w as i64) as usize, (b - x0).clamp(0, w as i64) as usize);
+                let (a, b) =
+                    ((a - x0).clamp(0, w as i64) as usize, (b - x0).clamp(0, w as i64) as usize);
                 out[row * w + a..row * w + b].fill(255);
             }
         }
