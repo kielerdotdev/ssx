@@ -73,7 +73,27 @@ The VA-API upload path (`encode::ffmpeg::hw`) is unsafe FFI that could not be ru
 
 ## Performance
 
-See the table at the end of this file (`examples/perf.rs`).
+Measured with `examples/perf.rs` (release build) on the 4-core, GPU-less development VM, which
+was shared with other builds (load average about 3 during the runs, so treat the numbers as a
+lower bound). Input: synthetic 1920x1080 BGRA colour bars at 30 fps, 10 s, software encoders.
+`realtime` = frames arrive live; `max` = virtual time, the pipeline is the bottleneck.
+
+| Encoder | realtime 30 fps | CPU (realtime) | max throughput | CPU (max) | peak RSS (realtime / max) |
+|---|---|---|---|---|---|
+| libx264 `ultrafast` (CRF preset default) | 299/299 frames, 0 dropped | 65% of one core (16% of the machine) | 126 fps | 240% of a core | 151 / 359 MiB |
+| libx264 `veryfast` | 298/298, 0 dropped | 118% of a core | 95 fps | 329% | 338 / 528 MiB |
+| `mpeg4` (native fallback) | 300/300, 0 dropped | 56% of a core | 107 fps | 168% | 132 / 333 MiB |
+
+Both software paths sustain 1080p30 with room to spare (3-4x headroom). File sizes of the
+synthetic pattern are meaningless (colour bars compress to 0.1-0.9 Mbit/s).
+
+Capture rates (unpaced, one core): X11 MIT-SHM `GetImage` at 1920x1080 on Xvfb: **191 fps**.
+wlroots on headless sway (1280x720, 60 Hz output): **60.4 fps**, i.e. the ceiling is the
+output's refresh rate (see the `source::wlroots` docs).
+
+Memory is bounded: the capture -> convert queue holds `queue_budget_bytes / frame size` frames
+(24 at 1080p by default; the `queue` column of the perf output shows the peak), everything
+after it applies backpressure instead of buffering.
 
 ## Examples
 

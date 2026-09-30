@@ -190,6 +190,7 @@ impl<T> Default for Mailbox<T> {
 
 /// Result of [`Mailbox::take`].
 #[derive(Debug)]
+#[allow(dead_code)] // used by the event-driven backends (portal, WGC) only
 pub(crate) enum Taken<T> {
     Value(T),
     Timeout,
@@ -231,6 +232,7 @@ impl<T> Mailbox<T> {
 
     /// Takes the newest value, waiting up to `timeout`. A pending value is delivered
     /// before an end/failure is reported.
+    #[allow(dead_code)] // used by the event-driven backends only
     pub(crate) fn take(&self, timeout: Duration) -> Taken<T> {
         let deadline = std::time::Instant::now() + timeout;
         let mut g = self.lock();

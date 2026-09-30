@@ -59,8 +59,9 @@ gif = ["dep:gifski", "dep:imgref", "dep:rgb"]
 # Allow GPL-licensed encoders (libx264, libx265) by default. Turning it off makes the
 # default selection LGPL-only (hardware, libopenh264, native, libvpx, SVT-AV1).
 gpl = []
-# System and microphone audio through cpal (WASAPI loopback, PipeWire/PulseAudio).
-audio = ["dep:cpal", "dep:rubato"]
+# System and microphone capture through cpal (WASAPI loopback, PipeWire/PulseAudio).
+# Resampling, drift compensation and mixing are always built (rubato).
+audio = ["dep:cpal"]
 # GPU tone mapping + NV12 conversion through ssx-gpu (wgpu).
 gpu = ["dep:ssx-gpu"]
 # Linux Wayland GNOME/KDE: xdg-desktop-portal ScreenCast + PipeWire.
@@ -85,7 +86,7 @@ ffmpeg-sys-next = { version = "9", optional = true, default-features = false }
 gifski = { version = "1.34", optional = true, default-features = false }
 imgref = { version = "1", optional = true }
 rgb = { version = "0.8", optional = true }
-rubato = { version = "5", optional = true }
+rubato = "5"
 ssx-gpu = { workspace = true, optional = true }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]

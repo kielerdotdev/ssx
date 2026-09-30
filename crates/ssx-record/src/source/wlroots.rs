@@ -26,6 +26,19 @@
 //! * Requests are issued no earlier than the frame grid allows (`1/fps`), so a busy screen
 //!   never produces more captures than frames wanted.
 //!
+//! # Frame-rate ceiling
+//!
+//! The ceiling is the **output's refresh rate**: both protocols deliver at most one frame per
+//! compositor repaint, so an unpaced loop settles at the refresh rate. Measured on headless
+//! sway (1280x720, 60 Hz output, `sway_streaming_loop_versus_reconnecting_still_api`):
+//! 60.4 fps for the streaming loop (2 ms CPU per frame), 30.2 fps damage-driven at a 30 fps
+//! grid (3 ms per frame), and, for comparison, 60.0 fps for the still API in a loop (3 ms per
+//! frame: the per-call connection setup is cheap next to a 16 ms frame interval; the
+//! streaming loop's gain is CPU and damage tracking, not a higher ceiling). A 144 Hz
+//! output would allow up to 144 fps; the per-frame cost is one `wl_shm` copy of the output
+//! (about 8 MB at 1080p) plus the BGRA conversion, a few milliseconds on one core. Real
+//! hardware compositors were not available here.
+//!
 //! Buffers are converted to tightly packed BGRA, the output transform is undone, and
 //! several outputs are stitched with [`ssx_capture::blit`]. Outputs whose buffer size does
 //! not equal their desktop-layout rectangle (fractional or mixed scaling) are **not**
