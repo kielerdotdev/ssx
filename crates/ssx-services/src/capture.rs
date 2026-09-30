@@ -43,11 +43,55 @@ use crate::hdr::tonemap_settings;
 /// Called on the capturing thread; it may block until the user has chosen. Return
 /// `Ok(None)` when the user pressed Esc. Rectangles are in **virtual-desktop physical
 /// pixels**; they are clipped to the desktop afterwards.
+///
+/// [`select`](Self::select) is the minimal contract (a rectangle). Selectors that can do more
+/// (window and monitor picking, ellipse and freeform masks, starting from the last region)
+/// implement [`pick`](Self::pick), which the capturer calls instead.
 pub trait RegionSelector: Send + Sync {
     /// Lets the user pick a rectangle on `desktop` (a frozen capture of the whole virtual
     /// desktop, `desktop.origin` is its top-left). `monitors` is empty when the backend
     /// cannot enumerate them.
     fn select(&self, monitors: &[Monitor], desktop: &Frame) -> Result<Option<Rect>, ServiceError>;
+
+    /// The richer form of [`select`](Self::select). The default asks for a plain rectangle.
+    fn pick(&self, req: &PickRequest<'_>) -> Result<Option<Picked>, ServiceError> {
+        Ok(self.select(req.monitors, req.desktop)?.map(Picked::rect))
+    }
+}
+
+/// What [`RegionSelector::pick`] is given.
+#[derive(Debug, Clone, Copy)]
+pub struct PickRequest<'a> {
+    /// The frozen desktop.
+    pub desktop: &'a Frame,
+    /// Monitors (empty when the backend cannot enumerate them).
+    pub monitors: &'a [Monitor],
+    /// Windows front to back, for hover-snap (empty when the backend cannot enumerate them).
+    pub windows: &'a [WindowInfo],
+    /// The previously captured region, to start the selection from.
+    pub initial: Option<Rect>,
+    /// Cancelled when the caller gives up (the tray's Cancel entry): a selector that shows a
+    /// window should close it and answer `Ok(None)`.
+    pub cancel: &'a CancelToken,
+}
+
+/// What the user chose.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Picked {
+    /// Bounding rectangle in virtual-desktop pixels.
+    pub rect: Rect,
+    /// Row-major coverage mask of `rect` (255 inside, 0 outside) for ellipse and freeform
+    /// selections. Pixels outside become transparent.
+    pub mask: Option<Vec<u8>>,
+    /// The window that was clicked, if the choice is a window (its title feeds `%t`).
+    pub window: Option<WindowInfo>,
+}
+
+impl Picked {
+    /// A plain rectangle.
+    pub fn rect(rect: Rect) -> Self {
+        Self { rect, mask: None, window: None }
+    }
 }
 
 /// The explicit targets the CLI can ask for beyond the workflow engine's [`CaptureTarget`]s.
@@ -273,34 +317,73 @@ impl ScreenCapturer {
         &self,
         opts: CaptureOptions,
         tonemap: TonemapSettings,
+        cancel: &CancelToken,
     ) -> Result<Captured, ServiceError> {
         let Some(selector) = &self.selector else {
             return Err(ServiceError::NotConfigured(
-                "interactive region selection needs the selection overlay, which is not part of \
-                 this build; capture an exact region with `ssx capture region --rect x,y,w,h`, \
+                "interactive region selection needs the `ssx-overlay` selection overlay, which \
+                 was not found (it must sit next to ssx or on PATH, or SSX_OVERLAY must name \
+                 it); capture an exact region with `ssx capture region --rect x,y,w,h`, \
                  or repeat the previous one with `ssx capture last-region`"
                     .to_owned(),
             ));
         };
         // Capture first, select second: the overlay shows exactly what will be saved.
-        let (desktop, monitors) = self.with(|s| {
+        let (desktop, monitors, windows) = self.with(|s| {
             s.set_tonemap(tonemap);
             let desktop = s.capture_desktop(&opts)?;
             // Not every backend can enumerate (the portal cannot): the overlay copes.
-            Ok((desktop, s.monitors().unwrap_or_default()))
+            Ok((desktop, s.monitors().unwrap_or_default(), s.windows().unwrap_or_default()))
         })?;
-        let Some(rect) = selector.select(&monitors, &desktop)? else {
+        let req = PickRequest {
+            desktop: &desktop,
+            monitors: &monitors,
+            windows: &windows,
+            initial: self.last_region.load(),
+            cancel,
+        };
+        let Some(picked) = selector.pick(&req)? else {
             return Err(ServiceError::Cancelled);
         };
-        let clipped = rect
+        let clipped = picked
+            .rect
             .intersect(desktop.rect())
             .filter(|r| !r.is_empty())
-            .ok_or_else(|| map_capture_error(CaptureError::InvalidRegion(rect)))?;
-        let frame = desktop
+            .ok_or_else(|| map_capture_error(CaptureError::InvalidRegion(picked.rect)))?;
+        let mut frame = desktop
             .crop_desktop(clipped)
             .map_err(|e| ServiceError::failed(format!("cannot crop the selection: {e}")))?;
+        if let Some(mask) = &picked.mask {
+            apply_mask(&mut frame, picked.rect, clipped, mask);
+        }
         self.last_region.save(clipped);
-        Ok(Captured::new(frame))
+        Ok(with_window_info(frame, picked.window.as_ref()))
+    }
+}
+
+/// Makes every pixel of `frame` (the crop `clipped` of a selection whose bounding box is
+/// `full`) transparent where `mask` (row-major over `full`) is zero. A mask of the wrong
+/// size is ignored: a selection must not fail because of a bad mask.
+fn apply_mask(frame: &mut Frame, full: Rect, clipped: Rect, mask: &[u8]) {
+    let (fw, fh) = (full.width as usize, full.height as usize);
+    let bpp = match frame.format() {
+        ssx_types::PixelFormat::Rgba8 | ssx_types::PixelFormat::Bgra8 => 4,
+        ssx_types::PixelFormat::Rgba16F => return,
+    };
+    if mask.len() != fw * fh || frame.size() != clipped.size() {
+        tracing::warn!("ignoring a selection mask that does not match the selection");
+        return;
+    }
+    let dx = usize::try_from(i64::from(clipped.x) - i64::from(full.x)).unwrap_or(0);
+    let dy = usize::try_from(i64::from(clipped.y) - i64::from(full.y)).unwrap_or(0);
+    for y in 0..clipped.height as usize {
+        let row = frame.row_mut(y as u32);
+        for x in 0..clipped.width as usize {
+            let covered = mask.get((dy + y) * fw + dx + x).is_some_and(|m| *m != 0);
+            if !covered && let Some(px) = row.get_mut(x * bpp..(x + 1) * bpp) {
+                px.fill(0);
+            }
+        }
     }
 }
 
@@ -334,7 +417,7 @@ impl Capturer for ScreenCapturer {
         let opts = CaptureOptions { include_cursor: req.include_cursor };
         let tonemap = tonemap_settings(&req.hdr);
         let captured = match req.target {
-            CaptureTarget::Region => return self.capture_interactive(opts, tonemap),
+            CaptureTarget::Region => return self.capture_interactive(opts, tonemap, cancel),
             CaptureTarget::Fullscreen => self.with(|s| {
                 s.set_tonemap(tonemap);
                 s.capture_desktop(&opts).map(Captured::new)
@@ -662,6 +745,75 @@ mod tests {
         let c = capturer(Fake::standard(), LastRegionStore::none()).with_selector(sel);
         let e = c.capture(&request(CaptureTarget::Region), &CancelToken::new()).unwrap_err();
         assert!(e.to_string().contains("outside every monitor"), "{e}");
+    }
+
+    /// A selector that answers `pick` with a canned [`Picked`] and records the request.
+    struct PickSelector(Option<Picked>, Mutex<Option<(usize, usize, Option<Rect>)>>);
+    impl RegionSelector for PickSelector {
+        fn select(&self, _: &[Monitor], _: &Frame) -> Result<Option<Rect>, ServiceError> {
+            panic!("pick must be preferred over select");
+        }
+        fn pick(&self, req: &PickRequest<'_>) -> Result<Option<Picked>, ServiceError> {
+            *self.1.lock().unwrap() = Some((req.monitors.len(), req.windows.len(), req.initial));
+            Ok(self.0.clone())
+        }
+    }
+
+    #[test]
+    fn pick_gets_windows_and_the_last_region_and_masks_become_transparent() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = LastRegionStore::in_dir(dir.path());
+        store.save(Rect::new(1, 2, 3, 4));
+        // A 6x4 selection with only its left half covered.
+        let mut mask = vec![0u8; 24];
+        for row in 0..4 {
+            mask[row * 6..row * 6 + 3].fill(255);
+        }
+        let win = window("w", Rect::new(30, 10, 6, 4), true);
+        let sel = Arc::new(PickSelector(
+            Some(Picked { rect: Rect::new(30, 10, 6, 4), mask: Some(mask), window: Some(win) }),
+            Mutex::new(None),
+        ));
+        let c = capturer(Fake::standard(), store).with_selector(sel.clone());
+        let got = c.capture(&request(CaptureTarget::Region), &CancelToken::new()).unwrap();
+        let (monitors, windows, initial) = sel.1.lock().unwrap().unwrap();
+        assert_eq!(monitors, 2);
+        assert!(windows > 0, "the selector gets the windows for hover-snap");
+        assert_eq!(initial, Some(Rect::new(1, 2, 3, 4)), "and the previous region");
+        assert_eq!(got.window_title.as_deref(), Some("title of w"));
+        let f = &got.frame;
+        assert_eq!((f.width(), f.height()), (6, 4));
+        for y in 0..4u32 {
+            let row = f.row(y);
+            assert!(row[..12].chunks(4).all(|p| p[3] == 255), "covered pixels stay opaque");
+            assert!(row[12..24].chunks(4).all(|p| p == [0, 0, 0, 0]), "the rest is transparent");
+        }
+        assert_eq!(c.last_region(), Some(Rect::new(30, 10, 6, 4)));
+    }
+
+    #[test]
+    fn a_mask_is_cropped_with_a_clipped_selection_and_a_bad_mask_is_ignored() {
+        // Selection sticks out of the 60x30 desktop on the right: the mask must follow.
+        let mut mask = vec![255u8; 10 * 2];
+        mask[9] = 0; // (9, 0): outside the desktop anyway
+        mask[10] = 0; // (0, 1): inside, must become transparent
+        let sel = Arc::new(PickSelector(
+            Some(Picked { rect: Rect::new(55, 10, 10, 2), mask: Some(mask), window: None }),
+            Mutex::new(None),
+        ));
+        let c = capturer(Fake::standard(), LastRegionStore::none()).with_selector(sel);
+        let got = c.capture(&request(CaptureTarget::Region), &CancelToken::new()).unwrap();
+        assert_eq!((got.frame.width(), got.frame.height()), (5, 2));
+        assert_eq!(&got.frame.row(1)[..4], &[0, 0, 0, 0]);
+        assert_eq!(got.frame.row(0)[3], 255);
+
+        let sel = Arc::new(PickSelector(
+            Some(Picked { rect: Rect::new(5, 5, 4, 4), mask: Some(vec![0; 3]), window: None }),
+            Mutex::new(None),
+        ));
+        let c = capturer(Fake::standard(), LastRegionStore::none()).with_selector(sel);
+        let got = c.capture(&request(CaptureTarget::Region), &CancelToken::new()).unwrap();
+        assert_matches_pattern(&got.frame, (5, 5));
     }
 
     #[test]

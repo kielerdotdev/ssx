@@ -21,6 +21,7 @@ ssx-capture.workspace = true
 ssx-hdr.workspace = true
 ssx-platform.workspace = true
 ssx-upload.workspace = true
+ssx-overlay = { path = "../ssx-overlay" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

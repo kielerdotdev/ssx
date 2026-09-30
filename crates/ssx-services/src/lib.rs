@@ -36,6 +36,8 @@ pub mod command;
 pub mod desktop;
 pub mod editor;
 pub mod hdr;
+pub mod helpers;
+pub mod overlay;
 pub mod production;
 pub mod runtime;
 pub mod secrets;
@@ -47,14 +49,16 @@ pub mod zipper;
 pub mod dialog;
 
 pub use capture::{
-    BackendReport, ExplicitTarget, LastRegionStore, RegionSelector, ScreenCapturer,
-    map_capture_error,
+    BackendReport, ExplicitTarget, LastRegionStore, PickRequest, Picked, RegionSelector,
+    ScreenCapturer, map_capture_error,
 };
 pub use clipboard::{ClipboardDiagnosis, ClipboardOptions, FileListFlavor, SystemClipboard};
 pub use command::SystemCommandRunner;
 pub use desktop::{DesktopNotifier, SystemOpener, probe_notifications};
 pub use editor::ExternalEditor;
 pub use hdr::tonemap_settings;
+pub use helpers::{Discovery, discover as discover_helper};
+pub use overlay::{OverlaySelector, PickMode};
 pub use production::{ProductionOptions, ProductionServices};
 pub use runtime::SharedRuntime;
 pub use secrets::{LayeredSecretStore, LazySecrets, SecretStatus};
