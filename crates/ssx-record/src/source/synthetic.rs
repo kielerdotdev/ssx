@@ -300,6 +300,7 @@ impl FrameSource for SyntheticSource {
             },
             hdr: self.cfg.format.is_float(),
             damage_driven: self.cfg.skip.is_some(),
+            realtime: self.cfg.time == TimeMode::Realtime,
         }
     }
 

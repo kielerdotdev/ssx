@@ -107,6 +107,10 @@ pub struct SourceInfo {
     pub hdr: bool,
     /// The source only delivers frames when the picture changes.
     pub damage_driven: bool,
+    /// Frames are captured live. `false` for offline sources (virtual-time synthetic
+    /// input) that can wait: the pipeline then applies backpressure to the source instead
+    /// of dropping frames.
+    pub realtime: bool,
 }
 
 /// A screen (or synthetic) video source. See the module docs for the contract.

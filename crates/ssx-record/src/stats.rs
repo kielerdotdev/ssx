@@ -1,9 +1,9 @@
 //! Live counters of a recording, readable from any thread while it runs.
 //!
 //! The invariant the tests check: every *slot* of the constant-rate timeline ends up in
-//! exactly one bucket, so `slots == encoded + dropped_backpressure`, and
-//! `slots == captured_used + duplicated` (`captured_used` being source frames that were
-//! not surplus). Nothing is counted twice and nothing silently vanishes.
+//! exactly one bucket, so `slots == encoded + dropped_backpressure + dropped_convert`, and
+//! `slots == captured - surplus_dropped - paused_discarded + duplicated` (source frames
+//! that were neither surplus nor captured while paused, plus repeats). Nothing is counted twice and nothing silently vanishes.
 
 use std::{
     sync::atomic::{AtomicU64, Ordering::Relaxed},
@@ -18,6 +18,8 @@ pub struct Counters {
     /// Source frames discarded because the slot was already filled (source faster than
     /// the target rate).
     pub surplus_dropped: AtomicU64,
+    /// Source frames discarded because the recording was paused.
+    pub paused_discarded: AtomicU64,
     /// Slots that repeat the previous frame.
     pub duplicated: AtomicU64,
     /// Timeline slots produced by the pacer (real + duplicate).
@@ -26,6 +28,8 @@ pub struct Counters {
     pub dropped_backpressure: AtomicU64,
     /// Of those, how many were duplicates (dropping them loses no picture).
     pub dropped_duplicates: AtomicU64,
+    /// Slots dropped because their frame could not be converted.
+    pub dropped_convert: AtomicU64,
     /// Slots handed to the encoder.
     pub encoded: AtomicU64,
     /// Audio sample frames (per channel) written to the encoder.
@@ -44,10 +48,12 @@ impl Counters {
         StatsSnapshot {
             captured: self.captured.load(Relaxed),
             surplus_dropped: self.surplus_dropped.load(Relaxed),
+            paused_discarded: self.paused_discarded.load(Relaxed),
             duplicated: self.duplicated.load(Relaxed),
             slots: self.slots.load(Relaxed),
             dropped_backpressure: self.dropped_backpressure.load(Relaxed),
             dropped_duplicates: self.dropped_duplicates.load(Relaxed),
+            dropped_convert: self.dropped_convert.load(Relaxed),
             encoded: self.encoded.load(Relaxed),
             audio_samples: self.audio_samples.load(Relaxed),
             audio_silence_samples: self.audio_silence_samples.load(Relaxed),
@@ -64,6 +70,8 @@ pub struct StatsSnapshot {
     pub captured: u64,
     /// Source frames dropped as surplus (source faster than the target rate).
     pub surplus_dropped: u64,
+    /// Source frames discarded while paused.
+    pub paused_discarded: u64,
     /// Slots that repeat the previous frame.
     pub duplicated: u64,
     /// Timeline slots produced (real + duplicate).
@@ -72,6 +80,8 @@ pub struct StatsSnapshot {
     pub dropped_backpressure: u64,
     /// Of `dropped_backpressure`, the ones that were duplicates.
     pub dropped_duplicates: u64,
+    /// Slots lost to conversion errors.
+    pub dropped_convert: u64,
     /// Slots encoded.
     pub encoded: u64,
     /// Audio sample frames written.
