@@ -155,7 +155,19 @@ fn portal_err(e: &ashpd::Error) -> SourceError {
             "no xdg-desktop-portal with the ScreenCast interface is running (install xdg-desktop-portal and your desktop's backend)"
                 .into(),
         ),
-        other => SourceError::backend("xdg-desktop-portal", other.to_string()),
+        other => {
+            let text = other.to_string();
+            if text.contains("was not provided by any .service")
+                || text.contains("ServiceUnknown")
+                || text.contains("NameHasNoOwner")
+            {
+                SourceError::Unavailable(format!(
+                    "no xdg-desktop-portal is running on the session bus ({text})"
+                ))
+            } else {
+                SourceError::backend("xdg-desktop-portal", text)
+            }
+        }
     }
 }
 

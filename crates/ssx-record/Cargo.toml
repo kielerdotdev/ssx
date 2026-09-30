@@ -122,6 +122,8 @@ wayland-server = "0.31"
 wayland-protocols = { version = "0.32", features = ["client", "server", "staging", "unstable"] }
 wayland-protocols-wlr = { version = "0.3", features = ["client", "server"] }
 serde_json.workspace = true
+# The mock ScreenCast portal of tests/portal.rs.
+zbus = { version = "5", default-features = false, features = ["async-io"] }
 
 [lints]
 workspace = true
