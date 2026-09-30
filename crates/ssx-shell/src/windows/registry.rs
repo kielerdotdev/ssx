@@ -3,7 +3,7 @@
 //! Only `HKEY_CURRENT_USER` is ever touched (no elevation, no per-machine changes), so paths
 //! are relative to it, e.g. `Software\Classes\*\shell\ssx.upload`. [`MemoryRegistry`] is a
 //! faithful in-memory fake (case-insensitive keys/values, implicit parent keys). The real
-//! backend [`WindowsRegistry`] only exists on `cfg(windows)` and is **compile-checked only**
+//! backend `WindowsRegistry` only exists on `cfg(windows)` and is **compile-checked only**
 //! in this repository's Linux CI: it has not been executed against a real registry.
 
 use std::collections::BTreeMap;
