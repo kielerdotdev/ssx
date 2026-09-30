@@ -19,7 +19,9 @@ impl HotkeyId {
         let id = id.as_ref();
         let ok = !id.is_empty()
             && id.len() <= 64
-            && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-'));
+            && id.chars().all(|c| {
+                c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-')
+            });
         if ok { Ok(Self(Arc::from(id))) } else { Err(InvalidHotkeyId(id.to_owned())) }
     }
 
@@ -56,7 +58,7 @@ mod tests {
     fn validates_ids() {
         assert!(HotkeyId::new("capture-region").is_ok());
         assert!(HotkeyId::new("a.b_c-9").is_ok());
-        assert!(HotkeyId::new(&"x".repeat(64)).is_ok());
+        assert!(HotkeyId::new("x".repeat(64)).is_ok());
         for bad in ["", "Upper", "has space", "slash/es", "ünï", "semi;colon", &"x".repeat(65)] {
             assert!(HotkeyId::new(bad).is_err(), "{bad:?}");
         }

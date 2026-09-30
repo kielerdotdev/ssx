@@ -14,6 +14,7 @@
 #![cfg(target_os = "linux")]
 
 use std::{
+    fmt::Write as _,
     os::unix::fs::{DirBuilderExt, PermissionsExt},
     path::{Path, PathBuf},
     process::{Child, Command as Process, Stdio},
@@ -83,7 +84,8 @@ impl Sway {
     fn socket(&self) -> Option<String> {
         std::fs::read_dir(&self.dir).ok()?.flatten().find_map(|e| {
             let n = e.file_name().to_string_lossy().into_owned();
-            (n.starts_with("wayland-") && !n.ends_with(".lock")).then_some(n)
+            let lock = Path::new(&n).extension().is_some_and(|x| x.eq_ignore_ascii_case("lock"));
+            (n.starts_with("wayland-") && !lock).then_some(n)
         })
     }
 
@@ -114,7 +116,8 @@ fn sway_accepts_every_key_and_modifier_spelling_we_emit() {
     let mut lines = String::new();
     let mut count = 0;
     for key in Key::all() {
-        let c = Chord::new(ssx_hotkeys::Modifiers::CTRL | ssx_hotkeys::Modifiers::SUPER, key).expect("modified");
+        let c = Chord::new(ssx_hotkeys::Modifiers::CTRL | ssx_hotkeys::Modifiers::SUPER, key)
+            .expect("modified");
         lines.push_str(&sway::bindsym_line(&c, &Command::new("true")));
         lines.push('\n');
         count += 1;
@@ -122,7 +125,15 @@ fn sway_accepts_every_key_and_modifier_spelling_we_emit() {
     // Every modifier subset, with a fixed key.
     for bits in 1..16u8 {
         let mut m = ssx_hotkeys::Modifiers::NONE;
-        for (i, f) in [ssx_hotkeys::Modifiers::CTRL, ssx_hotkeys::Modifiers::ALT, ssx_hotkeys::Modifiers::SHIFT, ssx_hotkeys::Modifiers::SUPER].into_iter().enumerate() {
+        for (i, f) in [
+            ssx_hotkeys::Modifiers::CTRL,
+            ssx_hotkeys::Modifiers::ALT,
+            ssx_hotkeys::Modifiers::SHIFT,
+            ssx_hotkeys::Modifiers::SUPER,
+        ]
+        .into_iter()
+        .enumerate()
+        {
             if bits & (1 << i) != 0 {
                 m = m | f;
             }
@@ -143,7 +154,12 @@ fn sway_accepts_every_key_and_modifier_spelling_we_emit() {
 
     let Some(sway) = Sway::start(&dir, &lines) else { return };
     let errors = sway.config_errors();
-    assert_eq!(errors.len(), 1, "expected only the negative control to fail, got {count} lines and:\n{}", errors.join("\n"));
+    assert_eq!(
+        errors.len(),
+        1,
+        "expected only the negative control to fail, got {count} lines and:\n{}",
+        errors.join("\n")
+    );
     assert!(errors[0].contains("NoSuchKeysymXYZ"), "{errors:?}");
 }
 
@@ -234,7 +250,10 @@ fn bindings_for(script: &Path, words: &[String]) -> Vec<(Chord, Command)> {
         .iter()
         .enumerate()
         .map(|(i, w)| {
-            (chord_for_slot(i).0, Command::new(script.display().to_string()).arg(i.to_string()).arg(w.clone()))
+            (
+                chord_for_slot(i).0,
+                Command::new(script.display().to_string()).arg(i.to_string()).arg(w.clone()),
+            )
         })
         .collect()
 }
@@ -257,7 +276,7 @@ fn hostile_arguments_survive_sway_and_sh_via_the_include_file() {
     // argument text. (Key injection is covered by the next test.)
     let mut config = String::from(PRELUDE);
     for (_, cmd) in &bindings {
-        config.push_str(&format!("exec_always {}\n", ssx_hotkeys::bindings::sway::exec_arg(cmd)));
+        let _ = writeln!(config, "exec_always {}", ssx_hotkeys::bindings::sway::exec_arg(cmd));
     }
     let Some(sway) = Sway::start(&dir, &config) else { return };
     assert!(sway.config_errors().is_empty(), "{:?}", sway.config_errors());
@@ -268,7 +287,11 @@ fn hostile_arguments_survive_sway_and_sh_via_the_include_file() {
             if let Some(g) = read_recorded(&dir, i) {
                 break g;
             }
-            assert!(Instant::now() < deadline, "command {i} ({w:?}) never ran; log:\n{}", sway.log_text());
+            assert!(
+                Instant::now() < deadline,
+                "command {i} ({w:?}) never ran; log:\n{}",
+                sway.log_text()
+            );
             std::thread::sleep(Duration::from_millis(50));
         };
         assert_eq!(got, want, "argument {w:?} changed on the way through sway and sh");
@@ -295,7 +318,7 @@ fn one_command_carrying_every_hostile_argument() {
     assert_eq!(got, want);
 }
 
-fn wtype_chord(mods: &[&str], key: &Key) -> Vec<String> {
+fn wtype_chord(mods: &[&str], key: Key) -> Vec<String> {
     let mut args = Vec::new();
     for m in mods {
         args.extend(["-M".to_owned(), (*m).to_owned()]);
@@ -309,7 +332,13 @@ fn wtype_chord(mods: &[&str], key: &Key) -> Vec<String> {
 
 #[test]
 fn pressing_a_generated_binding_runs_its_command() {
-    if Process::new("wtype").arg("--help").stdout(Stdio::null()).stderr(Stdio::null()).status().is_err() {
+    if Process::new("wtype")
+        .arg("--help")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_err()
+    {
         eprintln!("SKIP: `wtype` is not installed, so keys cannot be injected into sway");
         return;
     }
@@ -318,7 +347,8 @@ fn pressing_a_generated_binding_runs_its_command() {
     let words = corpus();
     let mut bindings = bindings_for(&script, &words);
     // And a bare key and a Super+Alt chord in the everyday style.
-    bindings.push((chord("Print"), Command::new(script.display().to_string()).args(["100", "print"])));
+    bindings
+        .push((chord("Print"), Command::new(script.display().to_string()).args(["100", "print"])));
     let config = config_with_include(&dir, &bindings);
     let Some(sway) = Sway::start(&dir, &config) else { return };
     assert!(sway.config_errors().is_empty(), "{:?}", sway.config_errors());
@@ -337,7 +367,7 @@ fn pressing_a_generated_binding_runs_its_command() {
     };
     for (i, _) in words.iter().enumerate() {
         let (c, mods) = chord_for_slot(i);
-        press(wtype_chord(&mods, &c.key()));
+        press(wtype_chord(&mods, c.key()));
     }
     press(vec!["-k".into(), "Print".into()]);
 
@@ -347,7 +377,11 @@ fn pressing_a_generated_binding_runs_its_command() {
             if let Some(g) = read_recorded(&dir, i) {
                 break g;
             }
-            assert!(Instant::now() < deadline, "pressing slot {i} ({w:?}) did not run the command; log:\n{}", sway.log_text());
+            assert!(
+                Instant::now() < deadline,
+                "pressing slot {i} ({w:?}) did not run the command; log:\n{}",
+                sway.log_text()
+            );
             std::thread::sleep(Duration::from_millis(50));
         };
         assert_eq!(got, vec![w.clone().into_bytes()], "binding {i}");
@@ -368,19 +402,26 @@ fn include_line_with_spaces_in_the_path_is_accepted() {
     let script = recorder(&dir);
     let home = dir.join("my home dir");
     let dirs = Dirs::under(&home);
-    let b = vec![(chord("Ctrl+Alt+Shift+Super+F1"), Command::new(script.display().to_string()).args(["0", "ok"]))];
+    let b = vec![(
+        chord("Ctrl+Alt+Shift+Super+F1"),
+        Command::new(script.display().to_string()).args(["0", "ok"]),
+    )];
     let report = files::write_include_file(&dirs, Target::Sway, &b).expect("write");
     assert!(report.include_line.contains("\\ "), "{}", report.include_line);
     // Prove the include was honoured by also making the included file run something at load.
     let mut text = std::fs::read_to_string(&report.path).expect("read");
-    text.push_str(&format!("exec_always {}\n", sway::exec_arg(&b[0].1)));
+    let _ = writeln!(text, "exec_always {}", sway::exec_arg(&b[0].1));
     std::fs::write(&report.path, text).expect("append");
     let config = format!("{}\n", report.include_line);
     let Some(sway) = Sway::start(&dir, &config) else { return };
     assert!(sway.config_errors().is_empty(), "{:?}", sway.config_errors());
     let deadline = Instant::now() + Duration::from_secs(10);
     while read_recorded(&dir, 0).is_none() {
-        assert!(Instant::now() < deadline, "included file was not loaded; log:\n{}", sway.log_text());
+        assert!(
+            Instant::now() < deadline,
+            "included file was not loaded; log:\n{}",
+            sway.log_text()
+        );
         std::thread::sleep(Duration::from_millis(50));
     }
 }

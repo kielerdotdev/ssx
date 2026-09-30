@@ -114,10 +114,19 @@ fn hostile_bindings() -> Vec<(Chord, Command)> {
         "",
         "line'\"'mix",
     ];
-    let mut out = vec![("Ctrl+Shift+S".parse().unwrap(), Command::new("ssx").args(["capture", "region"]).label("Capture region"))];
+    let mut out = vec![(
+        "Ctrl+Shift+S".parse().unwrap(),
+        Command::new("ssx").args(["capture", "region"]).label("Capture region"),
+    )];
     for (i, w) in words.iter().enumerate() {
         let chord: Chord = format!("Ctrl+Alt+F{}", i + 1).parse().unwrap();
-        out.push((chord, Command::new("/opt/my app/ssx").arg("--arg").arg(*w).label(format!("Label {i}: it's \"x\" \\ ü"))));
+        out.push((
+            chord,
+            Command::new("/opt/my app/ssx")
+                .arg("--arg")
+                .arg(*w)
+                .label(format!("Label {i}: it's \"x\" \\ ü")),
+        ));
     }
     out
 }
@@ -135,12 +144,14 @@ fn apply_writes_exactly_what_gnome_settings_reads_back() {
         let sp = e.schema_with_path();
         for (key, want) in [("name", &e.name), ("command", &e.command), ("binding", &e.binding)] {
             let raw = get(&s, &sp, key);
-            let (got, rest) = gnome::parse_gvariant_string(&raw).unwrap_or_else(|| panic!("unparsable {raw:?}"));
+            let (got, rest) =
+                gnome::parse_gvariant_string(&raw).unwrap_or_else(|| panic!("unparsable {raw:?}"));
             assert_eq!(rest.trim(), "");
             assert_eq!(&got, want, "{key} of {}", e.path);
         }
     }
-    let list = gnome::parse_gvariant_string_array(&get(&s, gnome::SCHEMA, gnome::LIST_KEY)).expect("list");
+    let list =
+        gnome::parse_gvariant_string_array(&get(&s, gnome::SCHEMA, gnome::LIST_KEY)).expect("list");
     assert_eq!(list, entries.iter().map(|e| e.path.clone()).collect::<Vec<_>>());
 }
 
@@ -150,12 +161,21 @@ fn second_apply_is_a_noop_and_merging_preserves_foreign_entries() {
     // A pre-existing entry from GNOME Settings.
     let foreign = format!("{}custom0/", gnome::PATH_PREFIX);
     let set = s
-        .run("gsettings", &["set".into(), gnome::SCHEMA.into(), gnome::LIST_KEY.into(), format!("['{foreign}']")])
+        .run(
+            "gsettings",
+            &["set".into(), gnome::SCHEMA.into(), gnome::LIST_KEY.into(), format!("['{foreign}']")],
+        )
         .expect("run");
     assert!(set.success, "{}", set.stderr);
     let fs = format!("{}:{foreign}", gnome::CUSTOM_SCHEMA);
-    for (k, v) in [("name", "Terminal"), ("command", "gnome-terminal"), ("binding", "<Control><Alt>t")] {
-        assert!(s.run("gsettings", &["set".into(), fs.clone(), k.into(), v.into()]).expect("run").success);
+    for (k, v) in
+        [("name", "Terminal"), ("command", "gnome-terminal"), ("binding", "<Control><Alt>t")]
+    {
+        assert!(
+            s.run("gsettings", &["set".into(), fs.clone(), k.into(), v.into()])
+                .expect("run")
+                .success
+        );
     }
 
     let bindings = hostile_bindings();
@@ -163,7 +183,8 @@ fn second_apply_is_a_noop_and_merging_preserves_foreign_entries() {
     let second = gnome::apply(&s, &bindings).expect("second apply");
     assert!(second.is_noop(), "{second:?}");
 
-    let list = gnome::parse_gvariant_string_array(&get(&s, gnome::SCHEMA, gnome::LIST_KEY)).expect("list");
+    let list =
+        gnome::parse_gvariant_string_array(&get(&s, gnome::SCHEMA, gnome::LIST_KEY)).expect("list");
     assert_eq!(list[0], foreign, "foreign entry stays first");
     assert_eq!(list.len(), 1 + bindings.len());
     assert_eq!(get(&s, &fs, "command").trim(), "'gnome-terminal'", "foreign values untouched");
@@ -171,11 +192,16 @@ fn second_apply_is_a_noop_and_merging_preserves_foreign_entries() {
     // Remove: ours go, the foreign one and its values stay.
     let removed = gnome::remove(&s).expect("remove");
     assert!(removed.list_updated);
-    let list = gnome::parse_gvariant_string_array(&get(&s, gnome::SCHEMA, gnome::LIST_KEY)).expect("list");
+    let list =
+        gnome::parse_gvariant_string_array(&get(&s, gnome::SCHEMA, gnome::LIST_KEY)).expect("list");
     assert_eq!(list, vec![foreign]);
     assert_eq!(get(&s, &fs, "binding").trim(), "'<Control><Alt>t'");
     let first = &gnome::entries(&bindings).expect("entries")[0];
-    assert_eq!(get(&s, &first.schema_with_path(), "command").trim(), "''", "values reset to default");
+    assert_eq!(
+        get(&s, &first.schema_with_path(), "command").trim(),
+        "''",
+        "values reset to default"
+    );
     assert!(gnome::remove(&s).expect("remove again").is_noop());
 }
 

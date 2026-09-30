@@ -209,7 +209,10 @@ pub(crate) fn slugs(bindings: &[(Chord, crate::command::Command)]) -> Vec<String
         let mut name = if collapsed.is_empty() {
             format!("cmd-{hash:08x}")
         } else if truncated {
-            format!("{}-{hash:08x}", collapsed.chars().take(31).collect::<String>().trim_end_matches('-'))
+            format!(
+                "{}-{hash:08x}",
+                collapsed.chars().take(31).collect::<String>().trim_end_matches('-')
+            )
         } else {
             collapsed
         };
@@ -250,7 +253,11 @@ mod tests {
             ("Print".parse().unwrap(), Command::new("ssx").args(["capture", "screen"])),
             (
                 "Super+Alt+R".parse().unwrap(),
-                Command::new("/usr/local/bin/ssx").args(["record", "--title", "it's a \"test\" $HOME; ok"]),
+                Command::new("/usr/local/bin/ssx").args([
+                    "record",
+                    "--title",
+                    "it's a \"test\" $HOME; ok",
+                ]),
             ),
         ]
     }
@@ -260,11 +267,21 @@ mod tests {
         let s = slugs(&fixture());
         assert_eq!(s[0], "ssx-capture-region");
         assert_eq!(s[1], "ssx-capture-screen");
-        assert!(s[2].starts_with("ssx-record-title-it-s-a-test-home-ok") || s[2].len() <= 40, "{}", s[2]);
+        assert!(
+            s[2].starts_with("ssx-record-title-it-s-a-test-home-ok") || s[2].len() <= 40,
+            "{}",
+            s[2]
+        );
         for slug in &s {
             assert!(slug.len() <= 41 + 9);
-            assert!(slug.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'), "{slug}");
-            assert!(!slug.starts_with('-') && !slug.ends_with('-') && !slug.contains("--"), "{slug}");
+            assert!(
+                slug.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'),
+                "{slug}"
+            );
+            assert!(
+                !slug.starts_with('-') && !slug.ends_with('-') && !slug.contains("--"),
+                "{slug}"
+            );
         }
         // Same command list => same slugs (idempotent apply depends on this).
         assert_eq!(s, slugs(&fixture()));

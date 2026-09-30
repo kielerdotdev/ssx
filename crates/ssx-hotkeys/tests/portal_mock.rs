@@ -135,7 +135,12 @@ fn sender_part(header: &Header<'_>) -> fdo::Result<String> {
         .replace('.', "_"))
 }
 
-fn respond<T: Serialize + Type + Send + 'static>(conn: &Connection, request_path: String, code: u32, results: T) {
+fn respond<T: Serialize + Type + Send + 'static>(
+    conn: &Connection,
+    request_path: String,
+    code: u32,
+    results: T,
+) {
     let conn = conn.clone();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(40));
@@ -165,7 +170,10 @@ impl MockGlobalShortcuts {
         #[zbus(connection)] conn: &Connection,
     ) -> fdo::Result<OwnedObjectPath> {
         let sender = sender_part(&header)?;
-        let request = format!("/org/freedesktop/portal/desktop/request/{sender}/{}", token(&options, "handle_token")?);
+        let request = format!(
+            "/org/freedesktop/portal/desktop/request/{sender}/{}",
+            token(&options, "handle_token")?
+        );
         let session = format!(
             "/org/freedesktop/portal/desktop/session/{sender}/{}",
             token(&options, "session_handle_token")?
@@ -181,15 +189,20 @@ impl MockGlobalShortcuts {
 
     fn bind_shortcuts(
         &self,
-        _session_handle: ObjectPath<'_>,
+        session_handle: ObjectPath<'_>,
         shortcuts: Vec<(String, HashMap<String, OwnedValue>)>,
-        _parent_window: String,
+        parent_window: String,
         options: HashMap<String, OwnedValue>,
         #[zbus(header)] header: Header<'_>,
         #[zbus(connection)] conn: &Connection,
     ) -> fdo::Result<OwnedObjectPath> {
+        // Part of the D-Bus signature, but the mock does not need them.
+        let _ = (&session_handle, &parent_window);
         let sender = sender_part(&header)?;
-        let request = format!("/org/freedesktop/portal/desktop/request/{sender}/{}", token(&options, "handle_token")?);
+        let request = format!(
+            "/org/freedesktop/portal/desktop/request/{sender}/{}",
+            token(&options, "handle_token")?
+        );
         let asked: Vec<(String, Option<String>)> = shortcuts
             .iter()
             .map(|(id, info)| {
@@ -208,10 +221,16 @@ impl MockGlobalShortcuts {
                 .into_iter()
                 .map(|(id, trig)| {
                     let mut info: HashMap<String, OwnedValue> = HashMap::new();
-                    info.insert("description".into(), Value::from(id.clone()).try_to_owned().expect("owned"));
+                    info.insert(
+                        "description".into(),
+                        Value::from(id.clone()).try_to_owned().expect("owned"),
+                    );
                     // The mock "compositor" reports the trigger in its own words.
                     let desc = format!("bound: {}", trig.unwrap_or_default());
-                    info.insert("trigger_description".into(), Value::from(desc).try_to_owned().expect("owned"));
+                    info.insert(
+                        "trigger_description".into(),
+                        Value::from(desc).try_to_owned().expect("owned"),
+                    );
                     (id, info)
                 })
                 .collect();
@@ -284,9 +303,15 @@ fn registers_through_the_portal_and_delivers_activations() {
     {
         let log = portal.log.lock().expect("log");
         assert_eq!(log.creates, 1);
-        assert_eq!(log.binds, vec![vec![("capture-region".to_owned(), Some("CTRL+SHIFT+s".to_owned()))]]);
+        assert_eq!(
+            log.binds,
+            vec![vec![("capture-region".to_owned(), Some("CTRL+SHIFT+s".to_owned()))]]
+        );
     }
-    assert_eq!(mgr.triggers().get("capture-region").map(String::as_str), Some("bound: CTRL+SHIFT+s"));
+    assert_eq!(
+        mgr.triggers().get("capture-region").map(String::as_str),
+        Some("bound: CTRL+SHIFT+s")
+    );
     assert_eq!(mgr.registered(), vec![(id("capture-region"), chord("Ctrl+Shift+S"))]);
     assert_eq!(mgr.backend().to_string(), "xdg-portal");
     assert!(!mgr.reports_release(), "release delivery is not guaranteed on the portal");
@@ -313,21 +338,24 @@ fn every_change_rebinds_the_whole_set_in_a_fresh_session() {
     let portal = Portal::start(&bus);
     let mut mgr = PortalHotkeys::connect_to(Some(&bus.address)).expect("connect");
 
-    mgr.register_all(vec![(id("a"), chord("Ctrl+Alt+A")), (id("b"), chord("Print"))]).expect("bind both at once");
+    mgr.register_all(vec![(id("a"), chord("Ctrl+Alt+A")), (id("b"), chord("Print"))])
+        .expect("bind both at once");
     assert_eq!(portal.log.lock().expect("log").creates, 1, "register_all binds in one session");
 
     mgr.register(id("c"), chord("Super+F5")).expect("add one");
     {
         let log = portal.log.lock().expect("log");
         assert_eq!(log.creates, 2, "portals may allow BindShortcuts only once per session");
-        let last: Vec<&str> = log.binds.last().expect("bind").iter().map(|(i, _)| i.as_str()).collect();
+        let last: Vec<&str> =
+            log.binds.last().expect("bind").iter().map(|(i, _)| i.as_str()).collect();
         assert_eq!(last, ["a", "b", "c"]);
     }
 
     mgr.unregister(&id("b")).expect("remove one");
     {
         let log = portal.log.lock().expect("log");
-        let last: Vec<&str> = log.binds.last().expect("bind").iter().map(|(i, _)| i.as_str()).collect();
+        let last: Vec<&str> =
+            log.binds.last().expect("bind").iter().map(|(i, _)| i.as_str()).collect();
         assert_eq!(last, ["a", "c"]);
     }
     assert_eq!(mgr.registered().len(), 2);
@@ -341,7 +369,11 @@ fn every_change_rebinds_the_whole_set_in_a_fresh_session() {
     mgr.unregister(&id("a")).expect("remove a");
     mgr.unregister(&id("c")).expect("remove c");
     assert!(mgr.registered().is_empty());
-    assert_eq!(portal.log.lock().expect("log").binds.len(), binds_before + 1, "only the {{c}} rebind");
+    assert_eq!(
+        portal.log.lock().expect("log").binds.len(),
+        binds_before + 1,
+        "only the {{c}} rebind"
+    );
 }
 
 #[test]
@@ -352,7 +384,10 @@ fn misuse_and_refusal_leave_the_manager_unchanged() {
     mgr.register(id("a"), chord("Ctrl+Alt+A")).expect("register");
 
     assert!(matches!(mgr.register(id("a"), chord("Ctrl+Alt+B")), Err(HotkeyError::DuplicateId(_))));
-    assert!(matches!(mgr.register(id("z"), chord("Ctrl+Alt+A")), Err(HotkeyError::DuplicateChord { .. })));
+    assert!(matches!(
+        mgr.register(id("z"), chord("Ctrl+Alt+A")),
+        Err(HotkeyError::DuplicateChord { .. })
+    ));
     assert!(matches!(mgr.unregister(&id("nope")), Err(HotkeyError::UnknownId(_))));
     assert_eq!(portal.log.lock().expect("log").creates, 1, "rejected locally, no portal traffic");
 
@@ -373,12 +408,16 @@ fn a_bus_without_the_portal_is_reported_as_unavailable() {
     let Some(bus) = Bus::start("absent") else { return };
     let err = PortalHotkeys::connect_to(Some(&bus.address)).expect_err("no portal on this bus");
     assert!(matches!(err, HotkeyError::Unavailable { .. }), "{err}");
-    assert!(err.to_string().contains("GlobalShortcuts") || err.to_string().contains("portal"), "{err}");
+    assert!(
+        err.to_string().contains("GlobalShortcuts") || err.to_string().contains("portal"),
+        "{err}"
+    );
 }
 
 #[test]
 fn an_unreachable_bus_is_reported_as_unavailable() {
-    let err = PortalHotkeys::connect_to(Some("unix:path=/nonexistent/ssx-no-bus")).expect_err("no bus");
+    let err =
+        PortalHotkeys::connect_to(Some("unix:path=/nonexistent/ssx-no-bus")).expect_err("no bus");
     assert!(matches!(err, HotkeyError::Unavailable { .. }), "{err}");
 }
 

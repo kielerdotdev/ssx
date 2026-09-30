@@ -8,7 +8,7 @@
 //! `hyprland.conf` conventions; Hyprland could not be run in the development environment,
 //! unlike sway, GNOME's `gsettings` and the XDG portal, which were exercised for real.
 
-use std::path::Path;
+use std::{fmt::Write as _, path::Path};
 
 use crate::{
     chord::{Chord, Modifiers},
@@ -50,7 +50,8 @@ pub fn render(bindings: &[(Chord, Command)]) -> Result<String> {
          # Load it from hyprland.conf with the `source` line printed by that command.\n",
     );
     for (chord, cmd) in bindings {
-        out.push_str(&format!("\n# {chord}: {}\n", comment_text(&cmd.display_name()).replace('#', "##")));
+        let _ =
+            write!(out, "\n# {chord}: {}\n", comment_text(&cmd.display_name()).replace('#', "##"));
         out.push_str(&bind_line(chord, cmd));
         out.push('\n');
     }
@@ -70,9 +71,18 @@ mod tests {
     #[test]
     fn bind_lines() {
         let c = Command::new("ssx").args(["capture", "region"]);
-        assert_eq!(bind_line(&"Ctrl+Shift+S".parse().unwrap(), &c), "bind = CTRL SHIFT, s, exec, ssx capture region");
-        assert_eq!(bind_line(&"Print".parse().unwrap(), &c), "bind = , Print, exec, ssx capture region");
-        assert_eq!(bind_line(&"Super+Alt+R".parse().unwrap(), &c), "bind = ALT SUPER, r, exec, ssx capture region");
+        assert_eq!(
+            bind_line(&"Ctrl+Shift+S".parse().unwrap(), &c),
+            "bind = CTRL SHIFT, s, exec, ssx capture region"
+        );
+        assert_eq!(
+            bind_line(&"Print".parse().unwrap(), &c),
+            "bind = , Print, exec, ssx capture region"
+        );
+        assert_eq!(
+            bind_line(&"Super+Alt+R".parse().unwrap(), &c),
+            "bind = ALT SUPER, r, exec, ssx capture region"
+        );
     }
 
     #[test]
@@ -95,6 +105,9 @@ mod tests {
 
     #[test]
     fn source_line_is_plain() {
-        assert_eq!(source_line(Path::new("/h/.config/hypr/ssx.conf")), "source = /h/.config/hypr/ssx.conf");
+        assert_eq!(
+            source_line(Path::new("/h/.config/hypr/ssx.conf")),
+            "source = /h/.config/hypr/ssx.conf"
+        );
     }
 }

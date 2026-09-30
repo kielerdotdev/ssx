@@ -19,7 +19,8 @@ fn any_mods() -> impl Strategy<Value = Modifiers> {
 }
 
 fn any_chord() -> impl Strategy<Value = Chord> {
-    (any_mods(), any_key()).prop_filter_map("bare typing keys are invalid", |(m, k)| Chord::new(m, k).ok())
+    (any_mods(), any_key())
+        .prop_filter_map("bare typing keys are invalid", |(m, k)| Chord::new(m, k).ok())
 }
 
 proptest! {

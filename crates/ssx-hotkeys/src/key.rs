@@ -180,22 +180,25 @@ impl Key {
             }
         }
         let lower = s.to_ascii_lowercase();
-        if let Some(n) = lower.strip_prefix('f').and_then(|n| n.parse::<u8>().ok()) {
-            if (1..=Self::MAX_F).contains(&n) && !lower[1..].starts_with('+') {
-                return Some(Key::F(n));
-            }
+        if let Some(n) = lower.strip_prefix('f').and_then(|n| n.parse::<u8>().ok())
+            && (1..=Self::MAX_F).contains(&n)
+            && !lower[1..].starts_with('+')
+        {
+            return Some(Key::F(n));
         }
         for prefix in ["numpad", "kp", "num"] {
-            if let Some(n) = lower.strip_prefix(prefix).and_then(|n| n.parse::<u8>().ok()) {
-                if n <= 9 && lower.len() == prefix.len() + 1 {
-                    return Some(Key::Numpad(n));
-                }
+            if let Some(n) = lower.strip_prefix(prefix).and_then(|n| n.parse::<u8>().ok())
+                && n <= 9
+                && lower.len() == prefix.len() + 1
+            {
+                return Some(Key::Numpad(n));
             }
         }
         NAMED
             .iter()
             .find(|d| {
-                d.name.eq_ignore_ascii_case(s) || d.aliases.iter().any(|a| a.eq_ignore_ascii_case(s))
+                d.name.eq_ignore_ascii_case(s)
+                    || d.aliases.iter().any(|a| a.eq_ignore_ascii_case(s))
             })
             .map(|d| Key::Named(d.key))
     }
@@ -206,11 +209,11 @@ impl Key {
         if let Some(d) = NAMED.iter().find(|d| d.xkb.eq_ignore_ascii_case(name)) {
             return Some(Key::Named(d.key));
         }
-        if let Some(n) = name.to_ascii_lowercase().strip_prefix("kp_").and_then(|n| n.parse::<u8>().ok())
+        if let Some(n) =
+            name.to_ascii_lowercase().strip_prefix("kp_").and_then(|n| n.parse::<u8>().ok())
+            && n <= 9
         {
-            if n <= 9 {
-                return Some(Key::Numpad(n));
-            }
+            return Some(Key::Numpad(n));
         }
         match name {
             "Page_Up" => return Some(Key::Named(Named::PageUp)),

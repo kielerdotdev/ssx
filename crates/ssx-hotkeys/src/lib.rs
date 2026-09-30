@@ -23,7 +23,7 @@
 //! let chord: Chord = "ctrl + shift + s".parse()?;
 //! assert_eq!(chord.to_string(), "Ctrl+Shift+S");
 //! let line = sway::bindsym_line(&chord, &Command::new("ssx").args(["capture", "region"]));
-//! assert_eq!(line, "bindsym Ctrl+Shift+s exec \"ssx capture region\"");
+//! assert_eq!(line, "bindsym Ctrl+Shift+s exec ssx capture region");
 //! # Ok::<(), ssx_hotkeys::ChordError>(())
 //! ```
 //!
@@ -99,7 +99,9 @@ pub fn open_manager_for(detection: Detection) -> Result<Box<dyn HotkeyManager>, 
     for strategy in detection.candidates.iter().copied().filter(|s| s.is_in_process()) {
         let attempt: Result<Box<dyn HotkeyManager>, HotkeyError> = match strategy {
             #[cfg(any(windows, target_os = "macos", all(unix, not(target_vendor = "apple"))))]
-            Strategy::GlobalHotkey => backend_global::GlobalHotkeys::new().map(|m| Box::new(m) as _),
+            Strategy::GlobalHotkey => {
+                backend_global::GlobalHotkeys::new().map(|m| Box::new(m) as _)
+            }
             #[cfg(target_os = "linux")]
             Strategy::Portal => backend_portal::PortalHotkeys::connect().map(|m| Box::new(m) as _),
             _ => continue,

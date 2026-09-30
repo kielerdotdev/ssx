@@ -53,7 +53,10 @@ struct Entry {
 impl fmt::Debug for GlobalHotkeys {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("GlobalHotkeys")
-            .field("registered", &self.entries.iter().map(|e| e.chord.to_string()).collect::<Vec<_>>())
+            .field(
+                "registered",
+                &self.entries.iter().map(|e| e.chord.to_string()).collect::<Vec<_>>(),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -83,7 +86,14 @@ impl GlobalHotkeys {
                 .spawn(move || forward_events(&map, &stop, &tx))
                 .map_err(|e| unavailable(format!("cannot start the event thread: {e}")))?
         };
-        Ok(Self { inner, entries: Vec::new(), by_crate_id, events, stop, forwarder: Some(forwarder) })
+        Ok(Self {
+            inner,
+            entries: Vec::new(),
+            by_crate_id,
+            events,
+            stop,
+            forwarder: Some(forwarder),
+        })
     }
 
     fn lock_map(&self) -> std::sync::MutexGuard<'_, HashMap<u32, HotkeyId>> {

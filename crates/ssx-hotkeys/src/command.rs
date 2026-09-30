@@ -14,6 +14,8 @@
 //! `,`, expands `$name`, and protects only double-quoted text); the test-suite replays a
 //! corpus of hostile arguments through it, including real key presses.
 
+use std::fmt::Write as _;
+
 /// Why a [`Command`] cannot be rendered.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum CommandError {
@@ -226,7 +228,7 @@ pub fn gvariant_string(s: &str) -> String {
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
             c if (c as u32) < 0x20 || c as u32 == 0x7f => {
-                out.push_str(&format!("\\u{:04x}", c as u32));
+                let _ = write!(out, "\\u{:04x}", c as u32);
             }
             c => out.push(c),
         }
@@ -348,7 +350,12 @@ pub(crate) mod tests {
             Command::new("x\0").validate(),
             Err(CommandError::ControlCharacter("NUL"))
         ));
-        assert!(Command::new("x").args(CORPUS.iter().copied().filter(|s| !s.contains('\n'))).validate().is_ok());
+        assert!(
+            Command::new("x")
+                .args(CORPUS.iter().copied().filter(|s| !s.contains('\n')))
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]
@@ -371,7 +378,8 @@ pub(crate) mod tests {
         for w in CORPUS {
             let out = hyprland_exec_arg(&Command::new("x").arg(*w));
             assert!(
-                !out.as_bytes().windows(2).any(|p| p[0] == b'$' && (p[1].is_ascii_alphanumeric() || p[1] == b'_' || p[1] == b'{')),
+                !out.as_bytes().windows(2).any(|p| p[0] == b'$'
+                    && (p[1].is_ascii_alphanumeric() || p[1] == b'_' || p[1] == b'{')),
                 "{w:?} -> {out}"
             );
             assert!(!out.replace("##", "").contains('#'), "single # left in {out}");
@@ -386,12 +394,11 @@ pub(crate) mod tests {
         while let Some(c) = it.next() {
             if c == '\\' {
                 match it.next() {
-                    Some('\\') => s.push('\\'),
+                    Some('\\') | None => s.push('\\'),
                     Some(o) => {
                         s.push('\\');
                         s.push(o);
                     }
-                    None => s.push('\\'),
                 }
             } else {
                 s.push(c);
@@ -437,7 +444,11 @@ pub(crate) mod tests {
         for w in CORPUS {
             let cmd = Command::new("ssx").arg(*w);
             let value = desktop_exec_value(&cmd);
-            assert_eq!(parse_desktop_exec(&value), vec!["ssx".to_owned(), (*w).to_owned()], "{w:?} -> {value}");
+            assert_eq!(
+                parse_desktop_exec(&value),
+                vec!["ssx".to_owned(), (*w).to_owned()],
+                "{w:?} -> {value}"
+            );
         }
         let all = Command::new("/opt/my app/ssx").args(CORPUS.iter().copied());
         let mut want = vec!["/opt/my app/ssx".to_owned()];
@@ -447,7 +458,10 @@ pub(crate) mod tests {
 
     #[test]
     fn desktop_exec_literal_examples() {
-        assert_eq!(desktop_exec_value(&Command::new("ssx").arg("capture").arg("region")), "ssx capture region");
+        assert_eq!(
+            desktop_exec_value(&Command::new("ssx").arg("capture").arg("region")),
+            "ssx capture region"
+        );
         assert_eq!(desktop_exec_value(&Command::new("ssx").arg("a b")), "ssx \"a b\"");
         assert_eq!(desktop_exec_value(&Command::new("ssx").arg("100%")), "ssx 100%%");
         // A backslash inside quotes is escaped twice: once for Exec, once for the string.

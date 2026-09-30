@@ -1,0 +1,7 @@
+# Proper names and protocol terms that appear throughout the docs; ".." keeps the built-in list.
+doc-valid-idents = [
+    "GlobalShortcuts", "GVariant", "GSettings", "XKB", "XDG", "KDE", "GNOME", "Hyprland",
+    "KConfig", "GLib", "macOS", "XGrabKey", "XWayland", "DBus", "KGlobalAccel", "Plasma",
+    "SysV", "MacOS", "OpenGL", "Wayland", "X11", "Win32", "RegisterHotKey", "XTEST", "GDK",
+    "GTK", "wlroots", "KWin", "LXQt", "MATE", "Cinnamon", "BindShortcuts", "..",
+]

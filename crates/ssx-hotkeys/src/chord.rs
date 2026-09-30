@@ -89,10 +89,14 @@ pub enum ChordError {
     #[error("empty part in shortcut {0:?}; parts are separated by a single '+'")]
     EmptyPart(String),
     /// A part before the last is not a modifier.
-    #[error("{0:?} is not a modifier (Ctrl, Alt, Shift, Super); a shortcut has exactly one non-modifier key, last")]
+    #[error(
+        "{0:?} is not a modifier (Ctrl, Alt, Shift, Super); a shortcut has exactly one non-modifier key, last"
+    )]
     NotAModifier(String),
     /// The last part is not a known key.
-    #[error("unknown key {0:?}; use a letter, digit, F1-F24, or a name such as Print, Space, PageUp")]
+    #[error(
+        "unknown key {0:?}; use a letter, digit, F1-F24, or a name such as Print, Space, PageUp"
+    )]
     UnknownKey(String),
     /// Only modifiers were given.
     #[error("shortcut {0:?} has no key, only modifiers")]
@@ -101,7 +105,9 @@ pub enum ChordError {
     #[error("modifier {0} given twice")]
     DuplicateModifier(&'static str),
     /// A typing key without a modifier would be unusable everywhere.
-    #[error("{0} needs at least one modifier (Ctrl, Alt, Shift or Super); a bare typing key cannot be a global shortcut")]
+    #[error(
+        "{0} needs at least one modifier (Ctrl, Alt, Shift or Super); a bare typing key cannot be a global shortcut"
+    )]
     NeedsModifier(String),
 }
 
@@ -244,9 +250,8 @@ impl FromStr for Chord {
         let (last, mods) = parts.split_last().ok_or(ChordError::Empty)?;
         let mut modifiers = Modifiers::NONE;
         for part in mods {
-            let m = match Modifiers::parse_one(part) {
-                Some(m) => m,
-                None => return Err(ChordError::NotAModifier((*part).to_owned())),
+            let Some(m) = Modifiers::parse_one(part) else {
+                return Err(ChordError::NotAModifier((*part).to_owned()));
             };
             if modifiers.contains(m) {
                 return Err(ChordError::DuplicateModifier(m.name()));
@@ -304,9 +309,14 @@ mod tests {
         assert!(matches!("Ctrl+".parse::<Chord>(), Err(ChordError::EmptyPart(_))));
         assert!(matches!("Ctrl+Shift".parse::<Chord>(), Err(ChordError::MissingKey(_))));
         assert!(matches!("Ctrl".parse::<Chord>(), Err(ChordError::MissingKey(_))));
-        assert!(matches!("Ctrl+Nope".parse::<Chord>(), Err(ChordError::UnknownKey(k)) if k == "Nope"));
+        assert!(
+            matches!("Ctrl+Nope".parse::<Chord>(), Err(ChordError::UnknownKey(k)) if k == "Nope")
+        );
         assert!(matches!("A+B".parse::<Chord>(), Err(ChordError::NotAModifier(m)) if m == "A"));
-        assert!(matches!("Ctrl+Ctrl+S".parse::<Chord>(), Err(ChordError::DuplicateModifier("Ctrl"))));
+        assert!(matches!(
+            "Ctrl+Ctrl+S".parse::<Chord>(),
+            Err(ChordError::DuplicateModifier("Ctrl"))
+        ));
         assert!(matches!("Control+Ctl+S".parse::<Chord>(), Err(ChordError::DuplicateModifier(_))));
         assert!(matches!("S".parse::<Chord>(), Err(ChordError::NeedsModifier(_))));
         assert!(matches!("Space".parse::<Chord>(), Err(ChordError::NeedsModifier(_))));
@@ -337,9 +347,10 @@ mod tests {
         for key in Key::all() {
             for bits in 0..16u8 {
                 let mut m = Modifiers::NONE;
-                for (i, flag) in [Modifiers::CTRL, Modifiers::ALT, Modifiers::SHIFT, Modifiers::SUPER]
-                    .into_iter()
-                    .enumerate()
+                for (i, flag) in
+                    [Modifiers::CTRL, Modifiers::ALT, Modifiers::SHIFT, Modifiers::SUPER]
+                        .into_iter()
+                        .enumerate()
                 {
                     if bits & (1 << i) != 0 {
                         m = m | flag;

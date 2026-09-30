@@ -39,10 +39,10 @@ pub fn sway_bindings(config: &str) -> Vec<(usize, Chord)> {
         let mut words = line.split_whitespace();
         match words.next() {
             Some("set") => {
-                if let (Some(name), Some(value)) = (words.next(), words.next()) {
-                    if name.starts_with('$') {
-                        vars.insert(name.to_owned(), value.to_owned());
-                    }
+                if let (Some(name), Some(value)) = (words.next(), words.next())
+                    && name.starts_with('$')
+                {
+                    vars.insert(name.to_owned(), value.to_owned());
                 }
             }
             Some("bindsym") => {
@@ -193,13 +193,25 @@ bindcode 133+31 exec by-code
         let b: Vec<String> = sway_bindings(SWAY).iter().map(|(_, c)| c.to_string()).collect();
         assert_eq!(
             b,
-            ["Super+Enter", "Shift+Super+S", "Shift+Super+R", "VolumeMute", "Print", "Ctrl+Alt+Delete", "Ctrl+Alt+T"]
+            [
+                "Super+Enter",
+                "Shift+Super+S",
+                "Shift+Super+R",
+                "VolumeMute",
+                "Print",
+                "Ctrl+Alt+Delete",
+                "Ctrl+Alt+T"
+            ]
         );
     }
 
     #[test]
     fn reports_line_numbers_and_text() {
-        let got = find_conflicts(Target::Sway, SWAY, &[c("Super+Shift+S"), c("Print"), c("Ctrl+Shift+S")]);
+        let got = find_conflicts(
+            Target::Sway,
+            SWAY,
+            &[c("Super+Shift+S"), c("Print"), c("Ctrl+Shift+S")],
+        );
         assert_eq!(got.len(), 2);
         assert_eq!((got[0].line_number, got[0].chord), (6, c("Shift+Super+S")));
         assert!(got[0].line.starts_with("bindsym $mod+Shift+s exec grim"));
@@ -230,7 +242,18 @@ windowrulev2 = float, class:foo
 
     #[test]
     fn no_false_positives_or_panics_on_garbage() {
-        for garbage in ["", "bindsym", "bindsym +", "bindsym ++", "bind =", "bind = ,", "bind = , ,", "set $x", "\u{0}\u{1}", "bind==,,,"] {
+        for garbage in [
+            "",
+            "bindsym",
+            "bindsym +",
+            "bindsym ++",
+            "bind =",
+            "bind = ,",
+            "bind = , ,",
+            "set $x",
+            "\u{0}\u{1}",
+            "bind==,,,",
+        ] {
             assert!(sway_bindings(garbage).is_empty(), "{garbage:?}");
             assert!(hyprland_bindings(garbage).is_empty(), "{garbage:?}");
         }
@@ -239,10 +262,14 @@ windowrulev2 = float, class:foo
 
     #[test]
     fn main_config_check_reads_from_the_injected_root() {
-        let root = std::env::temp_dir().join(format!("ssx-hotkeys-conflict-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("ssx-hotkeys-conflict-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let dirs = Dirs::under(&root);
-        assert!(check_main_config(&dirs, Target::Sway, &[c("Print")]).unwrap().is_empty(), "missing config");
+        assert!(
+            check_main_config(&dirs, Target::Sway, &[c("Print")]).unwrap().is_empty(),
+            "missing config"
+        );
         let p = files::main_config_path(&dirs, Target::Sway).unwrap();
         std::fs::create_dir_all(p.parent().unwrap()).unwrap();
         std::fs::write(&p, SWAY).unwrap();

@@ -78,7 +78,9 @@ pub(crate) fn run_checked(
         Ok(out) if out.success => Ok(out),
         Ok(out) => Err(BindingError::CommandFailed {
             command: display(program, args),
-            status: out.code.map_or_else(|| "killed by a signal".to_owned(), |c| format!("exit {c}")),
+            status: out
+                .code
+                .map_or_else(|| "killed by a signal".to_owned(), |c| format!("exit {c}")),
             stderr: out.stderr.trim().to_owned(),
         }),
         Err(e) if e.kind() == io::ErrorKind::NotFound => {

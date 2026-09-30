@@ -74,7 +74,8 @@ pub fn entries(bindings: &[(Chord, Command)]) -> Result<Vec<KdeEntry>> {
             let shortcut = chord
                 .to_qt_sequence()
                 .ok_or(BindingError::UnsupportedKey { target: Target::Kde, chord: *chord })?;
-            let desktop_id = format!("{NAME_PREFIX}{}.desktop", slug.strip_prefix("ssx-").unwrap_or(&slug));
+            let desktop_id =
+                format!("{NAME_PREFIX}{}.desktop", slug.strip_prefix("ssx-").unwrap_or(&slug));
             Ok(KdeEntry { desktop_file: desktop_file(cmd), desktop_id, shortcut })
         })
         .collect()
@@ -112,8 +113,16 @@ pub fn kwriteconfig_commands(tool: &str, entries: &[KdeEntry]) -> Vec<Vec<String
         .iter()
         .map(|e| {
             [
-                tool, "--file", "kglobalshortcutsrc", "--group", "services", "--group",
-                e.component(), "--key", "_launch", &e.shortcut,
+                tool,
+                "--file",
+                "kglobalshortcutsrc",
+                "--group",
+                "services",
+                "--group",
+                e.component(),
+                "--key",
+                "_launch",
+                &e.shortcut,
             ]
             .map(str::to_owned)
             .to_vec()
@@ -130,7 +139,10 @@ pub struct ApplyReport {
     pub shortcuts_registered: usize,
 }
 
-fn io_err(action: &'static str, path: &std::path::Path) -> impl FnOnce(std::io::Error) -> BindingError {
+fn io_err(
+    action: &'static str,
+    path: &std::path::Path,
+) -> impl FnOnce(std::io::Error) -> BindingError {
     let path = path.to_owned();
     move |source| BindingError::Io { action, path, source }
 }
@@ -194,9 +206,19 @@ pub fn remove(dirs: &Dirs, runner: &dyn CommandRunner) -> Result<ApplyReport> {
     let tool = kwriteconfig_tool(runner);
     for id in &ids {
         // Unregister first, so a failure leaves the launcher (and a retry possible).
-        let args: Vec<String> = ["--file", "kglobalshortcutsrc", "--group", "services", "--group", id, "--key", "_launch", "--delete"]
-            .map(str::to_owned)
-            .to_vec();
+        let args: Vec<String> = [
+            "--file",
+            "kglobalshortcutsrc",
+            "--group",
+            "services",
+            "--group",
+            id,
+            "--key",
+            "_launch",
+            "--delete",
+        ]
+        .map(str::to_owned)
+        .to_vec();
         run_checked(runner, tool, &args, HINT)?;
         report.shortcuts_registered += 1;
         let path = apps.join(id);
@@ -210,7 +232,13 @@ pub fn remove(dirs: &Dirs, runner: &dyn CommandRunner) -> Result<ApplyReport> {
 /// briefly drops every global shortcut in the session).
 pub fn reload(runner: &dyn CommandRunner) -> Result<()> {
     let args = ["--user", "restart", "plasma-kglobalaccel.service"].map(str::to_owned);
-    run_checked(runner, "systemctl", &args, "run this inside a systemd user session, or log out and in again").map(|_| ())
+    run_checked(
+        runner,
+        "systemctl",
+        &args,
+        "run this inside a systemd user session, or log out and in again",
+    )
+    .map(|_| ())
 }
 
 #[cfg(test)]
@@ -219,7 +247,8 @@ mod tests {
     use crate::bindings::{RunOutput, runner::fake::Fake, tests::fixture};
 
     fn temp(tag: &str) -> Dirs {
-        let root = std::env::temp_dir().join(format!("ssx-hotkeys-kde-{tag}-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("ssx-hotkeys-kde-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
         Dirs::under(&root)
@@ -236,13 +265,15 @@ mod tests {
 
     #[test]
     fn desktop_file_matches_what_system_settings_writes() {
-        let f = desktop_file(&Command::new("ssx").args(["capture", "region"]).label("Capture region"));
+        let f =
+            desktop_file(&Command::new("ssx").args(["capture", "region"]).label("Capture region"));
         assert_eq!(
             f,
             "[Desktop Entry]\nType=Application\nName=Capture region\nExec=ssx capture region\n\
              NoDisplay=true\nStartupNotify=false\nTerminal=false\nX-KDE-GlobalAccel-CommandShortcut=true\n"
         );
-        let hostile = desktop_file(&Command::new("ssx").arg("a b").arg("%f").label("line1\nX-Injected=1"));
+        let hostile =
+            desktop_file(&Command::new("ssx").arg("a b").arg("%f").label("line1\nX-Injected=1"));
         assert!(hostile.contains("Exec=ssx \"a b\" %%f\n"), "{hostile}");
         assert_eq!(hostile.matches('\n').count(), 8, "a newline in the label must not add a line");
         assert!(!hostile.contains("\nX-Injected"));
@@ -258,10 +289,13 @@ mod tests {
     #[test]
     fn kwriteconfig_invocations_are_exact() {
         let e = entries(&fixture()[..1]).unwrap();
-        let cmds: Vec<String> = kwriteconfig_commands("kwriteconfig6", &e).iter().map(|c| c.join(" ")).collect();
+        let cmds: Vec<String> =
+            kwriteconfig_commands("kwriteconfig6", &e).iter().map(|c| c.join(" ")).collect();
         assert_eq!(
             cmds,
-            ["kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-capture-region.desktop --key _launch Ctrl+Shift+S"]
+            [
+                "kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-capture-region.desktop --key _launch Ctrl+Shift+S"
+            ]
         );
     }
 
@@ -274,7 +308,8 @@ mod tests {
         let apps = applications_dir(&d);
         let text = fs::read_to_string(apps.join("net.local.ssx-capture-region.desktop")).unwrap();
         assert!(text.contains("X-KDE-GlobalAccel-CommandShortcut=true"));
-        let kw: Vec<String> = fake.calls_text().into_iter().filter(|c| c.contains("--key")).collect();
+        let kw: Vec<String> =
+            fake.calls_text().into_iter().filter(|c| c.contains("--key")).collect();
         assert_eq!(kw.len(), 3);
         // Second run: no file rewrites; registration is re-sent (kwriteconfig is idempotent).
         let r2 = apply(&d, &fake, &fixture()).unwrap();
@@ -288,13 +323,19 @@ mod tests {
         impl CommandRunner for Only5 {
             fn run(&self, program: &str, args: &[String]) -> std::io::Result<RunOutput> {
                 self.0.borrow_mut().push(format!("{program} {}", args.join(" ")));
-                if program == "kwriteconfig6" { Err(std::io::ErrorKind::NotFound.into()) } else { Ok(RunOutput::ok("")) }
+                if program == "kwriteconfig6" {
+                    Err(std::io::ErrorKind::NotFound.into())
+                } else {
+                    Ok(RunOutput::ok(""))
+                }
             }
         }
         let d = temp("kw5");
-        let r = Only5(Default::default());
+        let r = Only5(std::cell::RefCell::default());
         apply(&d, &r, &fixture()[..1]).unwrap();
-        assert!(r.0.borrow().iter().any(|c| c.starts_with("kwriteconfig5 --file kglobalshortcutsrc")));
+        assert!(
+            r.0.borrow().iter().any(|c| c.starts_with("kwriteconfig5 --file kglobalshortcutsrc"))
+        );
     }
 
     #[test]
@@ -308,10 +349,19 @@ mod tests {
         let fake2 = Fake::default();
         let r = remove(&d, &fake2).unwrap();
         assert_eq!(r.desktop_files_written, 3);
-        let mut left: Vec<String> = fs::read_dir(&apps).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        let mut left: Vec<String> = fs::read_dir(&apps)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
         left.sort();
         assert_eq!(left, ["firefox.desktop", "net.local.other.desktop"]);
-        assert!(fake2.calls_text().iter().filter(|c| c.contains("--file")).all(|c| c.contains("--delete") && c.contains("net.local.ssx-")));
+        assert!(
+            fake2
+                .calls_text()
+                .iter()
+                .filter(|c| c.contains("--file"))
+                .all(|c| c.contains("--delete") && c.contains("net.local.ssx-"))
+        );
         assert_eq!(remove(&d, &Fake::default()).unwrap(), ApplyReport::default());
     }
 

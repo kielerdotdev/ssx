@@ -3,7 +3,7 @@
 //! Regenerate after an intentional change with `UPDATE_GOLDEN=1 cargo test -p ssx-hotkeys
 //! --test golden` and review the diff: these files are what users' desktops will read.
 
-use std::path::PathBuf;
+use std::{fmt::Write as _, path::PathBuf};
 
 use ssx_hotkeys::{
     Chord, Command,
@@ -13,13 +13,23 @@ use ssx_hotkeys::{
 fn fixture() -> Vec<(Chord, Command)> {
     let c = |s: &str| s.parse::<Chord>().expect("valid chord");
     vec![
-        (c("Ctrl+Shift+S"), Command::new("ssx").args(["capture", "region"]).label("Capture region")),
+        (
+            c("Ctrl+Shift+S"),
+            Command::new("ssx").args(["capture", "region"]).label("Capture region"),
+        ),
         (c("Print"), Command::new("ssx").args(["capture", "screen"])),
-        (c("Super+Alt+R"), Command::new("/usr/local/bin/ssx").args(["record", "--title", "My clip"])),
+        (
+            c("Super+Alt+R"),
+            Command::new("/usr/local/bin/ssx").args(["record", "--title", "My clip"]),
+        ),
         (
             c("Ctrl+Alt+Shift+Super+F12"),
             Command::new("sh")
-                .args(["-c", "notify-send 'ssx' \"done: $HOME\"; echo 100% # ok, really", "arg with spaces"])
+                .args([
+                    "-c",
+                    "notify-send 'ssx' \"done: $HOME\"; echo 100% # ok, really",
+                    "arg with spaces",
+                ])
                 .label("Hostile: quotes, $, ; and #"),
         ),
         (c("Super+Grave"), Command::new("ssx").args(["capture", "window", "--delay=2"])),
@@ -34,8 +44,9 @@ fn golden(name: &str, actual: &str) {
         std::fs::write(&path, actual).expect("write golden");
         return;
     }
-    let expected = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("missing golden file {} ({e}); run with UPDATE_GOLDEN=1", path.display()));
+    let expected = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+        panic!("missing golden file {} ({e}); run with UPDATE_GOLDEN=1", path.display())
+    });
     assert!(
         expected == actual,
         "golden mismatch for {name}\n--- expected\n{expected}\n--- actual\n{actual}\n(UPDATE_GOLDEN=1 to accept)"
@@ -70,7 +81,7 @@ fn kde_desktop_files_and_kwriteconfig_commands() {
     let entries = kde::entries(&fixture()).expect("entries");
     let mut text = String::new();
     for e in &entries {
-        text.push_str(&format!("=== {} ({})\n{}\n", e.desktop_id, e.shortcut, e.desktop_file));
+        let _ = writeln!(text, "=== {} ({})\n{}", e.desktop_id, e.shortcut, e.desktop_file);
     }
     for cmd in kde::kwriteconfig_commands("kwriteconfig6", &entries) {
         text.push_str(&cmd.join(" "));
@@ -83,11 +94,13 @@ fn kde_desktop_files_and_kwriteconfig_commands() {
 fn include_lines_use_the_injected_root() {
     let d = Dirs::under("/home/example");
     assert_eq!(
-        ssx_hotkeys::bindings::files::include_line(&d, ssx_hotkeys::bindings::Target::Sway).as_deref(),
+        ssx_hotkeys::bindings::files::include_line(&d, ssx_hotkeys::bindings::Target::Sway)
+            .as_deref(),
         Some("include /home/example/.config/sway/config.d/ssx.conf")
     );
     assert_eq!(
-        ssx_hotkeys::bindings::files::include_line(&d, ssx_hotkeys::bindings::Target::Hyprland).as_deref(),
+        ssx_hotkeys::bindings::files::include_line(&d, ssx_hotkeys::bindings::Target::Hyprland)
+            .as_deref(),
         Some("source = /home/example/.config/hypr/ssx.conf")
     );
 }

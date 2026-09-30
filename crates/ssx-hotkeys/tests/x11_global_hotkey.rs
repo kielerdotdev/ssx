@@ -19,7 +19,17 @@ struct Xvfb(Child, String);
 impl Xvfb {
     fn start() -> Option<Xvfb> {
         let mut child = match Process::new("Xvfb")
-            .args(["-displayfd", "1", "-screen", "0", "640x480x24", "-noreset", "-ac", "-nolisten", "tcp"])
+            .args([
+                "-displayfd",
+                "1",
+                "-screen",
+                "0",
+                "640x480x24",
+                "-noreset",
+                "-ac",
+                "-nolisten",
+                "tcp",
+            ])
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
@@ -48,16 +58,18 @@ impl Drop for Xvfb {
 }
 
 fn xdotool(display: &str, args: &[&str]) -> bool {
-    Process::new("xdotool")
-        .args(args)
-        .env("DISPLAY", display)
-        .status()
-        .is_ok_and(|s| s.success())
+    Process::new("xdotool").args(args).env("DISPLAY", display).status().is_ok_and(|s| s.success())
 }
 
 #[test]
 fn registered_chord_produces_press_and_release_events() {
-    if Process::new("xdotool").arg("version").stdout(Stdio::null()).stderr(Stdio::null()).status().is_err() {
+    if Process::new("xdotool")
+        .arg("version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_err()
+    {
         eprintln!("SKIP: xdotool is not installed");
         return;
     }
@@ -77,12 +89,18 @@ fn registered_chord_produces_press_and_release_events() {
     assert_eq!(mgr.registered().len(), 2);
 
     // Misuse is rejected without touching the server.
-    assert!(matches!(mgr.register(region.clone(), "Ctrl+F1".parse().unwrap()), Err(HotkeyError::DuplicateId(_))));
+    assert!(matches!(
+        mgr.register(region.clone(), "Ctrl+F1".parse().unwrap()),
+        Err(HotkeyError::DuplicateId(_))
+    ));
     assert!(matches!(
         mgr.register(HotkeyId::new("other").unwrap(), chord_a),
         Err(HotkeyError::DuplicateChord { existing, .. }) if existing == region
     ));
-    assert!(matches!(mgr.unregister(&HotkeyId::new("nope").unwrap()), Err(HotkeyError::UnknownId(_))));
+    assert!(matches!(
+        mgr.unregister(&HotkeyId::new("nope").unwrap()),
+        Err(HotkeyError::UnknownId(_))
+    ));
 
     // Give the grab thread a moment: registration is synchronous, but xdotool starts a new
     // connection each time.
@@ -107,12 +125,18 @@ fn registered_chord_produces_press_and_release_events() {
     mgr.unregister(&region).expect("unregister");
     assert_eq!(mgr.registered().len(), 1);
     assert!(xdotool(&xvfb.1, &["key", "ctrl+shift+F9"]));
-    assert!(mgr.events().recv_timeout(Duration::from_millis(400)).is_err(), "event after unregister");
+    assert!(
+        mgr.events().recv_timeout(Duration::from_millis(400)).is_err(),
+        "event after unregister"
+    );
 
     // ...and can be registered again.
     mgr.register(region.clone(), chord_a).expect("re-register");
     assert!(xdotool(&xvfb.1, &["key", "ctrl+shift+F9"]));
-    assert_eq!(mgr.events().recv_timeout(wait).expect("press after re-register").state, HotkeyState::Pressed);
+    assert_eq!(
+        mgr.events().recv_timeout(wait).expect("press after re-register").state,
+        HotkeyState::Pressed
+    );
     assert!(mgr.reports_release());
     assert_eq!(mgr.backend().to_string(), "global-hotkey");
 }

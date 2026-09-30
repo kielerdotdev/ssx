@@ -15,6 +15,7 @@
 //! Only the blocks between the markers are ever modified or deleted.
 
 use std::{
+    fmt::Write as _,
     fs,
     path::{Path, PathBuf},
 };
@@ -145,7 +146,8 @@ pub fn status(dirs: &Dirs, target: Target) -> Result<Status> {
     };
     let block = text.as_deref().is_some_and(|t| find_block(t).is_some());
     let unmarked = text.as_deref().is_some_and(|t| {
-        let without = find_block(t).map_or_else(|| t.to_owned(), |(s, e)| format!("{}{}", &t[..s], &t[e..]));
+        let without =
+            find_block(t).map_or_else(|| t.to_owned(), |(s, e)| format!("{}{}", &t[..s], &t[e..]));
         without.lines().any(|l| l.trim() == line)
     });
     Ok(Status {
@@ -219,9 +221,10 @@ pub fn install_main_include(dirs: &Dirs, target: Target) -> Result<MainConfigCha
         }
         new.push('\n'); // blank separator, removed again by uninstall
     }
-    new.push_str(&format!(
-        "{BLOCK_BEGIN}\n# Managed by ssx; `ssx hotkeys uninstall` removes this block.\n{line}\n{BLOCK_END}\n"
-    ));
+    let _ = writeln!(
+        new,
+        "{BLOCK_BEGIN}\n# Managed by ssx; `ssx hotkeys uninstall` removes this block.\n{line}\n{BLOCK_END}"
+    );
     fs::write(&main, new).map_err(io_err("writing", &main))?;
     Ok(MainConfigChange::Changed)
 }
@@ -234,7 +237,9 @@ pub fn uninstall_main_include(dirs: &Dirs, target: Target) -> Result<MainConfigC
     };
     let text = match fs::read_to_string(&main) {
         Ok(t) => t,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(MainConfigChange::Unchanged),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(MainConfigChange::Unchanged);
+        }
         Err(e) => return Err(io_err("reading", &main)(e)),
     };
     let Some((s, e)) = find_block(&text) else { return Ok(MainConfigChange::Unchanged) };
@@ -261,7 +266,9 @@ pub fn uninstall(dirs: &Dirs, target: Target) -> Result<()> {
 pub fn reload(runner: &dyn CommandRunner, target: Target) -> Result<()> {
     let (program, args, hint) = match target {
         Target::Sway => ("swaymsg", vec!["reload".to_owned()], "is sway running and installed?"),
-        Target::Hyprland => ("hyprctl", vec!["reload".to_owned()], "is Hyprland running and installed?"),
+        Target::Hyprland => {
+            ("hyprctl", vec!["reload".to_owned()], "is Hyprland running and installed?")
+        }
         Target::Gnome | Target::Kde => return Ok(()),
     };
     run_checked(runner, program, &args, hint).map(|_| ())
@@ -273,7 +280,8 @@ mod tests {
     use crate::bindings::{runner::fake::Fake, tests::fixture};
 
     fn temp(tag: &str) -> Dirs {
-        let root = std::env::temp_dir().join(format!("ssx-hotkeys-files-{tag}-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("ssx-hotkeys-files-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
         Dirs::under(&root)
@@ -289,10 +297,22 @@ mod tests {
     #[test]
     fn paths_follow_the_documented_locations() {
         let d = Dirs::under("/r");
-        assert_eq!(include_file_path(&d, Target::Sway).unwrap(), PathBuf::from("/r/.config/sway/config.d/ssx.conf"));
-        assert_eq!(include_file_path(&d, Target::Hyprland).unwrap(), PathBuf::from("/r/.config/hypr/ssx.conf"));
-        assert_eq!(include_line(&d, Target::Sway).unwrap(), "include /r/.config/sway/config.d/ssx.conf");
-        assert_eq!(include_line(&d, Target::Hyprland).unwrap(), "source = /r/.config/hypr/ssx.conf");
+        assert_eq!(
+            include_file_path(&d, Target::Sway).unwrap(),
+            PathBuf::from("/r/.config/sway/config.d/ssx.conf")
+        );
+        assert_eq!(
+            include_file_path(&d, Target::Hyprland).unwrap(),
+            PathBuf::from("/r/.config/hypr/ssx.conf")
+        );
+        assert_eq!(
+            include_line(&d, Target::Sway).unwrap(),
+            "include /r/.config/sway/config.d/ssx.conf"
+        );
+        assert_eq!(
+            include_line(&d, Target::Hyprland).unwrap(),
+            "source = /r/.config/hypr/ssx.conf"
+        );
         assert!(include_file_path(&d, Target::Gnome).is_none());
     }
 
@@ -314,7 +334,7 @@ mod tests {
             // No stray temp files.
             let leftovers: Vec<_> = fs::read_dir(r1.path.parent().unwrap())
                 .unwrap()
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
                 .filter(|e| e.file_name().to_string_lossy().contains(".tmp"))
                 .collect();
             assert!(leftovers.is_empty());
@@ -324,7 +344,9 @@ mod tests {
     #[test]
     fn install_appends_block_idempotently_and_uninstall_restores_bytes() {
         for target in [Target::Sway, Target::Hyprland] {
-            for original in ["set $mod Mod4\nbindsym $mod+Return exec foot\n", "no trailing newline", ""] {
+            for original in
+                ["set $mod Mod4\nbindsym $mod+Return exec foot\n", "no trailing newline", ""]
+            {
                 let d = temp("block");
                 let main = write_main(&d, target, original);
                 assert_eq!(install_main_include(&d, target).unwrap(), MainConfigChange::Changed);
@@ -339,9 +361,16 @@ mod tests {
                 // Remove: byte-identical (modulo a newline added to an unterminated file).
                 assert_eq!(uninstall_main_include(&d, target).unwrap(), MainConfigChange::Changed);
                 let restored = fs::read_to_string(&main).unwrap();
-                let want = if original.is_empty() || original.ends_with('\n') { original.to_owned() } else { format!("{original}\n") };
+                let want = if original.is_empty() || original.ends_with('\n') {
+                    original.to_owned()
+                } else {
+                    format!("{original}\n")
+                };
                 assert_eq!(restored, want);
-                assert_eq!(uninstall_main_include(&d, target).unwrap(), MainConfigChange::Unchanged);
+                assert_eq!(
+                    uninstall_main_include(&d, target).unwrap(),
+                    MainConfigChange::Unchanged
+                );
                 assert!(!status(&d, target).unwrap().block_installed);
             }
         }
@@ -364,7 +393,10 @@ mod tests {
         let d = temp("crlf");
         let main = write_main(&d, Target::Hyprland, "a = 1\r\nb = 2\r\n");
         install_main_include(&d, Target::Hyprland).unwrap();
-        assert_eq!(install_main_include(&d, Target::Hyprland).unwrap(), MainConfigChange::Unchanged);
+        assert_eq!(
+            install_main_include(&d, Target::Hyprland).unwrap(),
+            MainConfigChange::Unchanged
+        );
         uninstall_main_include(&d, Target::Hyprland).unwrap();
         assert!(fs::read_to_string(&main).unwrap().starts_with("a = 1\r\nb = 2\r\n"));
     }
@@ -374,7 +406,10 @@ mod tests {
         let d = temp("manual");
         let line = include_line(&d, Target::Sway).unwrap();
         let main = write_main(&d, Target::Sway, &format!("x\n{line}\n"));
-        assert_eq!(install_main_include(&d, Target::Sway).unwrap(), MainConfigChange::AlreadyIncludedManually);
+        assert_eq!(
+            install_main_include(&d, Target::Sway).unwrap(),
+            MainConfigChange::AlreadyIncludedManually
+        );
         assert_eq!(fs::read_to_string(&main).unwrap(), format!("x\n{line}\n"));
         let st = status(&d, Target::Sway).unwrap();
         assert!(st.manually_included && !st.block_installed);
@@ -416,7 +451,10 @@ mod tests {
         install_main_include(&d, Target::Hyprland).unwrap();
         uninstall(&d, Target::Hyprland).unwrap();
         assert!(!r.path.exists());
-        assert_eq!(fs::read_to_string(main_config_path(&d, Target::Hyprland).unwrap()).unwrap(), "keep\n");
+        assert_eq!(
+            fs::read_to_string(main_config_path(&d, Target::Hyprland).unwrap()).unwrap(),
+            "keep\n"
+        );
         uninstall(&d, Target::Hyprland).unwrap(); // idempotent
     }
 
@@ -428,7 +466,9 @@ mod tests {
         assert_eq!(f.calls_text(), ["swaymsg reload", "hyprctl reload"]);
         reload(&f, Target::Gnome).unwrap();
         assert_eq!(f.calls.borrow().len(), 2);
-        f.canned.borrow_mut().insert("swaymsg reload".into(), crate::bindings::RunOutput::failed("no ipc"));
+        f.canned
+            .borrow_mut()
+            .insert("swaymsg reload".into(), crate::bindings::RunOutput::failed("no ipc"));
         let e = reload(&f, Target::Sway).unwrap_err();
         assert!(e.to_string().contains("no ipc"), "{e}");
     }

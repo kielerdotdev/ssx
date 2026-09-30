@@ -263,37 +263,149 @@ mod tests {
     #[test]
     fn detection_matrix() {
         #[rustfmt::skip]
-        let matrix: &[(&[(&str, &str)], Desktop, SessionType, &[Strategy])] = &[
+        type Case<'a> = (&'a [(&'a str, &'a str)], Desktop, SessionType, &'a [Strategy]);
+        let matrix: &[Case<'_>] = &[
             // X11 everywhere: the crate can grab keys.
-            (&[("XDG_CURRENT_DESKTOP", "XFCE"), ("XDG_SESSION_TYPE", "x11"), ("DISPLAY", ":0")], Desktop::Xfce, SessionType::X11, &[GlobalHotkey]),
-            (&[("XDG_CURRENT_DESKTOP", "ubuntu:GNOME"), ("XDG_SESSION_TYPE", "x11"), ("DISPLAY", ":0")], Desktop::Gnome, SessionType::X11, &[GlobalHotkey, GnomeGsettings]),
-            (&[("XDG_CURRENT_DESKTOP", "KDE"), ("XDG_SESSION_TYPE", "x11"), ("DISPLAY", ":0")], Desktop::Kde, SessionType::X11, &[GlobalHotkey, KdeShortcuts]),
+            (
+                &[("XDG_CURRENT_DESKTOP", "XFCE"), ("XDG_SESSION_TYPE", "x11"), ("DISPLAY", ":0")],
+                Desktop::Xfce,
+                SessionType::X11,
+                &[GlobalHotkey],
+            ),
+            (
+                &[
+                    ("XDG_CURRENT_DESKTOP", "ubuntu:GNOME"),
+                    ("XDG_SESSION_TYPE", "x11"),
+                    ("DISPLAY", ":0"),
+                ],
+                Desktop::Gnome,
+                SessionType::X11,
+                &[GlobalHotkey, GnomeGsettings],
+            ),
+            (
+                &[("XDG_CURRENT_DESKTOP", "KDE"), ("XDG_SESSION_TYPE", "x11"), ("DISPLAY", ":0")],
+                Desktop::Kde,
+                SessionType::X11,
+                &[GlobalHotkey, KdeShortcuts],
+            ),
             // Wayland desktops.
-            (&[("XDG_CURRENT_DESKTOP", "GNOME"), ("XDG_SESSION_TYPE", "wayland"), ("WAYLAND_DISPLAY", "wayland-0"), ("DISPLAY", ":0")], Desktop::Gnome, SessionType::Wayland, &[Portal, GnomeGsettings]),
-            (&[("XDG_CURRENT_DESKTOP", "ubuntu:GNOME"), ("XDG_SESSION_TYPE", "wayland")], Desktop::Gnome, SessionType::Wayland, &[Portal, GnomeGsettings]),
-            (&[("XDG_CURRENT_DESKTOP", "KDE"), ("XDG_SESSION_TYPE", "wayland")], Desktop::Kde, SessionType::Wayland, &[Portal, KdeShortcuts]),
-            (&[("XDG_CURRENT_DESKTOP", "sway"), ("XDG_SESSION_TYPE", "wayland"), ("SWAYSOCK", "/run/user/1000/sway-ipc.sock")], Desktop::Sway, SessionType::Wayland, &[SwayConfig]),
-            (&[("XDG_SESSION_TYPE", "wayland"), ("SWAYSOCK", "/run/x")], Desktop::Sway, SessionType::Wayland, &[SwayConfig]),
-            (&[("XDG_CURRENT_DESKTOP", "Hyprland"), ("XDG_SESSION_TYPE", "wayland"), ("HYPRLAND_INSTANCE_SIGNATURE", "abc_123")], Desktop::Hyprland, SessionType::Wayland, &[HyprlandConfig]),
-            (&[("XDG_SESSION_TYPE", "wayland"), ("HYPRLAND_INSTANCE_SIGNATURE", "abc")], Desktop::Hyprland, SessionType::Wayland, &[HyprlandConfig]),
-            (&[("XDG_CURRENT_DESKTOP", "niri"), ("XDG_SESSION_TYPE", "wayland")], Desktop::Niri, SessionType::Wayland, &[Portal, CliOnly]),
-            (&[("XDG_CURRENT_DESKTOP", "COSMIC"), ("XDG_SESSION_TYPE", "wayland")], Desktop::Cosmic, SessionType::Wayland, &[Portal, CliOnly]),
-            (&[("XDG_CURRENT_DESKTOP", "X-Cinnamon"), ("XDG_SESSION_TYPE", "wayland")], Desktop::Other, SessionType::Wayland, &[Portal, CliOnly]),
+            (
+                &[
+                    ("XDG_CURRENT_DESKTOP", "GNOME"),
+                    ("XDG_SESSION_TYPE", "wayland"),
+                    ("WAYLAND_DISPLAY", "wayland-0"),
+                    ("DISPLAY", ":0"),
+                ],
+                Desktop::Gnome,
+                SessionType::Wayland,
+                &[Portal, GnomeGsettings],
+            ),
+            (
+                &[("XDG_CURRENT_DESKTOP", "ubuntu:GNOME"), ("XDG_SESSION_TYPE", "wayland")],
+                Desktop::Gnome,
+                SessionType::Wayland,
+                &[Portal, GnomeGsettings],
+            ),
+            (
+                &[("XDG_CURRENT_DESKTOP", "KDE"), ("XDG_SESSION_TYPE", "wayland")],
+                Desktop::Kde,
+                SessionType::Wayland,
+                &[Portal, KdeShortcuts],
+            ),
+            (
+                &[
+                    ("XDG_CURRENT_DESKTOP", "sway"),
+                    ("XDG_SESSION_TYPE", "wayland"),
+                    ("SWAYSOCK", "/run/user/1000/sway-ipc.sock"),
+                ],
+                Desktop::Sway,
+                SessionType::Wayland,
+                &[SwayConfig],
+            ),
+            (
+                &[("XDG_SESSION_TYPE", "wayland"), ("SWAYSOCK", "/run/x")],
+                Desktop::Sway,
+                SessionType::Wayland,
+                &[SwayConfig],
+            ),
+            (
+                &[
+                    ("XDG_CURRENT_DESKTOP", "Hyprland"),
+                    ("XDG_SESSION_TYPE", "wayland"),
+                    ("HYPRLAND_INSTANCE_SIGNATURE", "abc_123"),
+                ],
+                Desktop::Hyprland,
+                SessionType::Wayland,
+                &[HyprlandConfig],
+            ),
+            (
+                &[("XDG_SESSION_TYPE", "wayland"), ("HYPRLAND_INSTANCE_SIGNATURE", "abc")],
+                Desktop::Hyprland,
+                SessionType::Wayland,
+                &[HyprlandConfig],
+            ),
+            (
+                &[("XDG_CURRENT_DESKTOP", "niri"), ("XDG_SESSION_TYPE", "wayland")],
+                Desktop::Niri,
+                SessionType::Wayland,
+                &[Portal, CliOnly],
+            ),
+            (
+                &[("XDG_CURRENT_DESKTOP", "COSMIC"), ("XDG_SESSION_TYPE", "wayland")],
+                Desktop::Cosmic,
+                SessionType::Wayland,
+                &[Portal, CliOnly],
+            ),
+            (
+                &[("XDG_CURRENT_DESKTOP", "X-Cinnamon"), ("XDG_SESSION_TYPE", "wayland")],
+                Desktop::Other,
+                SessionType::Wayland,
+                &[Portal, CliOnly],
+            ),
             // Missing session type: fall back to display variables.
-            (&[("XDG_CURRENT_DESKTOP", "GNOME"), ("WAYLAND_DISPLAY", "wayland-0"), ("DISPLAY", ":0")], Desktop::Gnome, SessionType::Wayland, &[Portal, GnomeGsettings]),
+            (
+                &[
+                    ("XDG_CURRENT_DESKTOP", "GNOME"),
+                    ("WAYLAND_DISPLAY", "wayland-0"),
+                    ("DISPLAY", ":0"),
+                ],
+                Desktop::Gnome,
+                SessionType::Wayland,
+                &[Portal, GnomeGsettings],
+            ),
             (&[("DISPLAY", ":1")], Desktop::Unknown, SessionType::X11, &[GlobalHotkey]),
             // Compositor variables without session info (e.g. launched from a service).
             (&[("SWAYSOCK", "/s")], Desktop::Sway, SessionType::Unknown, &[SwayConfig]),
-            (&[("HYPRLAND_INSTANCE_SIGNATURE", "x")], Desktop::Hyprland, SessionType::Unknown, &[HyprlandConfig]),
+            (
+                &[("HYPRLAND_INSTANCE_SIGNATURE", "x")],
+                Desktop::Hyprland,
+                SessionType::Unknown,
+                &[HyprlandConfig],
+            ),
             // Nothing at all (ssh, tty, container).
             (&[], Desktop::Unknown, SessionType::Unknown, &[CliOnly]),
             (&[("XDG_SESSION_TYPE", "tty")], Desktop::Unknown, SessionType::Unknown, &[CliOnly]),
             // Empty values count as unset.
-            (&[("XDG_CURRENT_DESKTOP", ""), ("DISPLAY", ""), ("SWAYSOCK", "")], Desktop::Unknown, SessionType::Unknown, &[CliOnly]),
+            (
+                &[("XDG_CURRENT_DESKTOP", ""), ("DISPLAY", ""), ("SWAYSOCK", "")],
+                Desktop::Unknown,
+                SessionType::Unknown,
+                &[CliOnly],
+            ),
             // Session type wins over leftover compositor variables.
-            (&[("XDG_SESSION_TYPE", "x11"), ("DISPLAY", ":0"), ("SWAYSOCK", "/stale")], Desktop::Sway, SessionType::X11, &[GlobalHotkey]),
+            (
+                &[("XDG_SESSION_TYPE", "x11"), ("DISPLAY", ":0"), ("SWAYSOCK", "/stale")],
+                Desktop::Sway,
+                SessionType::X11,
+                &[GlobalHotkey],
+            ),
             // Case-insensitive.
-            (&[("XDG_CURRENT_DESKTOP", "kde"), ("XDG_SESSION_TYPE", "WAYLAND")], Desktop::Kde, SessionType::Wayland, &[Portal, KdeShortcuts]),
+            (
+                &[("XDG_CURRENT_DESKTOP", "kde"), ("XDG_SESSION_TYPE", "WAYLAND")],
+                Desktop::Kde,
+                SessionType::Wayland,
+                &[Portal, KdeShortcuts],
+            ),
         ];
         for (pairs, desktop, session, want) in matrix {
             let d = case(pairs);

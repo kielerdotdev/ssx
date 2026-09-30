@@ -28,13 +28,7 @@
 //! The portal is spoken to on a private thread with its own D-Bus connection (blocking,
 //! runtime-agnostic `async-io`), so no async runtime is needed by the caller.
 
-use std::{
-    collections::HashMap,
-    fmt,
-    sync::mpsc,
-    thread::JoinHandle,
-    time::Duration,
-};
+use std::{collections::HashMap, fmt, sync::mpsc, thread::JoinHandle, time::Duration};
 
 use ashpd::desktop::global_shortcuts::{GlobalShortcuts, NewShortcut};
 use futures_lite::{StreamExt, future};
@@ -72,7 +66,10 @@ pub struct PortalHotkeys {
 impl fmt::Debug for PortalHotkeys {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PortalHotkeys")
-            .field("registered", &self.entries.iter().map(|(i, c)| format!("{i}={c}")).collect::<Vec<_>>())
+            .field(
+                "registered",
+                &self.entries.iter().map(|(i, c)| format!("{i}={c}")).collect::<Vec<_>>(),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -90,11 +87,9 @@ async fn connect_bus(address: Option<&str>) -> std::result::Result<zbus::Connect
         Some(a) => zbus::connection::Builder::address(a),
         None => zbus::connection::Builder::session(),
     };
-    builder
-        .map_err(|e| e.to_string())?
-        .build()
-        .await
-        .map_err(|e| format!("cannot connect to the D-Bus session bus ({e}); is a graphical session running?"))
+    builder.map_err(|e| e.to_string())?.build().await.map_err(|e| {
+        format!("cannot connect to the D-Bus session bus ({e}); is a graphical session running?")
+    })
 }
 
 impl PortalHotkeys {
@@ -166,7 +161,9 @@ impl PortalHotkeys {
                 Ok(())
             }
             Ok(Err(message)) => Err(backend_error(message)),
-            Err(_) => Err(backend_error("timed out waiting for the compositor to bind the shortcuts")),
+            Err(_) => {
+                Err(backend_error("timed out waiting for the compositor to bind the shortcuts"))
+            }
         }
     }
 }
@@ -240,8 +237,9 @@ async fn worker(
             .build()
             .await
             .map_err(|e| absent(&e))?;
-        let interface = zbus::names::InterfaceName::try_from("org.freedesktop.portal.GlobalShortcuts")
-            .map_err(|e| absent(&e))?;
+        let interface =
+            zbus::names::InterfaceName::try_from("org.freedesktop.portal.GlobalShortcuts")
+                .map_err(|e| absent(&e))?;
         props.get(interface, "version").await.map_err(|e| absent(&e))?;
         let gs = GlobalShortcuts::with_connection(conn).await.map_err(|e| absent(&e))?;
         // Subscribe before anything is bound so no activation can be missed.
@@ -286,10 +284,9 @@ async fn worker(
             }
         }
         let wake = future::or(
-            future::or(
-                async { Wake::Activated(activated.next().await) },
-                async { Wake::Deactivated(deactivated.next().await) },
-            ),
+            future::or(async { Wake::Activated(activated.next().await) }, async {
+                Wake::Deactivated(deactivated.next().await)
+            }),
             async {
                 async_io::Timer::after(TICK).await;
                 Wake::Tick
@@ -308,10 +305,10 @@ async fn worker(
             }
             Wake::Tick => continue,
         };
-        if let Some(id) = ids.get(&shortcut) {
-            if events.send(HotkeyEvent { id: id.clone(), state }).is_err() {
-                return; // manager dropped
-            }
+        if let Some(id) = ids.get(&shortcut)
+            && events.send(HotkeyEvent { id: id.clone(), state }).is_err()
+        {
+            return; // manager dropped
         }
     }
 }
@@ -339,7 +336,12 @@ async fn bind(
         })
         .collect();
     let request = gs
-        .bind_shortcuts(&new_session, &shortcuts, None, ashpd::desktop::global_shortcuts::BindShortcutsOptions::default())
+        .bind_shortcuts(
+            &new_session,
+            &shortcuts,
+            None,
+            ashpd::desktop::global_shortcuts::BindShortcutsOptions::default(),
+        )
         .await
         .map_err(|e| format!("BindShortcuts failed: {e}"))?;
     let bound = request.response().map_err(|e| format!("the shortcuts were not bound: {e}"))?;

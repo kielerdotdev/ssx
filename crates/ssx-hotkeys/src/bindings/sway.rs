@@ -7,7 +7,7 @@
 //! and `Mod4` for the Super key (sway accepts `Mod4` everywhere, `Super` only in newer
 //! versions). Key names are XKB keysyms and were validated against a real sway.
 
-use std::path::Path;
+use std::{fmt::Write as _, path::Path};
 
 use crate::{
     chord::{Chord, Modifiers},
@@ -52,7 +52,7 @@ pub fn render(bindings: &[(Chord, Command)]) -> Result<String> {
          # Include it from your sway config with the line printed by that command.\n",
     );
     for (chord, cmd) in bindings {
-        out.push_str(&format!("\n# {chord}: {}\n", comment_text(&cmd.display_name())));
+        let _ = write!(out, "\n# {chord}: {}\n", comment_text(&cmd.display_name()));
         out.push_str(&bindsym_line(chord, cmd));
         out.push('\n');
     }
@@ -67,7 +67,9 @@ pub fn render(bindings: &[(Chord, Command)]) -> Result<String> {
 pub fn include_line(include_file: &Path) -> String {
     let mut out = String::from("include ");
     for c in include_file.display().to_string().chars() {
-        if !(c.is_ascii_alphanumeric() || matches!(c, '/' | '.' | '_' | '-' | '+' | ':' | '@' | ',')) {
+        if !(c.is_ascii_alphanumeric()
+            || matches!(c, '/' | '.' | '_' | '-' | '+' | ':' | '@' | ','))
+        {
             out.push('\\');
         }
         out.push(c);
@@ -85,13 +87,19 @@ mod tests {
         assert_eq!(chord_syntax(&"Ctrl+Shift+S".parse().unwrap()), "Ctrl+Shift+s");
         assert_eq!(chord_syntax(&"Super+Alt+R".parse().unwrap()), "Alt+Mod4+r");
         assert_eq!(chord_syntax(&"Print".parse().unwrap()), "Print");
-        assert_eq!(chord_syntax(&"Super+Ctrl+Alt+Shift+Enter".parse().unwrap()), "Ctrl+Alt+Shift+Mod4+Return");
+        assert_eq!(
+            chord_syntax(&"Super+Ctrl+Alt+Shift+Enter".parse().unwrap()),
+            "Ctrl+Alt+Shift+Mod4+Return"
+        );
     }
 
     #[test]
     fn bindsym_lines_double_quote_only_what_needs_it() {
         let c = Command::new("ssx").args(["capture", "region"]);
-        assert_eq!(bindsym_line(&"Print".parse().unwrap(), &c), "bindsym Print exec ssx capture region");
+        assert_eq!(
+            bindsym_line(&"Print".parse().unwrap(), &c),
+            "bindsym Print exec ssx capture region"
+        );
         assert_eq!(exec_arg(&c), "ssx capture region");
         let spaced = Command::new("ssx").args(["a b", "c,d", "e;f", ""]);
         assert_eq!(exec_arg(&spaced), "ssx \"a b\" \"c,d\" \"e;f\" \"\"");
@@ -122,8 +130,14 @@ mod tests {
 
     #[test]
     fn include_line_quotes_only_when_needed() {
-        assert_eq!(include_line(Path::new("/home/u/.config/sway/config.d/ssx.conf")), "include /home/u/.config/sway/config.d/ssx.conf");
-        assert_eq!(include_line(Path::new("/home/my user/x.conf")), "include /home/my\\ user/x.conf");
+        assert_eq!(
+            include_line(Path::new("/home/u/.config/sway/config.d/ssx.conf")),
+            "include /home/u/.config/sway/config.d/ssx.conf"
+        );
+        assert_eq!(
+            include_line(Path::new("/home/my user/x.conf")),
+            "include /home/my\\ user/x.conf"
+        );
         assert_eq!(include_line(Path::new("/h/a\"b$c")), "include /h/a\\\"b\\$c");
     }
 }
