@@ -203,6 +203,15 @@ impl Renderer {
             return;
         };
         let (aw, ah) = (a.width as usize, a.height as usize);
+        if a == target.rect() && target.data.len() == aw * ah * 4 {
+            // Whole target (first frame, expose): draw in place, saving two 4K-sized passes.
+            self.compose_background(scene, a, target.data);
+            let mut cv =
+                Canvas { w: i64::from(a.width), h: i64::from(a.height), data: target.data };
+            self.draw_overlays(scene, a, &mut cv);
+            return;
+        }
+        // Partial area: compose in a small scratch buffer, then copy the rows out.
         let mut buf = std::mem::take(&mut self.scratch);
         buf.clear();
         buf.resize(aw * ah * 4, 0);

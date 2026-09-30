@@ -435,3 +435,21 @@ proptest! {
         soundness_run(if mon { SelectMode::Monitor } else { SelectMode::Window }, 1.0, &ops)?;
     }
 }
+
+#[test]
+fn undersized_or_misstrided_buffers_are_rejected_not_panicked_on() {
+    let data = vec![0u8; 100];
+    let view = |stride: usize, w: u32, h: u32| super::PixelView {
+        size: Size::new(w, h),
+        stride,
+        format: PixelFormat::Rgba8,
+        color_space: ColorSpace::Srgb,
+        data: &data,
+        origin: Point::new(0, 0),
+        scale_factor: 1.0,
+    };
+    assert!(Renderer::from_view(view(40, 10, 10), 0.5).is_err(), "100 bytes < 10 rows of 40");
+    assert!(Renderer::from_view(view(8, 4, 2), 0.5).is_err(), "stride smaller than a row");
+    assert!(Renderer::from_view(view(usize::MAX, 4, 3), 0.5).is_err(), "overflowing stride");
+    assert!(Renderer::from_view(view(16, 4, 6), 0.5).is_ok(), "exactly enough");
+}

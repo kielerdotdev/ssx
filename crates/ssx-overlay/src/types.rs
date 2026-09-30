@@ -206,3 +206,58 @@ pub enum OverlayOutcome {
     /// Escape, right-click on an empty overlay, or timeout.
     Cancelled,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sel(shape: SelectionShape, rect: Rect) -> Selection {
+        Selection { rect, shape, snapped_window: None }
+    }
+
+    #[test]
+    fn mask_agrees_with_contains_for_every_shape() {
+        let rect = Rect::new(-5, 10, 31, 17);
+        let tri = vec![Point::new(-5, 10), Point::new(26, 12), Point::new(3, 27)];
+        for shape in [SelectionShape::Rect, SelectionShape::Ellipse, SelectionShape::Freeform(tri)]
+        {
+            let s = sel(shape, rect);
+            let mask = s.mask();
+            assert_eq!(mask.len(), 31 * 17);
+            for y in 0..17 {
+                for x in 0..31 {
+                    let p = Point::new(rect.x + x, rect.y + y);
+                    assert_eq!(
+                        mask[(y * 31 + x) as usize] == 255,
+                        s.contains(p),
+                        "{:?} {p:?}",
+                        s.shape
+                    );
+                }
+            }
+            assert!(
+                !s.contains(Point::new(rect.x - 1, rect.y)),
+                "outside the rectangle is never inside"
+            );
+        }
+        let all = sel(SelectionShape::Rect, rect).mask();
+        assert!(all.iter().all(|&m| m == 255));
+        let ell = sel(SelectionShape::Ellipse, rect).mask();
+        let inside = ell.iter().map(|&m| usize::from(m == 255)).sum::<usize>() as f64;
+        let area = std::f64::consts::PI * 31.0 * 17.0 / 4.0;
+        assert!((inside - area).abs() < area * 0.08, "ellipse covers ~pi*a*b: {inside} vs {area}");
+    }
+
+    #[test]
+    fn colour_hex_and_options_round_trip() {
+        let c = PickedColor { point: Point::new(1, 2), rgb: [0x0a, 0xff, 0x00] };
+        assert_eq!(c.hex(), "#0aff00");
+        let o = OverlayOptions {
+            mode: SelectMode::Freeform,
+            ui_scale: UiScale::Fixed(1.5),
+            ..OverlayOptions::default()
+        };
+        let json = serde_json::to_string(&o).unwrap();
+        assert_eq!(serde_json::from_str::<OverlayOptions>(&json).unwrap(), o);
+    }
+}
