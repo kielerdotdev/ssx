@@ -338,7 +338,7 @@ fn open_stream(
     };
     macro_rules! build {
         ($t:ty, $conv:expr) => {{
-            let mut send = send;
+            let send = send;
             dev.build_input_stream(
                 config,
                 move |data: &[$t], info: &InputCallbackInfo| {

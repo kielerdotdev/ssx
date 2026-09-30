@@ -2,6 +2,7 @@
 
 #![deny(unsafe_code)]
 
+pub mod adapter;
 pub mod audio;
 pub mod convert;
 pub mod encode;

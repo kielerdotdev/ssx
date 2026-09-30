@@ -282,7 +282,7 @@ pub fn inspect(path: &Path) -> Result<MediaReport, String> {
         None => None,
     };
 
-    let mut handle_video = |v: &mut VState| -> Result<(), String> {
+    let handle_video = |v: &mut VState| -> Result<(), String> {
         let mut f = frame::Video::empty();
         while v.dec.receive_frame(&mut f).is_ok() {
             let (w, h) = (f.width(), f.height());
@@ -312,7 +312,7 @@ pub fn inspect(path: &Path) -> Result<MediaReport, String> {
         }
         Ok(())
     };
-    let mut handle_audio = |a: &mut AState| -> Result<(), String> {
+    let handle_audio = |a: &mut AState| -> Result<(), String> {
         let mut f = frame::Audio::empty();
         while a.dec.receive_frame(&mut f).is_ok() {
             if a.rep.start.is_nan() {

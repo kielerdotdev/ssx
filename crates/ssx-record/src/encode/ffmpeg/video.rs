@@ -11,7 +11,7 @@ use super::hw::HwUpload;
 use crate::encode::{
     InputKind, PlanarFrame, VideoParams,
     select::{Candidate, EncoderKind, HwApi},
-    settings::{Codec, Container, Quality, QualityPreset, SpeedPreset, VideoSettings},
+    settings::{Codec, Quality, QualityPreset, SpeedPreset, VideoSettings},
 };
 
 /// Encoder options derived from user settings for one candidate.
