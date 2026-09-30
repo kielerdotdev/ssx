@@ -445,11 +445,13 @@ mod tests {
     #[test]
     fn the_recording_runner_answers_like_an_empty_gnome() {
         let r = RecordingRunner::default();
-        let out = r
-            .run("gsettings", &["get".into(), "x".into(), "custom-keybindings".into()])
-            .unwrap();
+        let out =
+            r.run("gsettings", &["get".into(), "x".into(), "custom-keybindings".into()]).unwrap();
         assert_eq!(out.stdout, "@as []");
-        assert!(r.run("gsettings", &["get".into(), "x".into(), "name".into()]).unwrap().success == false);
+        assert!(
+            r.run("gsettings", &["get".into(), "x".into(), "name".into()]).unwrap().success
+                == false
+        );
         assert_eq!(r.calls.lock().unwrap().len(), 2);
     }
 

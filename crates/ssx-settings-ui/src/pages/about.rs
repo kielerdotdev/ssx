@@ -28,7 +28,11 @@ pub const NOTICES: &[Notice] = &[
     Notice { name: "egui / eframe", purpose: "this window", license: "MIT OR Apache-2.0" },
     Notice { name: "wgpu", purpose: "GPU rendering", license: "MIT OR Apache-2.0" },
     Notice { name: "image", purpose: "PNG, JPEG, WebP, GIF, BMP", license: "MIT OR Apache-2.0" },
-    Notice { name: "SQLite (rusqlite)", purpose: "the history database", license: "MIT; SQLite is public domain" },
+    Notice {
+        name: "SQLite (rusqlite)",
+        purpose: "the history database",
+        license: "MIT; SQLite is public domain",
+    },
     Notice { name: "tokio", purpose: "network uploads", license: "MIT" },
     Notice { name: "reqwest / rustls / ring", purpose: "HTTPS", license: "MIT OR Apache-2.0; ISC" },
     Notice { name: "keyring", purpose: "the credential store", license: "MIT OR Apache-2.0" },
@@ -38,7 +42,11 @@ pub const NOTICES: &[Notice] = &[
     Notice { name: "ashpd / zbus", purpose: "desktop portals", license: "MIT" },
     Notice { name: "notify-rust", purpose: "notifications", license: "MIT OR Apache-2.0" },
     Notice { name: "zip", purpose: "zipping folders", license: "MIT" },
-    Notice { name: "half, rayon, serde, toml, chrono", purpose: "core libraries", license: "MIT OR Apache-2.0" },
+    Notice {
+        name: "half, rayon, serde, toml, chrono",
+        purpose: "core libraries",
+        license: "MIT OR Apache-2.0",
+    },
 ];
 
 /// Draws the page.
@@ -49,14 +57,23 @@ pub fn ui(ui: &mut Ui, cx: &mut Cx<'_>) {
                 logo(ui, 56.0);
                 ui.vertical(|ui| {
                     ui.label(RichText::new("ssx").size(26.0).strong().color(Color32::WHITE));
-                    ui.label(RichText::new(format!("Version {}", env!("CARGO_PKG_VERSION"))).color(theme::TEXT));
-                    ui_kit::hint(ui, "Screenshots, recordings and uploads, on Windows, Linux and macOS.");
+                    ui.label(
+                        RichText::new(format!("Version {}", env!("CARGO_PKG_VERSION")))
+                            .color(theme::TEXT),
+                    );
+                    ui_kit::hint(
+                        ui,
+                        "Screenshots, recordings and uploads, on Windows, Linux and macOS.",
+                    );
                 });
             });
         });
         ui_kit::card(ui, Some("Licence"), |ui| {
             ui.label(format!("ssx is free software, released under the {LICENSE} licence."));
-            ui_kit::hint(ui, "You may use, study, share and change it. If you distribute a modified version you must do so under the same licence and make the source available.");
+            ui_kit::hint(
+                ui,
+                "You may use, study, share and change it. If you distribute a modified version you must do so under the same licence and make the source available.",
+            );
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 ui.label("Source code:");
@@ -76,23 +93,41 @@ pub fn ui(ui: &mut Ui, cx: &mut Cx<'_>) {
                 ("History database", cx.host.paths.history_db()),
             ] {
                 ui.horizontal(|ui| {
-                    let (rect, _) = ui.allocate_exact_size(egui::vec2(130.0, 18.0), egui::Sense::hover());
-                    ui.painter().text(rect.left_center(), egui::Align2::LEFT_CENTER, label, egui::FontId::proportional(13.0), theme::TEXT_DIM);
-                    ui.add(egui::Label::new(RichText::new(path.display().to_string()).monospace().size(12.0)).selectable(true));
+                    let (rect, _) =
+                        ui.allocate_exact_size(egui::vec2(130.0, 18.0), egui::Sense::hover());
+                    ui.painter().text(
+                        rect.left_center(),
+                        egui::Align2::LEFT_CENTER,
+                        label,
+                        egui::FontId::proportional(13.0),
+                        theme::TEXT_DIM,
+                    );
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(path.display().to_string()).monospace().size(12.0),
+                        )
+                        .selectable(true),
+                    );
                 });
             }
         });
         ui_kit::card(ui, Some("Third-party software"), |ui| {
-            ui_kit::hint(ui, "ssx is built on the work of many people. The main components, with their licences (all compatible with the GPL); the complete list is generated for each release.");
+            ui_kit::hint(
+                ui,
+                "ssx is built on the work of many people. The main components, with their licences (all compatible with the GPL); the complete list is generated for each release.",
+            );
             ui.add_space(6.0);
-            egui::Grid::new("notices").num_columns(3).spacing([18.0, 4.0]).striped(false).show(ui, |ui| {
-                for n in NOTICES {
-                    ui.label(RichText::new(n.name).color(Color32::WHITE));
-                    ui.label(RichText::new(n.purpose).color(theme::TEXT_DIM));
-                    ui.label(RichText::new(n.license).monospace().size(12.0));
-                    ui.end_row();
-                }
-            });
+            egui::Grid::new("notices").num_columns(3).spacing([18.0, 4.0]).striped(false).show(
+                ui,
+                |ui| {
+                    for n in NOTICES {
+                        ui.label(RichText::new(n.name).color(Color32::WHITE));
+                        ui.label(RichText::new(n.purpose).color(theme::TEXT_DIM));
+                        ui.label(RichText::new(n.license).monospace().size(12.0));
+                        ui.end_row();
+                    }
+                },
+            );
         });
     });
 }

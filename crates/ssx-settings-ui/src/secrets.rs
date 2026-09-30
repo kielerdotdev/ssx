@@ -48,7 +48,9 @@ impl SecretLocation {
     pub fn empty_text(&self) -> String {
         match self {
             SecretLocation::MemoryOnly(why) => {
-                format!("not set; there is no keyring here ({why}), so a value would only be kept in memory")
+                format!(
+                    "not set; there is no keyring here ({why}), so a value would only be kept in memory"
+                )
             }
             _ => "not set".to_owned(),
         }
@@ -243,7 +245,10 @@ impl SecretVault for MemoryVault {
         if let Some(e) = self.fail.lock().unwrap_or_else(PoisonError::into_inner).clone() {
             return Err(e);
         }
-        self.values.lock().unwrap_or_else(PoisonError::into_inner).insert(name.into(), value.into());
+        self.values
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(name.into(), value.into());
         self.store.set(name, value).map_err(|e| e.to_string())
     }
     fn delete(&self, name: &str) -> Result<(), String> {

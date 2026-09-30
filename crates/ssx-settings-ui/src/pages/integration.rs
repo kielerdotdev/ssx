@@ -10,7 +10,9 @@
 use egui::{Color32, RichText, Ui};
 use ssx_cli::{
     commands::{
-        doctor::{MonitorInfo, Problem, Report as DoctorReport, Severity as DoctorSeverity, render},
+        doctor::{
+            MonitorInfo, Problem, Report as DoctorReport, Severity as DoctorSeverity, render,
+        },
         shell::{IntegrationState, states},
     },
     output::Style,
@@ -176,7 +178,10 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
 
 fn menus_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     ui_kit::card(ui, Some("Right-click menus"), |ui| {
-        ui_kit::hint(ui, "Adds \"Upload with ssx\", \"Edit image with ssx\" and \"Upload as video with ssx\" to your file manager's context menu. Each entry only starts the ssx command with the selected files; nothing else is installed, and every file ssx writes is marked so it can be removed cleanly.");
+        ui_kit::hint(
+            ui,
+            "Adds \"Upload with ssx\", \"Edit image with ssx\" and \"Upload as video with ssx\" to your file manager's context menu. Each entry only starts the ssx command with the selected files; nothing else is installed, and every file ssx writes is marked so it can be removed cleanly.",
+        );
         ui.add_space(6.0);
         let shell = cx.host.shell.clone();
         let ctx_ok = match &shell.context {
@@ -195,7 +200,13 @@ fn menus_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             Err(e) => {
                 ui.horizontal_top(|ui| {
                     ui_kit::severity_icon(ui, ssx_core::settings::Severity::Error);
-                    ui.add(egui::Label::new(RichText::new(format!("The menus cannot be installed: {e}")).color(ui_kit::ERROR_TEXT)).wrap());
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(format!("The menus cannot be installed: {e}"))
+                                .color(ui_kit::ERROR_TEXT),
+                        )
+                        .wrap(),
+                    );
                 });
                 false
             }
@@ -227,15 +238,36 @@ fn menus_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         }
         if let Some((uninstall, report)) = st.last.clone() {
             ui.add_space(8.0);
-            ui.label(RichText::new(if uninstall { "Result of the removal" } else { "Result of the installation" }).strong().color(Color32::WHITE));
+            ui.label(
+                RichText::new(if uninstall {
+                    "Result of the removal"
+                } else {
+                    "Result of the installation"
+                })
+                .strong()
+                .color(Color32::WHITE),
+            );
             ui.add_space(2.0);
             for e in &report.entries {
                 let (text, ok) = status_text(&e.status);
                 ui.horizontal_top(|ui| {
-                    let (mark, color) = if ok { ("\u{2714}", ui_kit::OK_TEXT) } else if e.status.is_failure() { ("\u{2716}", ui_kit::ERROR_TEXT) } else { ("\u{2013}", theme::TEXT_DIM) };
+                    let (mark, color) = if ok {
+                        ("\u{2714}", ui_kit::OK_TEXT)
+                    } else if e.status.is_failure() {
+                        ("\u{2716}", ui_kit::ERROR_TEXT)
+                    } else {
+                        ("\u{2013}", theme::TEXT_DIM)
+                    };
                     ui.label(RichText::new(mark).color(color));
                     ui.label(RichText::new(e.name).strong());
-                    ui.add(egui::Label::new(RichText::new(text).color(if e.status.is_failure() { ui_kit::ERROR_TEXT } else { theme::TEXT_DIM })).wrap());
+                    ui.add(
+                        egui::Label::new(RichText::new(text).color(if e.status.is_failure() {
+                            ui_kit::ERROR_TEXT
+                        } else {
+                            theme::TEXT_DIM
+                        }))
+                        .wrap(),
+                    );
                 });
             }
             if report.has_failures() {
@@ -249,8 +281,16 @@ fn file_manager_row(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, s: &Integratio
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
         ui.label(RichText::new(&s.name).strong().color(Color32::WHITE));
-        ui_kit::badge(ui, if s.detected { "found" } else { "not found" }, if s.detected { ui_kit::OK_TEXT } else { theme::TEXT_DIM });
-        ui_kit::badge(ui, if s.installed { "menu installed" } else { "no menu" }, if s.installed { theme::ACCENT } else { theme::TEXT_DIM });
+        ui_kit::badge(
+            ui,
+            if s.detected { "found" } else { "not found" },
+            if s.detected { ui_kit::OK_TEXT } else { theme::TEXT_DIM },
+        );
+        ui_kit::badge(
+            ui,
+            if s.installed { "menu installed" } else { "no menu" },
+            if s.installed { theme::ACCENT } else { theme::TEXT_DIM },
+        );
         let open = st.details_open.as_deref() == Some(s.id.as_str());
         if ui_kit::link(ui, if open { "Hide details" } else { "Details" }).clicked() {
             st.details_open = if open { None } else { Some(s.id.clone()) };
@@ -270,7 +310,13 @@ fn file_manager_row(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, s: &Integratio
                 ui.set_width(ui.available_width());
                 ui.label(RichText::new(&d.summary).size(12.5));
                 for a in &d.artefacts {
-                    ui.add(egui::Label::new(RichText::new(a).monospace().size(11.5).color(theme::TEXT_DIM)).wrap().selectable(true));
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(a).monospace().size(11.5).color(theme::TEXT_DIM),
+                        )
+                        .wrap()
+                        .selectable(true),
+                    );
                 }
                 for n in &d.notes {
                     ui_kit::hint(ui, n);
@@ -287,7 +333,11 @@ fn run_shell(st: &mut State, cx: &Cx<'_>, uninstall: bool) {
         let Ok(ctx) = &shell.context else {
             return ShellDone { report: None, states: Vec::new(), uninstall };
         };
-        let report = if uninstall { shell.integrations.uninstall_all(ctx) } else { shell.integrations.install_all_with(ctx, force) };
+        let report = if uninstall {
+            shell.integrations.uninstall_all(ctx)
+        } else {
+            shell.integrations.install_all_with(ctx, force)
+        };
         let states = states(&shell.integrations, ctx);
         ShellDone { report: Some(report), states, uninstall }
     });
@@ -304,7 +354,9 @@ fn diagnostics(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                     st.rerun_doctor();
                 }
                 let can = st.doctor.as_ref().is_some_and(Result::is_ok);
-                if ui_kit::button_if(ui, "Copy report", can, "Nothing to copy yet").on_hover_text("Copy the report as text, to paste into a bug report").clicked()
+                if ui_kit::button_if(ui, "Copy report", can, "Nothing to copy yet")
+                    .on_hover_text("Copy the report as text, to paste into a bug report")
+                    .clicked()
                     && let Some(Ok(r)) = &st.doctor
                 {
                     ui.ctx().copy_text(report_text(r));
@@ -319,7 +371,13 @@ fn diagnostics(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             Some(Err(e)) => {
                 ui.horizontal_top(|ui| {
                     ui_kit::severity_icon(ui, ssx_core::settings::Severity::Error);
-                    ui.add(egui::Label::new(RichText::new(format!("The diagnostics failed: {e}")).color(ui_kit::ERROR_TEXT)).wrap());
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(format!("The diagnostics failed: {e}"))
+                                .color(ui_kit::ERROR_TEXT),
+                        )
+                        .wrap(),
+                    );
                 });
             }
             Some(Ok(r)) => report_view(ui, &r),
@@ -330,7 +388,13 @@ fn diagnostics(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
 fn kv(ui: &mut Ui, key: &str, value: impl Into<String>) {
     ui.horizontal_top(|ui| {
         let (rect, _) = ui.allocate_exact_size(egui::vec2(150.0, 18.0), egui::Sense::hover());
-        ui.painter().text(rect.left_top() + egui::vec2(0.0, 1.0), egui::Align2::LEFT_TOP, key, egui::FontId::proportional(12.5), theme::TEXT_DIM);
+        ui.painter().text(
+            rect.left_top() + egui::vec2(0.0, 1.0),
+            egui::Align2::LEFT_TOP,
+            key,
+            egui::FontId::proportional(12.5),
+            theme::TEXT_DIM,
+        );
         ui.add(egui::Label::new(RichText::new(value.into()).size(12.5)).wrap().selectable(true));
     });
 }
@@ -356,7 +420,17 @@ fn report_view(ui: &mut Ui, r: &DoctorReport) {
         problem(ui, p);
     }
     section(ui, "System");
-    kv(ui, "ssx", format!("{} on {} {}{}", r.version, r.os.name, r.os.arch, r.os.distribution.as_ref().map_or_else(String::new, |d| format!(" ({d})"))));
+    kv(
+        ui,
+        "ssx",
+        format!(
+            "{} on {} {}{}",
+            r.version,
+            r.os.name,
+            r.os.arch,
+            r.os.distribution.as_ref().map_or_else(String::new, |d| format!(" ({d})"))
+        ),
+    );
     kv(ui, "Session", format!("{}, desktop {}", r.session.session_type, r.session.desktop));
     section(ui, "Screen capture");
     match (&r.capture.backend, &r.capture.error) {
@@ -364,7 +438,11 @@ fn report_view(ui: &mut Ui, r: &DoctorReport) {
         (None, e) => kv(ui, "Backend", format!("none. {}", e.clone().unwrap_or_default())),
     }
     for a in &r.capture.attempts {
-        kv(ui, &format!("Tried {}", a.backend), a.reason.as_ref().map_or_else(|| "worked".to_owned(), |x| format!("rejected: {x}")));
+        kv(
+            ui,
+            &format!("Tried {}", a.backend),
+            a.reason.as_ref().map_or_else(|| "worked".to_owned(), |x| format!("rejected: {x}")),
+        );
     }
     section(ui, "Monitors and HDR");
     if r.monitors.is_empty() {
@@ -374,16 +452,71 @@ fn report_view(ui: &mut Ui, r: &DoctorReport) {
         kv(ui, &m.id, monitor_line(m));
     }
     section(ui, "This desktop");
-    kv(ui, "Clipboard", format!("{} (wl-copy {}, xclip {})", if r.clipboard.usable { "works" } else { "not available" }, yes_no(r.clipboard.wl_copy), yes_no(r.clipboard.xclip)));
-    kv(ui, "Notifications", r.notifications.server.clone().or_else(|| r.notifications.error.clone().map(|e| format!("not available ({e})"))).unwrap_or_default());
-    kv(ui, "Secret store", r.keyring.backend.clone().unwrap_or_else(|| format!("none ({})", r.keyring.reason.clone().unwrap_or_default())));
-    kv(ui, "Editor helper", r.editor.path.as_ref().map_or_else(|| "not found".to_owned(), |p| p.display().to_string()));
-    kv(ui, "Hotkeys", format!("{} workflow(s) with a shortcut; {}", r.hotkeys.bound_workflows, r.hotkeys.recommended));
+    kv(
+        ui,
+        "Clipboard",
+        format!(
+            "{} (wl-copy {}, xclip {})",
+            if r.clipboard.usable { "works" } else { "not available" },
+            yes_no(r.clipboard.wl_copy),
+            yes_no(r.clipboard.xclip)
+        ),
+    );
+    kv(
+        ui,
+        "Notifications",
+        r.notifications
+            .server
+            .clone()
+            .or_else(|| r.notifications.error.clone().map(|e| format!("not available ({e})")))
+            .unwrap_or_default(),
+    );
+    kv(
+        ui,
+        "Secret store",
+        r.keyring
+            .backend
+            .clone()
+            .unwrap_or_else(|| format!("none ({})", r.keyring.reason.clone().unwrap_or_default())),
+    );
+    kv(
+        ui,
+        "Editor helper",
+        r.editor.path.as_ref().map_or_else(|| "not found".to_owned(), |p| p.display().to_string()),
+    );
+    kv(
+        ui,
+        "Hotkeys",
+        format!(
+            "{} workflow(s) with a shortcut; {}",
+            r.hotkeys.bound_workflows, r.hotkeys.recommended
+        ),
+    );
     section(ui, "Files");
-    kv(ui, "Settings", format!("{}{}", r.paths.settings_file.display(), if r.paths.settings_exists { "" } else { " (not created yet)" }));
+    kv(
+        ui,
+        "Settings",
+        format!(
+            "{}{}",
+            r.paths.settings_file.display(),
+            if r.paths.settings_exists { "" } else { " (not created yet)" }
+        ),
+    );
     kv(ui, "Data", r.paths.data_dir.display().to_string());
-    kv(ui, "History", format!("{}{}", r.paths.history_db.display(), if r.paths.history_ok { "" } else { " (cannot be opened)" }));
-    kv(ui, "Uploaders", format!("{} configured, folder {}", r.uploaders.len(), r.paths.uploaders_dir.display()));
+    kv(
+        ui,
+        "History",
+        format!(
+            "{}{}",
+            r.paths.history_db.display(),
+            if r.paths.history_ok { "" } else { " (cannot be opened)" }
+        ),
+    );
+    kv(
+        ui,
+        "Uploaders",
+        format!("{} configured, folder {}", r.uploaders.len(), r.paths.uploaders_dir.display()),
+    );
 }
 
 fn problem(ui: &mut Ui, p: &Problem) {
@@ -402,12 +535,16 @@ fn problem(ui: &mut Ui, p: &Problem) {
 /// A believable report for tests and screenshots.
 pub fn sample_report() -> DoctorReport {
     use ssx_cli::commands::doctor::{
-        Attempt, CaptureInfo, ClipboardInfo, EditorInfo, HotkeyInfo, KeyringInfo, NotificationInfo, OsInfo,
-        PathsInfo, SessionInfo, SettingsInfo, UploaderState,
+        Attempt, CaptureInfo, ClipboardInfo, EditorInfo, HotkeyInfo, KeyringInfo, NotificationInfo,
+        OsInfo, PathsInfo, SessionInfo, SettingsInfo, UploaderState,
     };
     let mut r = DoctorReport {
         version: "0.1.0".to_owned(),
-        os: OsInfo { name: "linux".into(), arch: "x86_64".into(), distribution: Some("Fedora Linux 42".into()) },
+        os: OsInfo {
+            name: "linux".into(),
+            arch: "x86_64".into(),
+            distribution: Some("Fedora Linux 42".into()),
+        },
         session: SessionInfo {
             session_type: "wayland".into(),
             wayland_display: Some("wayland-1".into()),
@@ -421,19 +558,52 @@ pub fn sample_report() -> DoctorReport {
             backend: Some("wlroots screencopy".into()),
             attempts: vec![
                 Attempt { backend: "wayland".into(), ok: true, reason: None },
-                Attempt { backend: "portal".into(), ok: false, reason: Some("no xdg-desktop-portal on the session bus".into()) },
+                Attempt {
+                    backend: "portal".into(),
+                    ok: false,
+                    reason: Some("no xdg-desktop-portal on the session bus".into()),
+                },
             ],
             capabilities: None,
             error: None,
         },
         monitors: vec![
-            MonitorInfo { id: "DP-1".into(), name: "DELL U2723QE".into(), rect: "0,0 3840x2160".into(), scale_factor: 1.5, primary: true, hdr: "on".into(), sdr_white_nits: Some(203.0), max_luminance_nits: Some(600.0) },
-            MonitorInfo { id: "HDMI-A-1".into(), name: "LG 27GL850".into(), rect: "3840,0 2560x1440".into(), scale_factor: 1.0, primary: false, hdr: "off".into(), sdr_white_nits: None, max_luminance_nits: None },
+            MonitorInfo {
+                id: "DP-1".into(),
+                name: "DELL U2723QE".into(),
+                rect: "0,0 3840x2160".into(),
+                scale_factor: 1.5,
+                primary: true,
+                hdr: "on".into(),
+                sdr_white_nits: Some(203.0),
+                max_luminance_nits: Some(600.0),
+            },
+            MonitorInfo {
+                id: "HDMI-A-1".into(),
+                name: "LG 27GL850".into(),
+                rect: "3840,0 2560x1440".into(),
+                scale_factor: 1.0,
+                primary: false,
+                hdr: "off".into(),
+                sdr_white_nits: None,
+                max_luminance_nits: None,
+            },
         ],
         monitors_error: None,
-        clipboard: ClipboardInfo { usable: true, arboard: true, arboard_error: None, wl_copy: true, xclip: false, file_list_format: "text/uri-list".into() },
+        clipboard: ClipboardInfo {
+            usable: true,
+            arboard: true,
+            arboard_error: None,
+            wl_copy: true,
+            xclip: false,
+            file_list_format: "text/uri-list".into(),
+        },
         notifications: NotificationInfo { ok: true, server: Some("mako 1.9".into()), error: None },
-        keyring: KeyringInfo { persistent: false, backend: None, reason: Some("no Secret Service on the session bus".into()) },
+        keyring: KeyringInfo {
+            persistent: false,
+            backend: None,
+            reason: Some("no Secret Service on the session bus".into()),
+        },
         paths: PathsInfo {
             config_dir: "/home/demo/.config/ssx".into(),
             settings_file: "/home/demo/.config/ssx/settings.toml".into(),
@@ -447,7 +617,11 @@ pub fn sample_report() -> DoctorReport {
         uploaders: vec![UploaderState { name: "local".into(), kind: "local".into(), error: None }],
         editor: EditorInfo { found: true, path: Some("/usr/local/bin/ssx-editor-ui".into()) },
         shell_integrations: vec![],
-        hotkeys: HotkeyInfo { recommended: "sway bindsym include file".into(), strategies: vec!["sway bindsym include file".into()], bound_workflows: 4 },
+        hotkeys: HotkeyInfo {
+            recommended: "sway bindsym include file".into(),
+            strategies: vec!["sway bindsym include file".into()],
+            bound_workflows: 4,
+        },
         problems: vec![],
     };
     r.problems = ssx_cli::commands::doctor::derive_problems(&r);
@@ -471,8 +645,14 @@ mod tests {
     #[test]
     fn monitor_lines_show_hdr_state() {
         let r = sample_report();
-        assert_eq!(monitor_line(&r.monitors[0]), "DELL U2723QE (0,0 3840x2160, scale 1.50, primary), HDR on (203 nits SDR white)");
-        assert_eq!(monitor_line(&r.monitors[1]), "LG 27GL850 (3840,0 2560x1440, scale 1.00), HDR off");
+        assert_eq!(
+            monitor_line(&r.monitors[0]),
+            "DELL U2723QE (0,0 3840x2160, scale 1.50, primary), HDR on (203 nits SDR white)"
+        );
+        assert_eq!(
+            monitor_line(&r.monitors[1]),
+            "LG 27GL850 (3840,0 2560x1440, scale 1.00), HDR off"
+        );
     }
 
     #[test]
@@ -487,7 +667,11 @@ mod tests {
     #[test]
     fn the_sample_report_has_problems_worth_showing() {
         let r = sample_report();
-        assert!(r.problems.iter().any(|p| p.message.contains("credential store")), "{:?}", r.problems);
+        assert!(
+            r.problems.iter().any(|p| p.message.contains("credential store")),
+            "{:?}",
+            r.problems
+        );
         assert!(r.problems.iter().any(|p| matches!(p.severity, DoctorSeverity::Info)));
     }
 }

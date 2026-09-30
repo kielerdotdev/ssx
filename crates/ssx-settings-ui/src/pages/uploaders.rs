@@ -28,11 +28,11 @@ use crate::{
     ui_kit::{self, Answer, Field},
     uploader_forms::{
         FieldKind, FieldSpec, UploaderKind, check, fields, free_name, get_map, get_text,
-        has_plaintext_secret, name_problem, new_table, set_map, set_required_text, set_text,
+        name_problem, new_table, set_map, set_required_text, set_text,
     },
     uploader_registry::{
-        Collision, ImportPreview, Registry, Source, TestJob, import, import_collision, preview_import,
-        remove_file, type_word,
+        Collision, ImportPreview, Registry, Source, TestJob, import, import_collision,
+        preview_import, remove_file,
     },
 };
 
@@ -163,7 +163,10 @@ pub struct State {
 impl State {
     /// Whether any background work is running (tests wait for this to become `false`).
     pub fn busy(&self) -> bool {
-        self.test.running() || self.file_dialog.running() || self.folder_dialog.running() || self.secret_slot.running()
+        self.test.running()
+            || self.file_dialog.running()
+            || self.folder_dialog.running()
+            || self.secret_slot.running()
     }
 
     /// Selects a destination and forgets what was typed for the previous one.
@@ -178,10 +181,9 @@ impl State {
     }
 
     /// Starts an import from `path`: checks it and opens the dialog.
-    pub fn begin_import(&mut self, path: &std::path::Path, registry: &Registry, config_dir: &std::path::Path) {
+    pub fn begin_import(&mut self, path: &std::path::Path) {
         let preview = preview_import(path);
         let name = preview.suggested_name.clone();
-        let _ = (registry, config_dir);
         self.import = Some(ImportDialog { preview, name, overwrite: false, error: None });
     }
 }
@@ -226,10 +228,16 @@ pub fn secret_line(
     }
     match presence {
         None => SecretLine { text: "checking...".to_owned(), ok: false, removable: false },
-        Some(Err(e)) => SecretLine { text: format!("cannot read the credential store: {e}"), ok: false, removable: false },
+        Some(Err(e)) => SecretLine {
+            text: format!("cannot read the credential store: {e}"),
+            ok: false,
+            removable: false,
+        },
         Some(Ok(true)) => SecretLine { text: location.stored_text(), ok: true, removable: true },
         Some(Ok(false)) => SecretLine {
-            text: "the settings refer to a secret that is not in the credential store; enter it below".to_owned(),
+            text:
+                "the settings refer to a secret that is not in the credential store; enter it below"
+                    .to_owned(),
             ok: false,
             removable: true,
         },
@@ -263,7 +271,9 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     });
     ui.add_space(8.0);
     match st.tab {
-        Tab::Destinations => ui_kit::page_scroll(ui, "uploaders-dest", |ui| destinations(ui, st, cx)),
+        Tab::Destinations => {
+            ui_kit::page_scroll(ui, "uploaders-dest", |ui| destinations(ui, st, cx))
+        }
         Tab::Defaults => ui_kit::page_scroll(ui, "uploaders-defaults", |ui| defaults(ui, st, cx)),
     }
     dialogs(&ctx, st, cx);
@@ -273,7 +283,7 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
 fn poll(st: &mut State, cx: &mut Cx<'_>, ctx: &egui::Context) {
     let t = ctx.input(|i| i.time);
     if let Some(Some(path)) = st.file_dialog.poll() {
-        st.begin_import(&path, &cx.registry, &cx.host.paths.config_dir);
+        st.begin_import(&path);
     }
     if let Some(Some(dir)) = st.folder_dialog.poll()
         && let Some((uploader, key)) = st.folder_target.take()
@@ -324,10 +334,16 @@ fn handle_drops(st: &mut State, cx: &mut Cx<'_>, ctx: &egui::Context) {
         let is_sxcu = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("sxcu"));
         if is_sxcu {
             st.tab = Tab::Destinations;
-            st.begin_import(&path, &cx.registry, &cx.host.paths.config_dir);
+            st.begin_import(&path);
         } else {
             let t = ctx.input(|i| i.time);
-            cx.toasts.error(t, format!("{} is not a .sxcu file", path.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned())));
+            cx.toasts.error(
+                t,
+                format!(
+                    "{} is not a .sxcu file",
+                    path.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned())
+                ),
+            );
         }
     }
 }
@@ -337,9 +353,16 @@ fn drop_overlay(ctx: &egui::Context) {
         return;
     }
     let screen = ctx.content_rect();
-    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("drop-overlay")));
+    let painter = ctx
+        .layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("drop-overlay")));
     painter.rect_filled(screen, 0.0, Color32::from_black_alpha(150));
-    painter.text(screen.center(), egui::Align2::CENTER_CENTER, "Drop a .sxcu file to import it", egui::FontId::proportional(22.0), Color32::WHITE);
+    painter.text(
+        screen.center(),
+        egui::Align2::CENTER_CENTER,
+        "Drop a .sxcu file to import it",
+        egui::FontId::proportional(22.0),
+        Color32::WHITE,
+    );
 }
 
 // ---- destinations tab ---------------------------------------------------------------------
@@ -364,21 +387,29 @@ fn list_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
         input_style(ui);
         let busy = st.file_dialog.running();
-        if ui_kit::button_if(ui, "Import .sxcu...", !busy, "A dialog is already open").on_hover_text("Import a ShareX custom uploader (or drop the file on this window)").clicked() {
+        if ui_kit::button_if(ui, "Import .sxcu...", !busy, "A dialog is already open")
+            .on_hover_text("Import a ShareX custom uploader (or drop the file on this window)")
+            .clicked()
+        {
             let dialogs = cx.host.dialogs.clone();
-            st.file_dialog.start(cx.wake, move || dialogs.pick_file("Import a ShareX custom uploader", &["sxcu"]));
+            st.file_dialog.start(cx.wake, move || {
+                dialogs.pick_file("Import a ShareX custom uploader", &["sxcu"])
+            });
         }
         let menu = ui.menu_button("New destination", |ui| {
             ui.set_min_width(260.0);
             for k in UploaderKind::ALL {
                 if ui.button(k.label()).on_hover_text(k.blurb()).clicked() {
                     let taken = cx.registry.names();
-                    st.new_dialog = Some(NewDialog { kind: k, name: free_name(k.type_name(), &taken) });
+                    st.new_dialog =
+                        Some(NewDialog { kind: k, name: free_name(k.type_name(), &taken) });
                     ui.close();
                 }
             }
         });
-        menu.response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "New destination"));
+        menu.response.widget_info(|| {
+            egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "New destination")
+        });
     });
     ui.add_space(8.0);
     let registry = cx.registry.clone();
@@ -391,9 +422,18 @@ fn list_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             let origin = match Registry::source(e) {
                 Source::Builtin => "built in".to_owned(),
                 Source::Table => "settings".to_owned(),
-                Source::File => std::path::Path::new(&e.origin).file_name().map_or_else(|| e.origin.clone(), |n| n.to_string_lossy().into_owned()),
+                Source::File => std::path::Path::new(&e.origin)
+                    .file_name()
+                    .map_or_else(|| e.origin.clone(), |n| n.to_string_lossy().into_owned()),
             };
-            let r = ui_kit::list_item(ui, selected, &e.name, &format!("{}  \u{b7}  {origin}", e.kind), e.error.as_ref().map(|_| Severity::Error), &format!("Destination {}", e.name));
+            let r = ui_kit::list_item(
+                ui,
+                selected,
+                &e.name,
+                &format!("{}  \u{b7}  {origin}", e.kind),
+                e.error.as_ref().map(|_| Severity::Error),
+                &format!("Destination {}", e.name),
+            );
             if r.clicked() {
                 st.select(Some(e.name.clone()));
             }
@@ -405,13 +445,21 @@ fn list_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
 
 fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     if st.selected.is_none()
-        && let Some(first) = cx.registry.entries.iter().find(|e| Registry::source(e) != Source::Builtin).or(cx.registry.entries.first())
+        && let Some(first) = cx
+            .registry
+            .entries
+            .iter()
+            .find(|e| Registry::source(e) != Source::Builtin)
+            .or(cx.registry.entries.first())
     {
         st.select(Some(first.name.clone()));
     }
     let Some(name) = st.selected.clone() else {
         ui_kit::card(ui, None, |ui| {
-            ui_kit::hint(ui, "Select a destination to see its settings, or import a ShareX .sxcu file, or create a new one.");
+            ui_kit::hint(
+                ui,
+                "Select a destination to see its settings, or import a ShareX .sxcu file, or create a new one.",
+            );
         });
         return;
     };
@@ -426,7 +474,12 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             let origin = match Registry::source(&info) {
                 Source::Builtin => "built in".to_owned(),
                 Source::Table => "defined in settings.toml".to_owned(),
-                Source::File => format!("imported file {}", std::path::Path::new(&info.origin).file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned())),
+                Source::File => format!(
+                    "imported file {}",
+                    std::path::Path::new(&info.origin)
+                        .file_name()
+                        .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
+                ),
             };
             ui.label(RichText::new(origin).color(theme::TEXT_DIM));
         });
@@ -469,7 +522,9 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                 st.confirm = Some(Confirm::RemoveFile(name));
             }
         }
-        Source::Builtin => ui_kit::hint(ui, "Built-in destinations need no setup and cannot be removed."),
+        Source::Builtin => {
+            ui_kit::hint(ui, "Built-in destinations need no setup and cannot be removed.")
+        }
     }
 }
 
@@ -477,7 +532,10 @@ fn form_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, name: &str) {
     let Some(table) = cx.settings.uploaders.get(name).cloned() else { return };
     let Some(kind) = UploaderKind::of(&table) else {
         ui_kit::card(ui, Some("Settings"), |ui| {
-            ui_kit::hint(ui, "This table has a type the window cannot edit; change it in settings.toml.");
+            ui_kit::hint(
+                ui,
+                "This table has a type the window cannot edit; change it in settings.toml.",
+            );
         });
         return;
     };
@@ -508,7 +566,8 @@ fn form_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, name: &str) {
         let advanced: Vec<&FieldSpec> = fields(kind).iter().filter(|s| s.advanced).collect();
         if !advanced.is_empty() {
             ui.add_space(4.0);
-            let label = if st.advanced_open { "Hide advanced settings" } else { "Show advanced settings" };
+            let label =
+                if st.advanced_open { "Hide advanced settings" } else { "Show advanced settings" };
             if ui_kit::link(ui, label).clicked() {
                 st.advanced_open = !st.advanced_open;
             }
@@ -559,7 +618,14 @@ fn field_row(
                 if ui_kit::text_input(ui, spec.label, &mut v, "", 300.0).changed() {
                     set_text(table, spec.key, &v);
                 }
-                if ui_kit::button_if(ui, "Browse...", !st.folder_dialog.running(), "A dialog is open").clicked() {
+                if ui_kit::button_if(
+                    ui,
+                    "Browse...",
+                    !st.folder_dialog.running(),
+                    "A dialog is open",
+                )
+                .clicked()
+                {
                     let dialogs = cx.host.dialogs.clone();
                     st.folder_target = Some((uploader.to_owned(), spec.key));
                     st.folder_dialog.start(cx.wake, move || dialogs.pick_folder(None));
@@ -570,26 +636,50 @@ fn field_row(
             input_style(ui);
             let cur = get_text(table, spec.key).to_owned();
             let shown = if cur.is_empty() { "(default)".to_owned() } else { cur.clone() };
-            let combo = egui::ComboBox::from_id_salt((uploader, spec.key)).width(220.0).selected_text(shown).show_ui(ui, |ui| {
-                if ui.selectable_label(cur.is_empty(), "(default)").clicked() {
-                    set_text(table, spec.key, "");
-                }
-                for o in options {
-                    if ui.selectable_label(cur == *o, *o).clicked() {
-                        set_text(table, spec.key, o);
+            let combo = egui::ComboBox::from_id_salt((uploader, spec.key))
+                .width(220.0)
+                .selected_text(shown)
+                .show_ui(ui, |ui| {
+                    if ui.selectable_label(cur.is_empty(), "(default)").clicked() {
+                        set_text(table, spec.key, "");
                     }
-                }
+                    for o in options {
+                        if ui.selectable_label(cur == *o, *o).clicked() {
+                            set_text(table, spec.key, o);
+                        }
+                    }
+                });
+            combo.response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, spec.label)
             });
-            combo.response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, spec.label));
         }
         FieldKind::Map => {
             let mut entries = get_map(table, spec.key);
             let mut remove = None;
             for (k, (name, value)) in entries.iter_mut().enumerate() {
                 ui.horizontal(|ui| {
-                    ui_kit::text_input(ui, &format!("{} name {}", spec.label, k + 1), name, "name", 140.0);
-                    ui_kit::text_input(ui, &format!("{} value {}", spec.label, k + 1), value, "value", 200.0);
-                    if ui_kit::mini_icon_button(ui, Icon::Close, &format!("Remove {} {}", spec.label, k + 1), true).clicked() {
+                    ui_kit::text_input(
+                        ui,
+                        &format!("{} name {}", spec.label, k + 1),
+                        name,
+                        "name",
+                        140.0,
+                    );
+                    ui_kit::text_input(
+                        ui,
+                        &format!("{} value {}", spec.label, k + 1),
+                        value,
+                        "value",
+                        200.0,
+                    );
+                    if ui_kit::mini_icon_button(
+                        ui,
+                        Icon::Close,
+                        &format!("Remove {} {}", spec.label, k + 1),
+                        true,
+                    )
+                    .clicked()
+                    {
                         remove = Some(k);
                     }
                 });
@@ -607,7 +697,14 @@ fn field_row(
     ui.add_space(3.0);
 }
 
-fn secret_field(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, uploader: &str, spec: &FieldSpec, table: &mut toml::Table) {
+fn secret_field(
+    ui: &mut Ui,
+    st: &mut State,
+    cx: &mut Cx<'_>,
+    uploader: &str,
+    spec: &FieldSpec,
+    table: &mut toml::Table,
+) {
     let reference = get_text(table, spec.key).to_owned();
     let secret_name = reference_name(&reference).map(str::to_owned);
     let vault: Arc<dyn SecretVault> = cx.host.vault.clone();
@@ -618,31 +715,56 @@ fn secret_field(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, uploader: &str, sp
         && !st.secret_slot.running()
     {
         let (v, n2) = (vault.clone(), n.clone());
-        st.secret_slot.start(cx.wake, move || SecretMsg::Presence(vec![(n2.clone(), v.exists(&n2))]));
+        st.secret_slot
+            .start(cx.wake, move || SecretMsg::Presence(vec![(n2.clone(), v.exists(&n2))]));
     }
-    let env_var = secret_name.as_deref().filter(|n| vault.from_environment(n)).map(ssx_services::secrets::env_var_name);
-    let line = secret_line(&reference, secret_name.as_ref().and_then(|n| st.presence.get(n)), env_var.as_deref(), &location);
+    let env_var = secret_name
+        .as_deref()
+        .filter(|n| vault.from_environment(n))
+        .map(ssx_services::secrets::env_var_name);
+    let line = secret_line(
+        &reference,
+        secret_name.as_ref().and_then(|n| st.presence.get(n)),
+        env_var.as_deref(),
+        &location,
+    );
     ui.horizontal_top(|ui| {
         if line.ok {
             ui.label(RichText::new("\u{2714}").color(ui_kit::OK_TEXT));
         }
-        ui.add(egui::Label::new(RichText::new(&line.text).size(12.5).color(if line.ok { ui_kit::OK_TEXT } else { theme::TEXT_DIM })).wrap());
+        ui.add(
+            egui::Label::new(RichText::new(&line.text).size(12.5).color(if line.ok {
+                ui_kit::OK_TEXT
+            } else {
+                theme::TEXT_DIM
+            }))
+            .wrap(),
+        );
     });
     if env_var.is_none() {
         let input = st.secret_inputs.entry(spec.key.to_owned()).or_default();
         ui.horizontal(|ui| {
             input_style(ui);
+            // leave room for the two buttons: the row must never run out of the window
+            let width = (ui.available_width() - 2.0 * 84.0 - 16.0).clamp(110.0, 240.0);
             let r = ui.add(
                 egui::TextEdit::singleline(input)
                     .password(true)
                     .hint_text("enter a new value")
-                    .desired_width(240.0)
+                    .desired_width(width)
                     .margin(egui::Margin::symmetric(6, 4)),
             );
-            r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::TextEdit, true, format!("{} (new value)", spec.label)));
+            r.widget_info(|| {
+                egui::WidgetInfo::labeled(
+                    egui::WidgetType::TextEdit,
+                    true,
+                    format!("{} (new value)", spec.label),
+                )
+            });
             let can = !input.is_empty() && !st.secret_slot.running();
             if ui_kit::button_if(ui, "Store secret", can, "Type the value first").clicked() {
-                let name = secret_name.clone().unwrap_or_else(|| default_secret_name(uploader, spec.key));
+                let name =
+                    secret_name.clone().unwrap_or_else(|| default_secret_name(uploader, spec.key));
                 let (v, value) = (vault.clone(), std::mem::take(input));
                 let (u, f) = (uploader.to_owned(), spec.key.to_owned());
                 st.secret_slot.start(cx.wake, move || {
@@ -663,12 +785,14 @@ fn secret_field(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, uploader: &str, sp
             }
         });
     }
-    let _ = has_plaintext_secret;
 }
 
 fn test_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, name: &str, usable: bool) {
     ui_kit::card(ui, Some("Test"), |ui| {
-        ui_kit::hint(ui, "Uploads a tiny generated image (or shortens example.com) with the settings as they are on this page, saved or not.");
+        ui_kit::hint(
+            ui,
+            "Uploads a tiny generated image (or shortens example.com) with the settings as they are on this page, saved or not.",
+        );
         ui.add_space(6.0);
         let running = st.test.running() && st.test.name == name;
         ui.horizontal(|ui| {
@@ -678,7 +802,14 @@ fn test_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, name: &str, usable: b
                 {
                     c.cancel();
                 }
-            } else if ui_kit::button_if(ui, "Test upload", usable && !st.test.running(), if usable { "Another test is running" } else { "Fix the settings first" }).clicked() {
+            } else if ui_kit::button_if(
+                ui,
+                "Test upload",
+                usable && !st.test.running(),
+                if usable { "Another test is running" } else { "Fix the settings first" },
+            )
+            .clicked()
+            {
                 start_test(st, cx, name);
             }
         });
@@ -687,7 +818,11 @@ fn test_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, name: &str, usable: b
             let (sent, total) = st.test.progress().unwrap_or((0, None));
             let bar = match progress_fraction(sent, total) {
                 Some(f) => egui::ProgressBar::new(f).text(progress_text(sent, total)),
-                None => egui::ProgressBar::new(0.0).animate(true).text(if sent == 0 { "connecting...".to_owned() } else { progress_text(sent, total) }),
+                None => egui::ProgressBar::new(0.0).animate(true).text(if sent == 0 {
+                    "connecting...".to_owned()
+                } else {
+                    progress_text(sent, total)
+                }),
             };
             ui.add(bar.desired_width(360.0));
         }
@@ -762,7 +897,10 @@ fn defaults(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     let registry = cx.registry.clone();
     let issues = cx.issues.clone();
     ui_kit::card(ui, Some("Where content goes"), |ui| {
-        ui_kit::hint(ui, "The destination for each kind of content. A workflow can override these on the Workflows page.");
+        ui_kit::hint(
+            ui,
+            "The destination for each kind of content. A workflow can override these on the Workflows page.",
+        );
         ui.add_space(6.0);
         for (ty, label, key) in [
             (DestinationType::Image, "Images", "image"),
@@ -791,7 +929,15 @@ fn defaults(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                 "Not set".to_owned()
             };
             Field::new(label).issues(&issues, &format!("destinations.{key}")).show(ui, |ui| {
-                destination_picker(ui, ("default-dest", key), &format!("{label} destination"), slot, ty, &registry, &none_label);
+                destination_picker(
+                    ui,
+                    ("default-dest", key),
+                    &format!("{label} destination"),
+                    slot,
+                    ty,
+                    &registry,
+                    &none_label,
+                );
             });
             ui.add_space(3.0);
         }
@@ -809,35 +955,69 @@ fn defaults(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             }
         });
         ui.add_space(3.0);
-        Field::new("At the same time").issues(&issues, "post_file.max_parallel_uploads").help("How many files are uploaded at once (1 to 16).").show(ui, |ui| {
-            input_style(ui);
-            let mut n = cx.settings.post_file.max_parallel_uploads;
-            let r = ui.add(egui::DragValue::new(&mut n).range(1..=16).clamp_existing_to_range(false).suffix(" files"));
-            r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::DragValue, true, "Parallel uploads"));
-            if r.changed() {
-                cx.settings.post_file.max_parallel_uploads = n;
-            }
-        });
+        Field::new("At the same time")
+            .issues(&issues, "post_file.max_parallel_uploads")
+            .help("How many files are uploaded at once (1 to 16).")
+            .show(ui, |ui| {
+                input_style(ui);
+                let mut n = cx.settings.post_file.max_parallel_uploads;
+                let r = ui.add(
+                    egui::DragValue::new(&mut n)
+                        .range(1..=16)
+                        .clamp_existing_to_range(false)
+                        .suffix(" files"),
+                );
+                r.widget_info(|| {
+                    egui::WidgetInfo::labeled(egui::WidgetType::DragValue, true, "Parallel uploads")
+                });
+                if r.changed() {
+                    cx.settings.post_file.max_parallel_uploads = n;
+                }
+            });
     });
 }
 
-fn extension_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, registry: &Registry, issues: &crate::validation::Issues) {
+fn extension_card(
+    ui: &mut Ui,
+    st: &mut State,
+    cx: &mut Cx<'_>,
+    registry: &Registry,
+    issues: &crate::validation::Issues,
+) {
     ui_kit::card(ui, Some("By file type"), |ui| {
-        ui_kit::hint(ui, "Send files with a given extension to a specific destination, whatever kind of content they are (for example zip to your own server).");
+        ui_kit::hint(
+            ui,
+            "Send files with a given extension to a specific destination, whatever kind of content they are (for example zip to your own server).",
+        );
         ui.add_space(6.0);
-        let exts: Vec<String> = cx.settings.destinations.extension_overrides.keys().cloned().collect();
+        let exts: Vec<String> =
+            cx.settings.destinations.extension_overrides.keys().cloned().collect();
         let mut remove = None;
         for ext in &exts {
             let path = format!("destinations.extension_overrides.{ext}");
             Field::new(&format!(".{ext}")).issues(issues, &path).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     let mut cur = cx.settings.destinations.extension_overrides.get(ext).cloned();
-                    if destination_picker(ui, ("ext-dest", ext), &format!("Destination for .{ext}"), &mut cur, DestinationType::File, registry, "Choose...")
-                        && let Some(c) = cur
+                    if destination_picker(
+                        ui,
+                        ("ext-dest", ext),
+                        &format!("Destination for .{ext}"),
+                        &mut cur,
+                        DestinationType::File,
+                        registry,
+                        "Choose...",
+                    ) && let Some(c) = cur
                     {
                         cx.settings.destinations.extension_overrides.insert(ext.clone(), c);
                     }
-                    if ui_kit::mini_icon_button(ui, Icon::Close, &format!("Remove the override for .{ext}"), true).clicked() {
+                    if ui_kit::mini_icon_button(
+                        ui,
+                        Icon::Close,
+                        &format!("Remove the override for .{ext}"),
+                        true,
+                    )
+                    .clicked()
+                    {
                         remove = Some(ext.clone());
                     }
                 });
@@ -849,9 +1029,25 @@ fn extension_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>, registry: &Regis
         ui.horizontal(|ui| {
             ui_kit::text_input(ui, "New extension", &mut st.new_extension, "zip", 90.0);
             let ext = st.new_extension.trim().trim_start_matches('.').to_ascii_lowercase();
-            let free = !ext.is_empty() && !cx.settings.destinations.extension_overrides.contains_key(&ext);
-            if ui_kit::button_if(ui, "Add", free, if ext.is_empty() { "Type an extension such as zip" } else { "That extension already has a rule" }).clicked() {
-                let default = registry.choices_for(DestinationType::File).first().map(|e| e.name.clone()).unwrap_or_else(|| "local".to_owned());
+            let free =
+                !ext.is_empty() && !cx.settings.destinations.extension_overrides.contains_key(&ext);
+            if ui_kit::button_if(
+                ui,
+                "Add",
+                free,
+                if ext.is_empty() {
+                    "Type an extension such as zip"
+                } else {
+                    "That extension already has a rule"
+                },
+            )
+            .clicked()
+            {
+                let default = registry
+                    .choices_for(DestinationType::File)
+                    .first()
+                    .map(|e| e.name.clone())
+                    .unwrap_or_else(|| "local".to_owned());
                 cx.settings.destinations.extension_overrides.insert(ext, default);
                 st.new_extension.clear();
             }
@@ -924,13 +1120,13 @@ fn new_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
 fn import_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
     let Some(mut d) = st.import.take() else { return };
     let cfg = cx.host.paths.config_dir.clone();
-    let taken: Vec<String> = cx.registry.names();
     let collision = import_collision(&cx.registry, &cfg, &d.name);
-    let name_err = if d.name.is_empty() || !ssx_services::upload::sxcu_files::valid_uploader_name(&d.name) {
-        name_problem(&d.name, &[])
-    } else {
-        None
-    };
+    let name_err =
+        if d.name.is_empty() || !ssx_services::upload::sxcu_files::valid_uploader_name(&d.name) {
+            name_problem(&d.name, &[])
+        } else {
+            None
+        };
     let mut answer = None;
     let frame = egui::Frame::popup(&ctx.global_style()).inner_margin(egui::Margin::same(18));
     let m = egui::Modal::new(egui::Id::new("up-import")).frame(frame).show(ctx, |ui| {
@@ -997,12 +1193,17 @@ fn import_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
     if answer.is_none() && m.should_close() {
         answer = Some(Answer::Cancel);
     }
-    let _ = taken;
     match answer {
         Some(Answer::Confirm) => match import(&cfg, &d.preview.source, &d.name, d.overwrite) {
             Ok(done) => {
                 let t = ctx.input(|i| i.time);
-                cx.toasts.success(t, format!("Imported {:?} as {}. It is used like any other destination.", done.display_name, done.name));
+                cx.toasts.success(
+                    t,
+                    format!(
+                        "Imported {:?} as {}. It is used like any other destination.",
+                        done.display_name, done.name
+                    ),
+                );
                 st.select(Some(done.name));
                 st.tab = Tab::Destinations;
             }
@@ -1019,8 +1220,18 @@ fn import_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
 fn confirm_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
     let Some(c) = st.confirm.clone() else { return };
     let (name, title, verb, what) = match &c {
-        Confirm::RemoveTable(n) => (n.clone(), "Remove this destination?", "Remove", "The [uploaders] table is removed from the settings when you save."),
-        Confirm::RemoveFile(n) => (n.clone(), "Delete the imported file?", "Delete file", "The imported .sxcu file is deleted from disk right away."),
+        Confirm::RemoveTable(n) => (
+            n.clone(),
+            "Remove this destination?",
+            "Remove",
+            "The [uploaders] table is removed from the settings when you save.",
+        ),
+        Confirm::RemoveFile(n) => (
+            n.clone(),
+            "Delete the imported file?",
+            "Delete file",
+            "The imported .sxcu file is deleted from disk right away.",
+        ),
     };
     let refs = Registry::references_to(cx.settings, &name);
     let mut body = format!("\"{name}\": {what}");
@@ -1047,7 +1258,6 @@ fn confirm_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
         Some(Answer::Cancel) => st.confirm = None,
         None => {}
     }
-    let _ = type_word;
 }
 
 #[cfg(test)]
@@ -1065,7 +1275,12 @@ mod tests {
         assert!(!l.ok && !l.removable);
         let l = secret_line("keyring:x", Some(&Ok(true)), None, &keyring());
         assert!(l.ok && l.removable && l.text.contains("keyring"), "{l:?}");
-        let l = secret_line("keyring:x", Some(&Ok(true)), None, &SecretLocation::MemoryOnly("no bus".into()));
+        let l = secret_line(
+            "keyring:x",
+            Some(&Ok(true)),
+            None,
+            &SecretLocation::MemoryOnly("no bus".into()),
+        );
         assert!(l.text.contains("memory only"), "{l:?}");
         let l = secret_line("keyring:x", Some(&Ok(false)), None, &keyring());
         assert!(!l.ok && l.removable && l.text.contains("not in the credential store"));
@@ -1108,7 +1323,7 @@ mod tests {
         let f = dir.path().join("x.sxcu");
         std::fs::write(&f, r#"{"Version":"13.7.0","Name":"My Host","DestinationType":"ImageUploader","RequestMethod":"POST","RequestURL":"https://e.example.com/up","Body":"MultipartFormData","FileFormName":"f","URL":"{json:u}"}"#).unwrap();
         let mut st = State::default();
-        st.begin_import(&f, &Registry::default(), dir.path());
+        st.begin_import(&f);
         let d = st.import.unwrap();
         assert!(d.preview.importable());
         assert_eq!(d.name, "My-Host");

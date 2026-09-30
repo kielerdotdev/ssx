@@ -2,7 +2,9 @@
 
 use egui::{Modifiers, vec2};
 use egui_kittest::{Harness, kittest::Queryable};
-use ssx_core::settings::{AfterCapture, AfterUpload, InputKind, Settings, Severity, builtin_workflows};
+use ssx_core::settings::{
+    AfterCapture, AfterUpload, InputKind, Settings, Severity, builtin_workflows,
+};
 use ssx_settings_ui::{SettingsApp, nav::Page};
 
 use crate::common::*;
@@ -102,7 +104,10 @@ fn the_name_the_id_and_the_command_name_are_validated_next_to_the_field() {
     set_text(&mut h, "Command name", "Not Valid!");
     assert!(has(&h, "is not a valid command name"));
     set_text(&mut h, "Command name", "screen");
-    assert!(has(&h, "The command name is also used by Capture screen, save and copy"), "the clash is shown on the workflow being edited");
+    assert!(
+        has(&h, "The command name is also used by Capture screen, save and copy"),
+        "the clash is shown on the workflow being edited"
+    );
     set_text(&mut h, "Command name", "");
     assert_eq!(working(&h).workflows[0].trigger.cli_name, None);
     // the id is locked until asked for
@@ -117,7 +122,10 @@ fn add_and_remove_steps_from_the_menus() {
     let (mut h, _fx) = open();
     click(&mut h, "Add after-capture step");
     click(&mut h, "Open editor");
-    assert_eq!(working(&h).workflows[0].after_capture[0..3], [AfterCapture::SaveToFile, AfterCapture::CopyImageToClipboard, AfterCapture::Upload]);
+    assert_eq!(
+        working(&h).workflows[0].after_capture[0..3],
+        [AfterCapture::SaveToFile, AfterCapture::CopyImageToClipboard, AfterCapture::Upload]
+    );
     assert_eq!(*working(&h).workflows[0].after_capture.last().unwrap(), AfterCapture::OpenEditor);
     // the editor after save is a warning the user can see
     assert!(has(&h, "open_editor runs after save_to_file"));
@@ -132,11 +140,20 @@ fn add_and_remove_steps_from_the_menus() {
 fn move_buttons_reorder_steps_and_stop_at_the_ends() {
     let (mut h, _fx) = open();
     click(&mut h, "Move Save to file down");
-    assert_eq!(working(&h).workflows[0].after_capture, [AfterCapture::CopyImageToClipboard, AfterCapture::SaveToFile, AfterCapture::Upload]);
+    assert_eq!(
+        working(&h).workflows[0].after_capture,
+        [AfterCapture::CopyImageToClipboard, AfterCapture::SaveToFile, AfterCapture::Upload]
+    );
     click(&mut h, "Move Upload up");
-    assert_eq!(working(&h).workflows[0].after_capture, [AfterCapture::CopyImageToClipboard, AfterCapture::Upload, AfterCapture::SaveToFile]);
+    assert_eq!(
+        working(&h).workflows[0].after_capture,
+        [AfterCapture::CopyImageToClipboard, AfterCapture::Upload, AfterCapture::SaveToFile]
+    );
     click(&mut h, "Revert");
-    assert_eq!(working(&h).workflows[0].after_capture, [AfterCapture::SaveToFile, AfterCapture::CopyImageToClipboard, AfterCapture::Upload]);
+    assert_eq!(
+        working(&h).workflows[0].after_capture,
+        [AfterCapture::SaveToFile, AfterCapture::CopyImageToClipboard, AfterCapture::Upload]
+    );
 }
 
 #[test]
@@ -146,12 +163,18 @@ fn dragging_a_step_by_its_handle_reorders_the_list() {
     let below = h.get_by_label_contains("Reorder Upload:").rect();
     // drop below the last step
     drag(&mut h, from, egui::pos2(from.x, below.bottom() + 20.0));
-    assert_eq!(working(&h).workflows[0].after_capture, [AfterCapture::CopyImageToClipboard, AfterCapture::Upload, AfterCapture::SaveToFile]);
+    assert_eq!(
+        working(&h).workflows[0].after_capture,
+        [AfterCapture::CopyImageToClipboard, AfterCapture::Upload, AfterCapture::SaveToFile]
+    );
     // and back to the top
     let from = h.get_by_label_contains("Reorder Save to file").rect().center();
     let top = h.get_by_label_contains("Reorder Copy image to clipboard").rect();
     drag(&mut h, from, egui::pos2(from.x, top.top() - 4.0));
-    assert_eq!(working(&h).workflows[0].after_capture, [AfterCapture::SaveToFile, AfterCapture::CopyImageToClipboard, AfterCapture::Upload]);
+    assert_eq!(
+        working(&h).workflows[0].after_capture,
+        [AfterCapture::SaveToFile, AfterCapture::CopyImageToClipboard, AfterCapture::Upload]
+    );
 }
 
 #[test]
@@ -160,7 +183,10 @@ fn dropping_a_step_where_it_already_is_changes_nothing() {
     let r = h.get_by_label_contains("Reorder Copy image to clipboard").rect();
     let c = r.center();
     drag(&mut h, c, egui::pos2(c.x, c.y + 3.0));
-    assert_eq!(working(&h).workflows[0].after_capture, Settings::default().workflows[0].after_capture);
+    assert_eq!(
+        working(&h).workflows[0].after_capture,
+        Settings::default().workflows[0].after_capture
+    );
     assert!(!h.state().model.is_dirty());
 }
 
@@ -183,12 +209,20 @@ fn alt_arrows_on_a_focused_handle_reorder_and_the_focus_follows() {
 #[test]
 fn dragging_a_workflow_in_the_list_reorders_it_and_the_selection_follows() {
     let (mut h, _fx) = open();
-    let from = h.get_by_label_contains("Reorder Capture region, save, copy and upload").rect().center();
+    let from =
+        h.get_by_label_contains("Reorder Capture region, save, copy and upload").rect().center();
     let target = h.get_by_label_contains("Reorder Capture screen, save and copy").rect();
     drag(&mut h, from, egui::pos2(from.x, target.bottom() + 6.0));
     let ids: Vec<String> = working(&h).workflows.iter().take(4).map(|w| w.id.clone()).collect();
-    assert_eq!(ids, ["capture-region-edit", "capture-fullscreen", "capture-region", "capture-window"]);
-    assert_eq!(h.state().workflows.selected, 2, "the selected workflow moved, and is still selected");
+    assert_eq!(
+        ids,
+        ["capture-region-edit", "capture-fullscreen", "capture-region", "capture-window"]
+    );
+    assert_eq!(
+        h.state().workflows.selected,
+        2,
+        "the selected workflow moved, and is still selected"
+    );
     assert_eq!(text_of(&h, "Workflow name"), "Capture region, save, copy and upload");
 }
 
@@ -219,20 +253,28 @@ fn run_command_steps_have_their_own_editor_and_are_validated() {
     let steps = &working(&h).workflows[0].after_upload;
     assert_eq!(
         *steps.last().unwrap(),
-        AfterUpload::RunCommand { program: "/usr/bin/notify-send".into(), args: vec!["Uploaded {url}".into()] }
+        AfterUpload::RunCommand {
+            program: "/usr/bin/notify-send".into(),
+            args: vec!["Uploaded {url}".into()]
+        }
     );
     assert!(!h.state().model.current_issues().blocks_save());
     click(&mut h, "Apply");
     let saved = fx.load();
     assert_eq!(saved.workflows[0].after_upload.last(), steps.last());
     click(&mut h, "Remove argument 1");
-    assert!(matches!(working(&h).workflows[0].after_upload.last(), Some(AfterUpload::RunCommand { args, .. }) if args.is_empty()));
+    assert!(
+        matches!(working(&h).workflows[0].after_upload.last(), Some(AfterUpload::RunCommand { args, .. }) if args.is_empty())
+    );
 }
 
 #[test]
 fn a_hotkey_can_be_recorded_from_the_keyboard() {
     let (mut h, fx) = open();
-    click(&mut h, "Hotkey of Capture region, save, copy and upload: record a shortcut by pressing it");
+    click(
+        &mut h,
+        "Hotkey of Capture region, save, copy and upload: record a shortcut by pressing it",
+    );
     h.key_press_modifiers(Modifiers::CTRL | Modifiers::SHIFT, egui::Key::F9);
     settle(&mut h);
     assert_eq!(working(&h).workflows[0].trigger.hotkey.as_deref(), Some("Ctrl+Shift+F9"));
@@ -243,7 +285,10 @@ fn a_hotkey_can_be_recorded_from_the_keyboard() {
 #[test]
 fn a_hotkey_used_twice_is_an_error_that_names_the_other_workflow() {
     let (mut h, _fx) = open();
-    click(&mut h, "Hotkey of Capture region, save, copy and upload: record a shortcut by pressing it");
+    click(
+        &mut h,
+        "Hotkey of Capture region, save, copy and upload: record a shortcut by pressing it",
+    );
     // PrintScreen is what "Capture screen" uses
     h.key_press_modifiers(Modifiers::CTRL | Modifiers::SHIFT, egui::Key::S);
     settle(&mut h);
@@ -257,7 +302,13 @@ fn a_hotkey_used_twice_is_an_error_that_names_the_other_workflow() {
     assert_eq!(working(&h).workflows[0].trigger.hotkey.as_deref(), Some("Alt+PrintScreen"));
     assert!(has(&h, "Also used by Capture active window, save and upload"));
     assert!(h.state().model.current_issues().blocks_save());
-    assert!(h.state().model.current_issues().errors().any(|i| i.severity == Severity::Error && i.message.contains("already used")));
+    assert!(
+        h.state()
+            .model
+            .current_issues()
+            .errors()
+            .any(|i| i.severity == Severity::Error && i.message.contains("already used"))
+    );
 }
 
 #[test]
@@ -277,11 +328,18 @@ fn escape_cancels_recording_and_backspace_clears() {
 #[test]
 fn a_typing_key_alone_is_rejected_with_advice() {
     let (mut h, _fx) = open();
-    click(&mut h, "Hotkey of Capture region, save, copy and upload: record a shortcut by pressing it");
+    click(
+        &mut h,
+        "Hotkey of Capture region, save, copy and upload: record a shortcut by pressing it",
+    );
     h.key_press(egui::Key::S);
     settle(&mut h);
     assert!(has(&h, "would stop you typing that key everywhere"));
-    assert_eq!(working(&h).workflows[0].trigger.hotkey.as_deref(), Some("Ctrl+PrintScreen"), "unchanged");
+    assert_eq!(
+        working(&h).workflows[0].trigger.hotkey.as_deref(),
+        Some("Ctrl+PrintScreen"),
+        "unchanged"
+    );
 }
 
 #[test]

@@ -59,7 +59,10 @@ pub fn save_dir_note(dir: &Path) -> Option<PathNote> {
     match std::fs::metadata(dir) {
         Ok(m) if m.is_dir() => {
             if m.permissions().readonly() {
-                Some(PathNote { severity: Severity::Warning, text: "this folder is read-only; saving will fail".to_owned() })
+                Some(PathNote {
+                    severity: Severity::Warning,
+                    text: "this folder is read-only; saving will fail".to_owned(),
+                })
             } else {
                 None
             }
@@ -85,7 +88,10 @@ pub fn save_dir_note(dir: &Path) -> Option<PathNote> {
                     } else {
                         PathNote {
                             severity: Severity::Error,
-                            text: format!("{} is a file, so this folder cannot be created", a.display()),
+                            text: format!(
+                                "{} is a file, so this folder cannot be created",
+                                a.display()
+                            ),
                         }
                     });
                 }
@@ -93,7 +99,8 @@ pub fn save_dir_note(dir: &Path) -> Option<PathNote> {
             }
             Some(PathNote {
                 severity: Severity::Warning,
-                text: "this folder does not exist yet; ssx creates it when it saves the first file".to_owned(),
+                text: "this folder does not exist yet; ssx creates it when it saves the first file"
+                    .to_owned(),
             })
         }
     }
@@ -101,10 +108,7 @@ pub fn save_dir_note(dir: &Path) -> Option<PathNote> {
 
 /// The text a token chip inserts: parameters get a sensible value (`%i{n}` becomes `%i{3}`).
 pub fn insertable(spelling: &str) -> String {
-    spelling
-        .replace("{n}", "{3}")
-        .replace("{base,len}", "{62,4}")
-        .replace("{path}", "{names.txt}")
+    spelling.replace("{n}", "{3}").replace("{base,len}", "{62,4}").replace("{path}", "{names.txt}")
 }
 
 /// The individual spellings in a cheat-sheet row (`"%y  %yy"` gives `%y`, `%yy`).
@@ -146,9 +150,21 @@ impl State {
     }
 }
 
-fn number(ui: &mut Ui, label: &str, v: &mut u32, range: std::ops::RangeInclusive<u32>, suffix: &str) -> egui::Response {
+fn number(
+    ui: &mut Ui,
+    label: &str,
+    v: &mut u32,
+    range: std::ops::RangeInclusive<u32>,
+    suffix: &str,
+) -> egui::Response {
     ssx_editor_ui::ui::widgets::input_style(ui);
-    let r = ui.add(egui::DragValue::new(v).range(range).clamp_existing_to_range(false).suffix(suffix.to_owned()).speed(1.0));
+    let r = ui.add(
+        egui::DragValue::new(v)
+            .range(range)
+            .clamp_existing_to_range(false)
+            .suffix(suffix.to_owned())
+            .speed(1.0),
+    );
     r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::DragValue, true, label));
     r
 }
@@ -171,34 +187,61 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
 fn save_location(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     ui_kit::card(ui, Some("Save location"), |ui| {
         let default_dir = General::default().resolve_save_dir();
-        let mut text = cx.settings.general.save_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default();
+        let mut text = cx
+            .settings
+            .general
+            .save_dir
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
         Field::new("Save folder")
             .issues(cx.issues, "general.save_dir")
             .help(&format!("Empty means the default, {}.", default_dir.display()))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    if ui_kit::text_input(ui, "Save folder", &mut text, &default_dir.display().to_string(), 360.0).changed() {
+                    if ui_kit::text_input(
+                        ui,
+                        "Save folder",
+                        &mut text,
+                        &default_dir.display().to_string(),
+                        360.0,
+                    )
+                    .changed()
+                    {
                         cx.settings.general.save_dir =
                             if text.is_empty() { None } else { Some(PathBuf::from(&text)) };
                     }
                     let busy = st.folder_dialog.running();
-                    if ui_kit::button_if(ui, "Browse...", !busy, "A dialog is already open").clicked() {
+                    if ui_kit::button_if(ui, "Browse...", !busy, "A dialog is already open")
+                        .clicked()
+                    {
                         let dialogs = cx.host.dialogs.clone();
                         let start = cx.settings.general.save_dir.clone();
-                        st.folder_dialog.start(cx.wake, move || dialogs.pick_folder(start.as_deref()));
+                        st.folder_dialog
+                            .start(cx.wake, move || dialogs.pick_folder(start.as_deref()));
                     }
                     if cx.settings.general.save_dir.is_some()
-                        && ui_kit::button(ui, "Use default").on_hover_text("Go back to the Pictures/ssx folder").clicked()
+                        && ui_kit::button(ui, "Use default")
+                            .on_hover_text("Go back to the Pictures/ssx folder")
+                            .clicked()
                     {
                         cx.settings.general.save_dir = None;
                     }
                 });
-                if let Some(dir) = cx.settings.general.save_dir.as_deref().filter(|d| !d.as_os_str().is_empty())
+                if let Some(dir) =
+                    cx.settings.general.save_dir.as_deref().filter(|d| !d.as_os_str().is_empty())
                     && let Some(n) = save_dir_note(dir)
                 {
                     ui.horizontal_top(|ui| {
                         ui_kit::severity_icon(ui, n.severity);
-                        ui.add(egui::Label::new(RichText::new(n.text).size(12.0).color(ui_kit::severity_color(n.severity))).wrap());
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(n.text)
+                                    .size(12.0)
+                                    .color(ui_kit::severity_color(n.severity)),
+                            )
+                            .wrap(),
+                        );
                     });
                 }
             });
@@ -243,10 +286,17 @@ fn pattern_row(
         // The core validator already reports unknown / unsupported tokens; only what it does
         // not check (illegal characters) is added here, to avoid saying things twice.
         if !report.illegal_chars.is_empty() {
-            for m in report.messages(kind).into_iter().skip(report.unknown_tokens.len() + report.unsupported.len()) {
+            for m in report
+                .messages(kind)
+                .into_iter()
+                .skip(report.unknown_tokens.len() + report.unsupported.len())
+            {
                 ui.horizontal_top(|ui| {
                     ui_kit::severity_icon(ui, Severity::Warning);
-                    ui.add(egui::Label::new(RichText::new(m).size(12.0).color(ui_kit::WARN_TEXT)).wrap());
+                    ui.add(
+                        egui::Label::new(RichText::new(m).size(12.0).color(ui_kit::WARN_TEXT))
+                            .wrap(),
+                    );
                 });
             }
         }
@@ -257,18 +307,39 @@ fn pattern_row(
 fn file_names(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     ui_kit::card(ui, Some("File names"), |ui| {
         let mut folder = cx.settings.general.folder_pattern.clone();
-        let folder_report = pattern_row(ui, st, cx, PatternTarget::Folder, "Folder pattern", "general.folder_pattern", &mut folder, PatternKind::Folder);
+        let folder_report = pattern_row(
+            ui,
+            st,
+            cx,
+            PatternTarget::Folder,
+            "Folder pattern",
+            "general.folder_pattern",
+            &mut folder,
+            PatternKind::Folder,
+        );
         cx.settings.general.folder_pattern = folder;
         ui.add_space(4.0);
         let mut name = cx.settings.general.file_name_pattern.clone();
-        let name_report = pattern_row(ui, st, cx, PatternTarget::File, "File name pattern", "general.file_name_pattern", &mut name, PatternKind::FileName);
+        let name_report = pattern_row(
+            ui,
+            st,
+            cx,
+            PatternTarget::File,
+            "File name pattern",
+            "general.file_name_pattern",
+            &mut name,
+            PatternKind::FileName,
+        );
         cx.settings.general.file_name_pattern = name;
 
         ui.add_space(2.0);
         Field::new("Examples").show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 for (label, pattern) in EXAMPLE_FILE_PATTERNS {
-                    if ui_kit::chip(ui, label, cx.settings.general.file_name_pattern == *pattern).on_hover_text(*pattern).clicked() {
+                    if ui_kit::chip(ui, label, cx.settings.general.file_name_pattern == *pattern)
+                        .on_hover_text(*pattern)
+                        .clicked()
+                    {
                         cx.settings.general.file_name_pattern = (*pattern).to_owned();
                     }
                 }
@@ -283,7 +354,8 @@ fn file_names(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                     cx.settings.general.max_file_name_len = n as usize;
                 }
             });
-        Field::new("Longest window title").issues(cx.issues, "general.max_title_len")
+        Field::new("Longest window title")
+            .issues(cx.issues, "general.max_title_len")
             .help("How much of the window title %t may use; 0 is unlimited.")
             .show(ui, |ui| {
                 let mut n = cx.settings.general.max_title_len as u32;
@@ -305,29 +377,49 @@ fn file_names(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             .inner_margin(egui::Margin::symmetric(12, 8))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.label(RichText::new("Preview: where the next screenshot goes").size(11.5).color(theme::TEXT_DIM));
+                ui.label(
+                    RichText::new("Preview: where the next screenshot goes")
+                        .size(11.5)
+                        .color(theme::TEXT_DIM),
+                );
                 ui.add_space(2.0);
                 let dir = p.full.parent().map(|d| d.display().to_string()).unwrap_or_default();
                 let sep = std::path::MAIN_SEPARATOR;
                 let job = {
                     let mut j = egui::text::LayoutJob::default();
                     let mono = egui::FontId::monospace(13.0);
-                    j.append(&format!("{dir}{sep}"), 0.0, egui::TextFormat::simple(mono.clone(), theme::TEXT_DIM));
+                    j.append(
+                        &format!("{dir}{sep}"),
+                        0.0,
+                        egui::TextFormat::simple(mono.clone(), theme::TEXT_DIM),
+                    );
                     j.append(&p.file_name, 0.0, egui::TextFormat::simple(mono, Color32::WHITE));
                     j.wrap.max_width = ui.available_width();
                     j
                 };
                 let r = ui.add(egui::Label::new(job).wrap().selectable(true));
-                r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, format!("Preview: {}", p.full.display())));
+                r.widget_info(|| {
+                    egui::WidgetInfo::labeled(
+                        egui::WidgetType::Label,
+                        true,
+                        format!("Preview: {}", p.full.display()),
+                    )
+                });
                 if let Some(e) = &p.error {
                     ui.label(RichText::new(e).size(12.0).color(ui_kit::ERROR_TEXT));
                 }
                 let mut notes: Vec<String> = Vec::new();
                 if name_report.uses_window {
-                    notes.push(format!("%t is shown with the sample window title \"{}\"", st.sample.window_title));
+                    notes.push(format!(
+                        "%t is shown with the sample window title \"{}\"",
+                        st.sample.window_title
+                    ));
                 }
                 if name_report.uses_counter || folder_report.uses_counter {
-                    notes.push(format!("%i shows the next counter value ({})", st.sample.next_counter));
+                    notes.push(format!(
+                        "%i shows the next counter value ({})",
+                        st.sample.next_counter
+                    ));
                 }
                 if !notes.is_empty() {
                     ui_kit::hint(ui, &notes.join(". "));
@@ -351,7 +443,10 @@ fn cheat_sheet(ui: &mut Ui, st: &State, cx: &mut Cx<'_>) {
         PatternTarget::File => "file name pattern",
         PatternTarget::Folder => "folder pattern",
     };
-    ui_kit::hint(ui, &format!("Click a token to append it to the {target_name} (the field you used last)."));
+    ui_kit::hint(
+        ui,
+        &format!("Click a token to append it to the {target_name} (the field you used last)."),
+    );
     ui.add_space(4.0);
     let mut group = "";
     for doc in CHEAT_SHEET {
@@ -367,10 +462,17 @@ fn cheat_sheet(ui: &mut Ui, st: &State, cx: &mut Cx<'_>) {
                     ui.label(RichText::new(s).monospace().color(theme::TEXT));
                     continue;
                 }
-                if ui_kit::chip(ui, s, false).on_hover_text(format!("Insert {}", insertable(s))).clicked() {
+                if ui_kit::chip(ui, s, false)
+                    .on_hover_text(format!("Insert {}", insertable(s)))
+                    .clicked()
+                {
                     match st.target {
-                        PatternTarget::File => append_token(&mut cx.settings.general.file_name_pattern, s),
-                        PatternTarget::Folder => append_token(&mut cx.settings.general.folder_pattern, s),
+                        PatternTarget::File => {
+                            append_token(&mut cx.settings.general.file_name_pattern, s)
+                        }
+                        PatternTarget::Folder => {
+                            append_token(&mut cx.settings.general.folder_pattern, s)
+                        }
                     }
                 }
             }
@@ -396,7 +498,11 @@ fn images(ui: &mut Ui, cx: &mut Cx<'_>) {
             if let Some(f) = ui_kit::segmented_row(
                 ui,
                 cur,
-                &[(ImageFormatKind::Png, "PNG"), (ImageFormatKind::Jpg, "JPEG"), (ImageFormatKind::Webp, "WebP")],
+                &[
+                    (ImageFormatKind::Png, "PNG"),
+                    (ImageFormatKind::Jpg, "JPEG"),
+                    (ImageFormatKind::Webp, "WebP"),
+                ],
             ) {
                 cx.settings.general.image_format = f;
             }
@@ -405,13 +511,23 @@ fn images(ui: &mut Ui, cx: &mut Cx<'_>) {
         let lossy = cx.settings.general.image_format == ImageFormatKind::Jpg;
         Field::new("Quality")
             .issues(cx.issues, "general.image_quality")
-            .help(if lossy { "Lower is smaller and blurrier." } else { "PNG and WebP are lossless; quality applies to JPEG only." })
+            .help(if lossy {
+                "Lower is smaller and blurrier."
+            } else {
+                "PNG and WebP are lossless; quality applies to JPEG only."
+            })
             .show(ui, |ui| {
                 ui.add_enabled_ui(lossy, |ui| {
                     ssx_editor_ui::ui::widgets::input_style(ui);
                     let mut q = u32::from(cx.settings.general.image_quality);
-                    let r = ui.add(egui::Slider::new(&mut q, 1..=100).trailing_fill(true).clamping(egui::SliderClamping::Edits));
-                    r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Slider, true, "Quality"));
+                    let r = ui.add(
+                        egui::Slider::new(&mut q, 1..=100)
+                            .trailing_fill(true)
+                            .clamping(egui::SliderClamping::Edits),
+                    );
+                    r.widget_info(|| {
+                        egui::WidgetInfo::labeled(egui::WidgetType::Slider, true, "Quality")
+                    });
                     if r.changed() {
                         cx.settings.general.image_quality = q.clamp(1, 100) as u8;
                     }
@@ -419,7 +535,11 @@ fn images(ui: &mut Ui, cx: &mut Cx<'_>) {
             });
         ui.add_space(4.0);
         Field::new("Notifications").show(ui, |ui| {
-            ui_kit::switch(ui, "Show a notification when a workflow finishes", &mut cx.settings.general.show_notifications);
+            ui_kit::switch(
+                ui,
+                "Show a notification when a workflow finishes",
+                &mut cx.settings.general.show_notifications,
+            );
         });
     });
 }
@@ -462,21 +582,45 @@ fn startup(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
 fn history(ui: &mut Ui, cx: &mut Cx<'_>) {
     ui_kit::card(ui, Some("History"), |ui| {
         Field::new("Record history").show(ui, |ui| {
-            ui_kit::switch(ui, "Remember what was captured and uploaded", &mut cx.settings.history.enabled);
+            ui_kit::switch(
+                ui,
+                "Remember what was captured and uploaded",
+                &mut cx.settings.history.enabled,
+            );
         });
         ui.add_space(4.0);
-        Field::new("Keep at most").help("Older entries are removed first. 0 keeps everything.").show(ui, |ui| {
-            number(ui, "Keep at most", &mut cx.settings.history.max_entries, 0..=1_000_000, " entries");
-        });
-        Field::new("Keep for").help("Entries older than this are removed. 0 keeps them forever.").show(ui, |ui| {
-            number(ui, "Keep for", &mut cx.settings.history.max_age_days, 0..=36_500, " days");
-        });
-        Field::new("Thumbnail size").issues(cx.issues, "history.thumbnail_max_edge")
+        Field::new("Keep at most")
+            .help("Older entries are removed first. 0 keeps everything.")
+            .show(ui, |ui| {
+                number(
+                    ui,
+                    "Keep at most",
+                    &mut cx.settings.history.max_entries,
+                    0..=1_000_000,
+                    " entries",
+                );
+            });
+        Field::new("Keep for")
+            .help("Entries older than this are removed. 0 keeps them forever.")
+            .show(ui, |ui| {
+                number(ui, "Keep for", &mut cx.settings.history.max_age_days, 0..=36_500, " days");
+            });
+        Field::new("Thumbnail size")
+            .issues(cx.issues, "history.thumbnail_max_edge")
             .help("Longest edge of the previews stored in the history (16 to 1024).")
             .show(ui, |ui| {
-                number(ui, "Thumbnail size", &mut cx.settings.history.thumbnail_max_edge, 16..=1024, " px");
+                number(
+                    ui,
+                    "Thumbnail size",
+                    &mut cx.settings.history.thumbnail_max_edge,
+                    16..=1024,
+                    " px",
+                );
             });
-        ui_kit::hint(ui, "Deleting entries now, or pruning to these limits, is done on the History page. Files on disk are never removed by retention.");
+        ui_kit::hint(
+            ui,
+            "Deleting entries now, or pruning to these limits, is done on the History page. Files on disk are never removed by retention.",
+        );
     });
 }
 

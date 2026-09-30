@@ -63,7 +63,8 @@ impl PatternReport {
             out.push(format!("{t} {hint}"));
         }
         if !self.illegal_chars.is_empty() {
-            let list: String = self.illegal_chars.iter().map(|c| display_char(*c)).collect::<Vec<_>>().join(" ");
+            let list: String =
+                self.illegal_chars.iter().map(|c| display_char(*c)).collect::<Vec<_>>().join(" ");
             out.push(match kind {
                 PatternKind::FileName => format!(
                     "{list} cannot be used in a file name and will be removed; for sub-folders use the folder pattern"
@@ -103,12 +104,10 @@ pub fn literal_text(source: &str) -> String {
             continue;
         }
         // Longest known token name, else the alphanumeric run (an unknown token).
-        let name_len = names
-            .iter()
-            .filter(|n| after.starts_with(**n))
-            .map(|n| n.len())
-            .max()
-            .unwrap_or_else(|| after.find(|c: char| !c.is_ascii_alphanumeric()).unwrap_or(after.len()));
+        let name_len =
+            names.iter().filter(|n| after.starts_with(**n)).map(|n| n.len()).max().unwrap_or_else(
+                || after.find(|c: char| !c.is_ascii_alphanumeric()).unwrap_or(after.len()),
+            );
         let mut tail = &after[name_len..];
         if name_len == 0 {
             // A lone percent sign is literal text.
@@ -228,15 +227,17 @@ pub fn preview_paths(
             Err(e) => error = Some(e.to_string()),
         }
     }
-    let file_name =
-        match render_file_name(&general.file_name_pattern, general.image_format.extension(), &ctx)
-        {
-            Ok(n) => n,
-            Err(e) => {
-                error.get_or_insert(e.to_string());
-                String::new()
-            }
-        };
+    let file_name = match render_file_name(
+        &general.file_name_pattern,
+        general.image_format.extension(),
+        &ctx,
+    ) {
+        Ok(n) => n,
+        Err(e) => {
+            error.get_or_insert(e.to_string());
+            String::new()
+        }
+    };
     PathPreview { full: dir.join(&file_name), folder, file_name, save_dir, error }
 }
 
@@ -366,7 +367,10 @@ mod tests {
             file_name_pattern: "x".into(),
             ..General::default()
         };
-        assert_eq!(preview_paths(&g, &clock(), &env(), &SampleInputs::default()).file_name, "x.jpg");
+        assert_eq!(
+            preview_paths(&g, &clock(), &env(), &SampleInputs::default()).file_name,
+            "x.jpg"
+        );
     }
 
     #[test]
@@ -378,7 +382,10 @@ mod tests {
         };
         let s = SampleInputs { next_counter: 7, ..SampleInputs::default() };
         let p = preview_paths(&g, &clock(), &env(), &s);
-        assert_eq!(p.file_name, "marius@laptop_firefox_Example_Domain_-_Firefox_1920 x 1080_007.png");
+        assert_eq!(
+            p.file_name,
+            "marius@laptop_firefox_Example_Domain_-_Firefox_1920 x 1080_007.png"
+        );
     }
 
     #[test]
@@ -402,7 +409,10 @@ mod tests {
             max_file_name_len: 5,
             ..General::default()
         };
-        assert_eq!(preview_paths(&g, &clock(), &env(), &SampleInputs::default()).file_name, "abcde.png");
+        assert_eq!(
+            preview_paths(&g, &clock(), &env(), &SampleInputs::default()).file_name,
+            "abcde.png"
+        );
     }
 
     #[test]
@@ -417,7 +427,9 @@ mod tests {
 
     #[test]
     fn clean_patterns_have_no_warnings() {
-        for src in ["Screenshot_%y-%mo-%d_%h-%mi-%s", "%i{4}", "%%literal", "%rf{C:\\lines.txt}", ""] {
+        for src in
+            ["Screenshot_%y-%mo-%d_%h-%mi-%s", "%i{4}", "%%literal", "%rf{C:\\lines.txt}", ""]
+        {
             let r = analyze(src, PatternKind::FileName);
             assert!(!r.has_warnings(), "{src}: {r:?}");
         }
@@ -438,7 +450,10 @@ mod tests {
         assert!(analyze("%rf{/tmp/a:b}", PatternKind::FileName).illegal_chars.is_empty());
         // control characters are illegal too
         assert_eq!(analyze("a\tb", PatternKind::FileName).illegal_chars, ['\t']);
-        assert!(analyze("a\tb", PatternKind::FileName).messages(PatternKind::FileName)[0].contains("U+0009"));
+        assert!(
+            analyze("a\tb", PatternKind::FileName).messages(PatternKind::FileName)[0]
+                .contains("U+0009")
+        );
     }
 
     #[test]
@@ -462,7 +477,10 @@ mod tests {
     fn cheat_sheet_covers_every_token_the_core_knows() {
         let documented: Vec<String> = CHEAT_SHEET.iter().flat_map(names_in).collect();
         for name in known_token_names() {
-            assert!(documented.iter().any(|d| d == name), "token %{name} is not in the cheat sheet");
+            assert!(
+                documented.iter().any(|d| d == name),
+                "token %{name} is not in the cheat sheet"
+            );
         }
         for d in &documented {
             assert!(
@@ -476,7 +494,10 @@ mod tests {
     fn cheat_sheet_examples_all_parse_as_known_tokens() {
         for row in CHEAT_SHEET {
             for w in row.token.split_whitespace() {
-                let sample = w.replace("{n}", "{4}").replace("{base,len}", "{62,4}").replace("{path}", "{/x}");
+                let sample = w
+                    .replace("{n}", "{4}")
+                    .replace("{base,len}", "{62,4}")
+                    .replace("{path}", "{/x}");
                 let r = analyze(&sample, PatternKind::FileName);
                 assert!(r.unknown_tokens.is_empty(), "{w}: {r:?}");
             }

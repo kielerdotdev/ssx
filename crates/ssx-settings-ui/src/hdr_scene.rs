@@ -183,7 +183,8 @@ pub fn build_scene(sdr_white_nits: f32) -> Scene {
     let mut ui_px = |x: u32, y: u32, c8: [u8; 3], canvas: &mut Canvas| {
         canvas.set(x, y, lin(c8));
         if UI_REGION.contains(x, y) {
-            let i = ((y - UI_REGION.y0) * (UI_REGION.x1 - UI_REGION.x0) + (x - UI_REGION.x0)) as usize;
+            let i =
+                ((y - UI_REGION.y0) * (UI_REGION.x1 - UI_REGION.x0) + (x - UI_REGION.x0)) as usize;
             ui_reference[i] = c8;
         }
     };
@@ -338,7 +339,9 @@ pub const fn operator_label(op: TonemapOperator) -> &'static str {
 pub const fn operator_blurb(op: TonemapOperator) -> &'static str {
     match op {
         TonemapOperator::Clip => "Hard clip at SDR white: the legacy look, highlights blow out.",
-        TonemapOperator::ReinhardExtended => "Smooth roll-off with a white point at the peak. The default.",
+        TonemapOperator::ReinhardExtended => {
+            "Smooth roll-off with a white point at the peak. The default."
+        }
         TonemapOperator::Bt2390 => "The broadcast standard's spline shoulder.",
         TonemapOperator::AcesFit => "Filmic curve; more contrast in the highlights.",
     }
@@ -370,10 +373,10 @@ impl Readout {
         let w = UI_REGION.x1 - UI_REGION.x0;
         for y in UI_REGION.y0..UI_REGION.y1 {
             for x in UI_REGION.x0..UI_REGION.x1 {
-                let want = scene.ui_reference[((y - UI_REGION.y0) * w + (x - UI_REGION.x0)) as usize];
+                let want =
+                    scene.ui_reference[((y - UI_REGION.y0) * w + (x - UI_REGION.x0)) as usize];
                 let got = out.get_pixel(x, y).0;
-                let dev =
-                    (0..3).map(|i| want[i].abs_diff(got[i])).max().unwrap_or(0);
+                let dev = (0..3).map(|i| want[i].abs_diff(got[i])).max().unwrap_or(0);
                 max_dev = max_dev.max(dev);
                 if dev == 0 {
                     identical += 1;
@@ -596,7 +599,10 @@ mod tests {
     #[test]
     fn presets_classify_and_round_trip() {
         assert_eq!(HdrPreset::classify(&HdrConfig::default()), HdrPreset::Faithful);
-        assert_eq!(HdrPreset::classify(&HdrConfig::preserve_highlights()), HdrPreset::PreserveHighlights);
+        assert_eq!(
+            HdrPreset::classify(&HdrConfig::preserve_highlights()),
+            HdrPreset::PreserveHighlights
+        );
         for p in [HdrPreset::Faithful, HdrPreset::PreserveHighlights] {
             assert_eq!(HdrPreset::classify(&p.config().unwrap()), p);
         }

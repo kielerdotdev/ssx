@@ -68,14 +68,27 @@ pub fn severity_icon(ui: &mut Ui, s: Severity) {
 /// A one-row text layout that ends in an ellipsis instead of wrapping.
 pub fn truncated(text: &str, font: FontId, color: Color32, width: f32) -> egui::text::LayoutJob {
     let mut job = egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color);
-    job.wrap = egui::text::TextWrapping { max_width: width.max(8.0), max_rows: 1, break_anywhere: true, overflow_character: Some('\u{2026}') };
+    job.wrap = egui::text::TextWrapping {
+        max_width: width.max(8.0),
+        max_rows: 1,
+        break_anywhere: true,
+        overflow_character: Some('\u{2026}'),
+    };
     job
 }
 
 /// A two-line list entry (title over a dimmed subtitle) that highlights when selected.
 /// `a11y` is the accessible name; `marker` shows a severity dot on the right.
-pub fn list_item(ui: &mut Ui, selected: bool, title: &str, subtitle: &str, marker: Option<Severity>, a11y: &str) -> Response {
-    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width().max(160.0), 44.0), Sense::click());
+pub fn list_item(
+    ui: &mut Ui,
+    selected: bool,
+    title: &str,
+    subtitle: &str,
+    marker: Option<Severity>,
+    a11y: &str,
+) -> Response {
+    let (rect, resp) =
+        ui.allocate_exact_size(vec2(ui.available_width().max(160.0), 44.0), Sense::click());
     resp.widget_info(|| WidgetInfo::selected(WidgetType::RadioButton, true, selected, a11y));
     if ui.is_rect_visible(rect) {
         let r = CornerRadius::same(5);
@@ -89,10 +102,20 @@ pub fn list_item(ui: &mut Ui, selected: bool, title: &str, subtitle: &str, marke
             ui.painter().rect_stroke(rect, r, Stroke::new(1.5, Color32::WHITE), StrokeKind::Inside);
         }
         let text_w = rect.width() - 22.0 - if marker.is_some() { 20.0 } else { 0.0 };
-        let title_job = truncated(title, FontId::proportional(13.5), if selected { Color32::WHITE } else { theme::TEXT }, text_w);
+        let title_job = truncated(
+            title,
+            FontId::proportional(13.5),
+            if selected { Color32::WHITE } else { theme::TEXT },
+            text_w,
+        );
         let g = ui.painter().layout_job(title_job);
         ui.painter().galley(pos2(rect.left() + 11.0, rect.top() + 6.0), g, theme::TEXT);
-        let sub_job = truncated(subtitle, FontId::proportional(11.5), if selected { Color32::from_rgb(196, 208, 230) } else { theme::TEXT_DIM }, text_w);
+        let sub_job = truncated(
+            subtitle,
+            FontId::proportional(11.5),
+            if selected { Color32::from_rgb(196, 208, 230) } else { theme::TEXT_DIM },
+            text_w,
+        );
         let g = ui.painter().layout_job(sub_job);
         ui.painter().galley(pos2(rect.left() + 11.0, rect.top() + 25.0), g, theme::TEXT_DIM);
         if let Some(sev) = marker {
@@ -155,8 +178,10 @@ pub fn issue_lines_exact(ui: &mut Ui, issues: &Issues, path: &str) {
             ui.spacing_mut().item_spacing.x = 5.0;
             severity_icon(ui, i.severity);
             ui.add(
-                egui::Label::new(RichText::new(&i.message).size(12.0).color(severity_color(i.severity)))
-                    .wrap(),
+                egui::Label::new(
+                    RichText::new(&i.message).size(12.0).color(severity_color(i.severity)),
+                )
+                .wrap(),
             );
         });
     }
@@ -206,10 +231,16 @@ impl<'a> Field<'a> {
     pub fn show<R>(self, ui: &mut Ui, add: impl FnOnce(&mut Ui) -> R) -> R {
         ui.horizontal_top(|ui| {
             let (rect, _) = ui.allocate_exact_size(vec2(self.label_width, 26.0), Sense::hover());
-            let label = if self.required { format!("{} *", self.label) } else { self.label.to_owned() };
-            let job = truncated(&label, FontId::proportional(13.0), theme::TEXT, self.label_width - 8.0);
+            let label =
+                if self.required { format!("{} *", self.label) } else { self.label.to_owned() };
+            let job =
+                truncated(&label, FontId::proportional(13.0), theme::TEXT, self.label_width - 8.0);
             let g = ui.painter().layout_job(job);
-            ui.painter().galley(pos2(rect.left(), rect.center().y - g.size().y / 2.0), g, theme::TEXT);
+            ui.painter().galley(
+                pos2(rect.left(), rect.center().y - g.size().y / 2.0),
+                g,
+                theme::TEXT,
+            );
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing.y = 3.0;
                 let r = add(ui);
@@ -228,7 +259,13 @@ impl<'a> Field<'a> {
 }
 
 /// A single-line text box named `label` for screen readers.
-pub fn text_input(ui: &mut Ui, label: &str, text: &mut String, hint_text: &str, width: f32) -> Response {
+pub fn text_input(
+    ui: &mut Ui,
+    label: &str,
+    text: &mut String,
+    hint_text: &str,
+    width: f32,
+) -> Response {
     widgets::input_style(ui);
     let r = ui.add(
         egui::TextEdit::singleline(text)
@@ -308,7 +345,11 @@ pub fn switch(ui: &mut Ui, label: &str, on: &mut bool) -> Response {
 }
 
 /// The editor's segmented control laid out on one row; returns the newly chosen value.
-pub fn segmented_row<T: PartialEq + Copy>(ui: &mut Ui, current: T, options: &[(T, &str)]) -> Option<T> {
+pub fn segmented_row<T: PartialEq + Copy>(
+    ui: &mut Ui,
+    current: T,
+    options: &[(T, &str)],
+) -> Option<T> {
     ui.horizontal(|ui| widgets::segmented(ui, current, options)).inner
 }
 
@@ -338,7 +379,13 @@ fn chip_padded(ui: &mut Ui, text: &str, selected: bool, pad: f32) -> Response {
         };
         ui.painter().rect_filled(rect, CornerRadius::same(12), fill);
         ui.painter().rect_stroke(rect, CornerRadius::same(12), stroke, StrokeKind::Inside);
-        ui.painter().text(rect.center(), Align2::CENTER_CENTER, text, font, if selected { Color32::WHITE } else { theme::TEXT });
+        ui.painter().text(
+            rect.center(),
+            Align2::CENTER_CENTER,
+            text,
+            font,
+            if selected { Color32::WHITE } else { theme::TEXT },
+        );
         if resp.has_focus() {
             ui.painter().rect_stroke(
                 rect.expand(1.5),
@@ -358,8 +405,17 @@ pub fn badge(ui: &mut Ui, text: &str, color: Color32) {
     let (rect, resp) = ui.allocate_exact_size(vec2(galley.size().x + 12.0, 18.0), Sense::hover());
     resp.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, text));
     ui.painter().rect_filled(rect, CornerRadius::same(9), color.gamma_multiply(0.18));
-    ui.painter().rect_stroke(rect, CornerRadius::same(9), Stroke::new(1.0, color.gamma_multiply(0.55)), StrokeKind::Inside);
-    ui.painter().galley(pos2(rect.left() + 6.0, rect.center().y - galley.size().y / 2.0), galley, color);
+    ui.painter().rect_stroke(
+        rect,
+        CornerRadius::same(9),
+        Stroke::new(1.0, color.gamma_multiply(0.55)),
+        StrokeKind::Inside,
+    );
+    ui.painter().galley(
+        pos2(rect.left() + 6.0, rect.center().y - galley.size().y / 2.0),
+        galley,
+        color,
+    );
 }
 
 /// A normal button with a minimum width.
@@ -386,21 +442,43 @@ pub fn danger(ui: &mut Ui, text: &str) -> Response {
     let galley = ui.painter().layout_no_wrap(text.to_owned(), font, ERROR_TEXT);
     let (rect, resp) = ui.allocate_exact_size(vec2(galley.size().x + 22.0, 26.0), Sense::click());
     resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, text));
-    let fill = if resp.hovered() { Color32::from_rgb(88, 44, 46) } else { Color32::from_rgb(62, 40, 42) };
+    let fill =
+        if resp.hovered() { Color32::from_rgb(88, 44, 46) } else { Color32::from_rgb(62, 40, 42) };
     ui.painter().rect_filled(rect, CornerRadius::same(5), fill);
-    ui.painter().rect_stroke(rect, CornerRadius::same(5), Stroke::new(1.0, ERROR_TEXT.gamma_multiply(0.7)), StrokeKind::Inside);
-    ui.painter().galley(pos2(rect.left() + 11.0, rect.center().y - galley.size().y / 2.0), galley, ERROR_TEXT);
+    ui.painter().rect_stroke(
+        rect,
+        CornerRadius::same(5),
+        Stroke::new(1.0, ERROR_TEXT.gamma_multiply(0.7)),
+        StrokeKind::Inside,
+    );
+    ui.painter().galley(
+        pos2(rect.left() + 11.0, rect.center().y - galley.size().y / 2.0),
+        galley,
+        ERROR_TEXT,
+    );
     if resp.has_focus() {
-        ui.painter().rect_stroke(rect.expand(1.5), CornerRadius::same(6), Stroke::new(1.5, Color32::WHITE), StrokeKind::Outside);
+        ui.painter().rect_stroke(
+            rect.expand(1.5),
+            CornerRadius::same(6),
+            Stroke::new(1.5, Color32::WHITE),
+            StrokeKind::Outside,
+        );
     }
     resp
 }
 
 /// A compact icon button (24 x 22) for row actions: move up, move down, remove. `tip` is the
 /// tooltip and the accessible name.
-pub fn mini_icon_button(ui: &mut Ui, icon: ssx_editor_ui::icons::Icon, tip: &str, enabled: bool) -> Response {
-    let (rect, resp) =
-        ui.allocate_exact_size(vec2(24.0, 22.0), if enabled { Sense::click() } else { Sense::hover() });
+pub fn mini_icon_button(
+    ui: &mut Ui,
+    icon: ssx_editor_ui::icons::Icon,
+    tip: &str,
+    enabled: bool,
+) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(
+        vec2(24.0, 22.0),
+        if enabled { Sense::click() } else { Sense::hover() },
+    );
     resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, tip));
     if ui.is_rect_visible(rect) {
         let hovered = resp.hovered() && enabled;
@@ -408,7 +486,12 @@ pub fn mini_icon_button(ui: &mut Ui, icon: ssx_editor_ui::icons::Icon, tip: &str
             ui.painter().rect_filled(rect, CornerRadius::same(4), theme::HOVER_BG);
         }
         if resp.has_focus() {
-            ui.painter().rect_stroke(rect, CornerRadius::same(4), Stroke::new(1.5, Color32::WHITE), StrokeKind::Inside);
+            ui.painter().rect_stroke(
+                rect,
+                CornerRadius::same(4),
+                Stroke::new(1.5, Color32::WHITE),
+                StrokeKind::Inside,
+            );
         }
         let ink = if !enabled {
             theme::TEXT_DIM.gamma_multiply(0.5)
@@ -429,7 +512,10 @@ pub fn mini_icon_button(ui: &mut Ui, icon: ssx_editor_ui::icons::Icon, tip: &str
 
 /// A borderless text-like button (links inside a sentence, "Show" toggles).
 pub fn link(ui: &mut Ui, text: &str) -> Response {
-    let r = ui.add(egui::Label::new(RichText::new(text).color(theme::ACCENT).underline()).sense(Sense::click()));
+    let r = ui.add(
+        egui::Label::new(RichText::new(text).color(theme::ACCENT).underline())
+            .sense(Sense::click()),
+    );
     r.widget_info(|| WidgetInfo::labeled(WidgetType::Link, true, text));
     r.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
@@ -563,7 +649,12 @@ pub fn show_toasts(ctx: &Context, toasts: &mut Toasts) {
                         .stroke(Stroke::new(1.0, accent.gamma_multiply(0.8)))
                         .corner_radius(CornerRadius::same(7))
                         .inner_margin(Margin::symmetric(12, 8))
-                        .shadow(egui::Shadow { offset: [0, 3], blur: 10, spread: 0, color: Color32::from_black_alpha(100) })
+                        .shadow(egui::Shadow {
+                            offset: [0, 3],
+                            blur: 10,
+                            spread: 0,
+                            color: Color32::from_black_alpha(100),
+                        })
                         .show(ui, |ui| {
                             ui.set_max_width(420.0);
                             ui.label(RichText::new(&t.text).color(text_col));
@@ -586,7 +677,14 @@ pub enum Answer {
 
 /// A modal confirmation with a confirm and a cancel button. `Esc` cancels. Returns the answer
 /// in the frame it is given.
-pub fn confirm(ctx: &Context, id: &str, title: &str, body: &str, confirm_label: &str, destructive: bool) -> Option<Answer> {
+pub fn confirm(
+    ctx: &Context,
+    id: &str,
+    title: &str,
+    body: &str,
+    confirm_label: &str,
+    destructive: bool,
+) -> Option<Answer> {
     let mut answer = None;
     let frame = Frame::popup(&ctx.global_style()).inner_margin(Margin::same(18));
     let m = Modal::new(Id::new(("ssx-confirm", id))).frame(frame).show(ctx, |ui| {
@@ -597,7 +695,11 @@ pub fn confirm(ctx: &Context, id: &str, title: &str, body: &str, confirm_label: 
         ui.add(egui::Label::new(body).wrap());
         ui.add_space(12.0);
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            let ok = if destructive { danger(ui, confirm_label) } else { primary(ui, confirm_label, true) };
+            let ok = if destructive {
+                danger(ui, confirm_label)
+            } else {
+                primary(ui, confirm_label, true)
+            };
             if ok.clicked() {
                 answer = Some(Answer::Confirm);
             }

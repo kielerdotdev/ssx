@@ -593,7 +593,11 @@ mod tests {
             ..HistoryFilter::default()
         };
         assert!(backwards.date_problems()[0].contains("after"));
-        let unused = HistoryFilter { range: DateRange::Week, from_text: "junk".into(), ..HistoryFilter::default() };
+        let unused = HistoryFilter {
+            range: DateRange::Week,
+            from_text: "junk".into(),
+            ..HistoryFilter::default()
+        };
         assert!(unused.date_problems().is_empty());
     }
 
@@ -697,7 +701,11 @@ mod tests {
         f.set_uploader(Some("imgur".into()));
         f.toggle_kind(EntryKind::Video);
         let p = load_page(&h, &f, now()).unwrap();
-        assert!(p.entries.iter().all(|e| e.kind == EntryKind::Video && e.uploader.as_deref() == Some("imgur")));
+        assert!(
+            p.entries
+                .iter()
+                .all(|e| e.kind == EntryKind::Video && e.uploader.as_deref() == Some("imgur"))
+        );
         assert_eq!(p.total, 3, "i % 12 == 0 among 0..30");
     }
 
@@ -751,7 +759,10 @@ mod tests {
         assert_eq!(format_time(ms("2025-03-15T14:05:00+02:00"), tz()), "2025-03-15 14:05");
         assert_eq!(format_time_relative(ms("2025-03-15T09:10:00+02:00"), now()), "Today 09:10");
         assert_eq!(format_time_relative(ms("2025-03-14T23:10:00+02:00"), now()), "Yesterday 23:10");
-        assert_eq!(format_time_relative(ms("2025-03-01T08:00:00+02:00"), now()), "2025-03-01 08:00");
+        assert_eq!(
+            format_time_relative(ms("2025-03-01T08:00:00+02:00"), now()),
+            "2025-03-01 08:00"
+        );
     }
 
     #[test]
@@ -774,9 +785,17 @@ mod tests {
 
     #[test]
     fn prune_policy_treats_zero_as_unlimited() {
-        let p = prune_policy(&HistorySettings { max_entries: 0, max_age_days: 0, ..HistorySettings::default() });
+        let p = prune_policy(&HistorySettings {
+            max_entries: 0,
+            max_age_days: 0,
+            ..HistorySettings::default()
+        });
         assert_eq!(p, PrunePolicy::default());
-        let p = prune_policy(&HistorySettings { max_entries: 50, max_age_days: 2, ..HistorySettings::default() });
+        let p = prune_policy(&HistorySettings {
+            max_entries: 50,
+            max_age_days: 2,
+            ..HistorySettings::default()
+        });
         assert_eq!(p.max_entries, Some(50));
         assert_eq!(p.max_age, Some(std::time::Duration::from_secs(2 * 86_400)));
         assert_eq!(destination_for(EntryKind::Video), DestinationType::Video);

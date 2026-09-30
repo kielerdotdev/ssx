@@ -68,7 +68,12 @@ pub fn demo_history(files_dir: &Path) -> Arc<History> {
             EntryKind::Text => "txt",
             _ => "zip",
         };
-        let name = format!("Screenshot_2025-03-{:02}_{:02}-{:02}-00.{ext}", 9 - (i / 12), 14 - (i % 12), (i * 7) % 60);
+        let name = format!(
+            "Screenshot_2025-03-{:02}_{:02}-{:02}-00.{ext}",
+            9 - (i / 12),
+            14 - (i % 12),
+            (i * 7) % 60
+        );
         let path: PathBuf = files_dir.join(&name);
         // every 5th entry has lost its file
         if i % 5 != 3 {
@@ -81,20 +86,32 @@ pub fn demo_history(files_dir: &Path) -> Arc<History> {
             e.height = Some(1080);
             // every 7th image has no stored thumbnail (falls back to the file / a placeholder)
             if i % 7 != 5 {
-                e.thumbnail = Some(thumbnail_from_image(&picture(i as u32), ThumbnailOptions::default()).unwrap());
+                e.thumbnail = Some(
+                    thumbnail_from_image(&picture(i as u32), ThumbnailOptions::default()).unwrap(),
+                );
             }
         }
         if i % 2 == 0 {
             let up = if i % 4 == 0 { "imgur" } else { "my-s3" };
             e.uploader = Some(up.to_owned());
-            e.upload_url = Some(if up == "imgur" { format!("https://i.imgur.com/k{i:03}Ab.png") } else { format!("https://cdn.example.com/shots/{i:03}.{ext}") });
+            e.upload_url = Some(if up == "imgur" {
+                format!("https://i.imgur.com/k{i:03}Ab.png")
+            } else {
+                format!("https://cdn.example.com/shots/{i:03}.{ext}")
+            });
             if up == "imgur" {
                 e.deletion_url = Some(format!("https://imgur.com/delete/{i:03}xyz"));
             }
         }
-        e.window_title = Some(["Firefox", "Terminal", "Settings", "Slack", "Figma"][(i % 5) as usize].to_owned());
-        e.process_name = Some(["firefox", "foot", "gnome-control-center", "slack", "figma"][(i % 5) as usize].to_owned());
-        e.workflow_id = Some(if i % 3 == 0 { "capture-region" } else { "capture-fullscreen" }.to_owned());
+        e.window_title = Some(
+            ["Firefox", "Terminal", "Settings", "Slack", "Figma"][(i % 5) as usize].to_owned(),
+        );
+        e.process_name = Some(
+            ["firefox", "foot", "gnome-control-center", "slack", "figma"][(i % 5) as usize]
+                .to_owned(),
+        );
+        e.workflow_id =
+            Some(if i % 3 == 0 { "capture-region" } else { "capture-fullscreen" }.to_owned());
         db.insert(&e).unwrap();
     }
     db
@@ -103,7 +120,10 @@ pub fn demo_history(files_dir: &Path) -> Arc<History> {
 /// Settings with a couple of uploaders and a few edits, like a lived-in install.
 pub fn lived_in_settings() -> Settings {
     let mut s = Settings::default();
-    s.uploaders.insert("imgur".into(), "type = 'imgur'\nclient_id = 'a1b2c3d4e5f6'\nthumbnail_size = 'medium'\n".parse().unwrap());
+    s.uploaders.insert(
+        "imgur".into(),
+        "type = 'imgur'\nclient_id = 'a1b2c3d4e5f6'\nthumbnail_size = 'medium'\n".parse().unwrap(),
+    );
     s.uploaders.insert(
         "my-s3".into(),
         "type = 's3'\npreset = 'r2'\nbucket = 'screenshots'\naccount_id = 'abc123'\naccess_key_id = 'keyring:my-s3-access-key-id'\nsecret_access_key = 'keyring:my-s3-secret-access-key'\npublic_url_template = 'https://cdn.example.com/{key}'\n".parse().unwrap(),

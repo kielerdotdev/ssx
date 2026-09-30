@@ -200,7 +200,8 @@ pub fn make(history: &History, req: &Request) -> Result<Decoded, String> {
         return Err("no preview stored for this kind of entry".to_owned());
     }
     let path = req.path.as_ref().ok_or_else(|| "no preview and no local file".to_owned())?;
-    let meta = std::fs::metadata(path).map_err(|_| "the file is gone and no preview was stored".to_owned())?;
+    let meta = std::fs::metadata(path)
+        .map_err(|_| "the file is gone and no preview was stored".to_owned())?;
     if meta.len() > MAX_FALLBACK_BYTES {
         return Err("the file is too large to preview".to_owned());
     }
@@ -224,7 +225,11 @@ impl std::fmt::Debug for Loader {
 
 impl Loader {
     /// Starts `threads` workers reading from `history`. `wake` is called after each answer.
-    pub fn new(history: Arc<History>, threads: usize, wake: impl Fn() + Send + Sync + 'static) -> Self {
+    pub fn new(
+        history: Arc<History>,
+        threads: usize,
+        wake: impl Fn() + Send + Sync + 'static,
+    ) -> Self {
         let (req_tx, req_rx) = mpsc::channel::<Request>();
         let (res_tx, res_rx) = mpsc::channel::<Response>();
         let req_rx = Arc::new(Mutex::new(req_rx));
@@ -232,17 +237,19 @@ impl Loader {
         let mut handles = Vec::new();
         for i in 0..threads.max(1) {
             let (rx, tx, h, w) = (req_rx.clone(), res_tx.clone(), history.clone(), wake.clone());
-            if let Ok(handle) = std::thread::Builder::new().name(format!("ssx-thumb-{i}")).spawn(move || {
-                loop {
-                    let next = rx.lock().unwrap_or_else(PoisonError::into_inner).recv();
-                    let Ok(req) = next else { break };
-                    let result = make(&h, &req);
-                    if tx.send(Response { id: req.id, result }).is_err() {
-                        break;
+            if let Ok(handle) =
+                std::thread::Builder::new().name(format!("ssx-thumb-{i}")).spawn(move || {
+                    loop {
+                        let next = rx.lock().unwrap_or_else(PoisonError::into_inner).recv();
+                        let Ok(req) = next else { break };
+                        let result = make(&h, &req);
+                        if tx.send(Response { id: req.id, result }).is_err() {
+                            break;
+                        }
+                        w();
                     }
-                    w();
-                }
-            }) {
+                })
+            {
                 handles.push(handle);
             }
         }
@@ -470,7 +477,10 @@ mod tests {
             w.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         });
         assert!(l.request(Request { id: ids[0], kind: EntryKind::Image, path: None }));
-        assert!(!l.request(Request { id: ids[0], kind: EntryKind::Image, path: None }), "already on its way");
+        assert!(
+            !l.request(Request { id: ids[0], kind: EntryKind::Image, path: None }),
+            "already on its way"
+        );
         assert!(l.request(Request {
             id: ids[1],
             kind: EntryKind::Image,

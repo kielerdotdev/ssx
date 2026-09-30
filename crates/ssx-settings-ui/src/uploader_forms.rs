@@ -69,7 +69,9 @@ impl UploaderKind {
             UploaderKind::S3 => "AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO and others.",
             UploaderKind::Http => "PUT or POST the file to any URL, with optional authentication.",
             UploaderKind::Local => "Copy files into a folder and report a file:// or web URL.",
-            UploaderKind::Shortener => "Turns long URLs into short ones (is.gd, v.gd, TinyURL or your own).",
+            UploaderKind::Shortener => {
+                "Turns long URLs into short ones (is.gd, v.gd, TinyURL or your own)."
+            }
         }
     }
 
@@ -112,7 +114,12 @@ pub struct FieldSpec {
     pub advanced: bool,
 }
 
-const fn f(key: &'static str, label: &'static str, help: &'static str, kind: FieldKind) -> FieldSpec {
+const fn f(
+    key: &'static str,
+    label: &'static str,
+    help: &'static str,
+    kind: FieldKind,
+) -> FieldSpec {
     FieldSpec { key, label, help, kind, required: false, advanced: false }
 }
 
@@ -129,48 +136,113 @@ const fn adv(mut s: FieldSpec) -> FieldSpec {
 use FieldKind::{Choice, Folder, Map, Secret, Text};
 
 const IMGUR: &[FieldSpec] = &[
-    f("client_id", "Client ID", "For anonymous uploads: register an application at api.imgur.com/oauth2/addclient.", Text),
-    f("access_token", "Access token", "For uploads to your account. Used instead of the client ID when set.", Secret),
+    f(
+        "client_id",
+        "Client ID",
+        "For anonymous uploads: register an application at api.imgur.com/oauth2/addclient.",
+        Text,
+    ),
+    f(
+        "access_token",
+        "Access token",
+        "For uploads to your account. Used instead of the client ID when set.",
+        Secret,
+    ),
     f("title", "Title", "Title given to every upload.", Text),
     f("description", "Description", "Description given to every upload.", Text),
     f("album", "Album", "Album (id or delete hash) to add uploads to.", Text),
-    f("thumbnail_size", "Thumbnail size", "Size of the thumbnail URL.", Choice(&["small", "thumb", "medium", "large", "huge"])),
+    f(
+        "thumbnail_size",
+        "Thumbnail size",
+        "Size of the thumbnail URL.",
+        Choice(&["small", "thumb", "medium", "large", "huge"]),
+    ),
     adv(f("api_base", "API base URL", "For self-hosted or test servers.", Text)),
     adv(f("image_base", "Image base URL", "Where image links point.", Text)),
     adv(f("site_base", "Site base URL", "Where page links point.", Text)),
 ];
 
 const S3: &[FieldSpec] = &[
-    f("preset", "Provider", "Fills in the endpoint style. `custom` needs an endpoint.", Choice(&["aws", "r2", "b2", "wasabi", "minio", "custom"])),
+    f(
+        "preset",
+        "Provider",
+        "Fills in the endpoint style. `custom` needs an endpoint.",
+        Choice(&["aws", "r2", "b2", "wasabi", "minio", "custom"]),
+    ),
     req(f("bucket", "Bucket", "The bucket to upload into.", Text)),
     f("region", "Region", "For example us-east-1; Backblaze needs it.", Text),
     f("endpoint", "Endpoint", "Required for `custom` and `minio`: https://host:port.", Text),
     f("account_id", "Account ID", "Cloudflare R2 only.", Text),
     f("access_key_id", "Access key ID", "Stored in the keyring, never in settings.toml.", Secret),
-    f("secret_access_key", "Secret access key", "Stored in the keyring, never in settings.toml.", Secret),
+    f(
+        "secret_access_key",
+        "Secret access key",
+        "Stored in the keyring, never in settings.toml.",
+        Secret,
+    ),
     f("key_prefix", "Key prefix", "Folder inside the bucket, e.g. screenshots/.", Text),
-    f("public_url_template", "Public URL", "How the link is built, e.g. https://cdn.example.com/{key}.", Text),
+    f(
+        "public_url_template",
+        "Public URL",
+        "How the link is built, e.g. https://cdn.example.com/{key}.",
+        Text,
+    ),
     adv(f("session_token", "Session token", "Temporary credentials only.", Secret)),
-    adv(f("addressing", "Addressing", "How the bucket appears in the URL.", Choice(&["auto", "path", "virtual"]))),
+    adv(f(
+        "addressing",
+        "Addressing",
+        "How the bucket appears in the URL.",
+        Choice(&["auto", "path", "virtual"]),
+    )),
     adv(f("key_template", "Key template", "Object name pattern.", Text)),
     adv(f("acl", "ACL", "For example public-read.", Text)),
     adv(f("storage_class", "Storage class", "For example STANDARD_IA.", Text)),
     adv(f("cache_control", "Cache-Control", "Header stored with the object.", Text)),
     adv(f("content_disposition", "Content-Disposition", "Header stored with the object.", Text)),
-    adv(f("payload_signing", "Payload signing", "Whether request bodies are hashed.", Choice(&["auto", "unsigned", "hashed"]))),
+    adv(f(
+        "payload_signing",
+        "Payload signing",
+        "Whether request bodies are hashed.",
+        Choice(&["auto", "unsigned", "hashed"]),
+    )),
     adv(f("headers", "Extra headers", "Sent with every request.", Map)),
 ];
 
 const HTTP: &[FieldSpec] = &[
-    req(f("url", "URL", "Where to send the file. The file name is appended for raw PUT uploads.", Text)),
+    req(f(
+        "url",
+        "URL",
+        "Where to send the file. The file name is appended for raw PUT uploads.",
+        Text,
+    )),
     f("method", "Method", "Default is put.", Choice(&["put", "post", "patch"])),
-    f("body", "Body", "raw sends the file as the body; multipart sends a form.", Choice(&["raw", "multipart"])),
-    f("field", "Form field", "Multipart only: the field that carries the file (default file).", Text),
-    f("auth", "Authentication", "How to prove who you are.", Choice(&["none", "bearer", "basic", "header"])),
+    f(
+        "body",
+        "Body",
+        "raw sends the file as the body; multipart sends a form.",
+        Choice(&["raw", "multipart"]),
+    ),
+    f(
+        "field",
+        "Form field",
+        "Multipart only: the field that carries the file (default file).",
+        Text,
+    ),
+    f(
+        "auth",
+        "Authentication",
+        "How to prove who you are.",
+        Choice(&["none", "bearer", "basic", "header"]),
+    ),
     f("auth_secret", "Token or password", "Stored in the keyring, never in settings.toml.", Secret),
     f("auth_user", "User name", "For basic authentication.", Text),
     f("auth_header", "Header name", "For header authentication, e.g. X-Api-Key.", Text),
-    f("result", "URL of the result", "request_url, body, header:<Name>, json:</pointer> or template:<text>.", Text),
+    f(
+        "result",
+        "URL of the result",
+        "request_url, body, header:<Name>, json:</pointer> or template:<text>.",
+        Text,
+    ),
     adv(f("fields", "Extra form fields", "Multipart only.", Map)),
     adv(f("headers", "Extra headers", "Sent with every request.", Map)),
 ];
@@ -181,10 +253,20 @@ const LOCAL: &[FieldSpec] = &[
 ];
 
 const SHORTENER: &[FieldSpec] = &[
-    f("service", "Service", "A built-in service, or leave empty and give an endpoint.", Choice(&["is.gd", "v.gd", "tinyurl"])),
+    f(
+        "service",
+        "Service",
+        "A built-in service, or leave empty and give an endpoint.",
+        Choice(&["is.gd", "v.gd", "tinyurl"]),
+    ),
     f("endpoint", "Endpoint", "Your own shortening service.", Text),
     adv(f("method", "Method", "Default is get.", Choice(&["get", "post"]))),
-    adv(f("url_param", "URL parameter", "Name of the parameter that carries the long URL (default url).", Text)),
+    adv(f(
+        "url_param",
+        "URL parameter",
+        "Name of the parameter that carries the long URL (default url).",
+        Text,
+    )),
     adv(f("response", "Response", "text, or json:</pointer>.", Text)),
     adv(f("params", "Extra parameters", "Sent with every request.", Map)),
     adv(f("headers", "Extra headers", "Sent with every request.", Map)),
@@ -246,9 +328,7 @@ pub fn get_map(t: &Table, key: &str) -> Vec<(String, String)> {
     t.get(key)
         .and_then(Value::as_table)
         .map(|m| {
-            m.iter()
-                .map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_owned()))
-                .collect()
+            m.iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_owned())).collect()
         })
         .unwrap_or_default()
 }
@@ -322,10 +402,7 @@ pub fn free_name(base: &str, taken: &[String]) -> String {
     if !taken.contains(&base) {
         return base;
     }
-    (2..)
-        .map(|n| format!("{base}-{n}"))
-        .find(|c| !taken.contains(c))
-        .unwrap_or(base)
+    (2..).map(|n| format!("{base}-{n}")).find(|c| !taken.contains(c)).unwrap_or(base)
 }
 
 #[cfg(test)]
@@ -359,7 +436,9 @@ mod tests {
             match spec.kind {
                 Choice(options) => Value::String(options[0].to_owned()),
                 Secret => Value::String("keyring:some-secret".to_owned()),
-                Map => Value::Table([("X-A".to_owned(), Value::String("b".into()))].into_iter().collect()),
+                Map => Value::Table(
+                    [("X-A".to_owned(), Value::String("b".into()))].into_iter().collect(),
+                ),
                 Folder => Value::String("/tmp/ssx-out".into()),
                 Text => Value::String(match (kind, spec.key) {
                     (UploaderKind::S3, "endpoint") => "https://s3.example.com".to_owned(),
@@ -368,7 +447,9 @@ mod tests {
                     (_, "result") => "body".to_owned(),
                     (_, "response") => "text".to_owned(),
                     (UploaderKind::Imgur, "client_id") => "abc123".to_owned(),
-                    (_, k) if k.ends_with("_base") || k == "base_url" => "https://example.com".to_owned(),
+                    (_, k) if k.ends_with("_base") || k == "base_url" => {
+                        "https://example.com".to_owned()
+                    }
                     (_, "public_url_template") => "https://cdn.example.com/{key}".to_owned(),
                     _ => "x".to_owned(),
                 }),
@@ -427,14 +508,23 @@ mod tests {
                             }
                             UploaderKind::S3 => {
                                 t.insert("bucket".into(), Value::String("b".into()));
-                                t.insert("endpoint".into(), Value::String("https://e.example.com".into()));
+                                t.insert(
+                                    "endpoint".into(),
+                                    Value::String("https://e.example.com".into()),
+                                );
                                 t.insert("account_id".into(), Value::String("acc".into()));
                                 t.insert("region".into(), Value::String("eu-1".into()));
                             }
                             UploaderKind::Http => {
-                                t.insert("url".into(), Value::String("https://e.example.com".into()));
+                                t.insert(
+                                    "url".into(),
+                                    Value::String("https://e.example.com".into()),
+                                );
                                 if spec.key == "auth" && *o != "none" {
-                                    t.insert("auth_secret".into(), Value::String("keyring:s".into()));
+                                    t.insert(
+                                        "auth_secret".into(),
+                                        Value::String("keyring:s".into()),
+                                    );
                                     t.insert("auth_user".into(), Value::String("u".into()));
                                     t.insert("auth_header".into(), Value::String("X-K".into()));
                                 }
@@ -442,7 +532,10 @@ mod tests {
                             UploaderKind::Shortener => {
                                 if spec.key != "service" {
                                     t.remove("service");
-                                    t.insert("endpoint".into(), Value::String("https://e.example.com/api".into()));
+                                    t.insert(
+                                        "endpoint".into(),
+                                        Value::String("https://e.example.com/api".into()),
+                                    );
                                 }
                             }
                             UploaderKind::Local => {}
@@ -473,8 +566,19 @@ mod tests {
     #[test]
     fn maps_round_trip() {
         let mut t = Table::new();
-        set_map(&mut t, "headers", &[("X-A".into(), "1".into()), ("  ".into(), "dropped".into()), ("X-B".into(), "2".into())]);
-        assert_eq!(get_map(&t, "headers"), [("X-A".to_owned(), "1".to_owned()), ("X-B".into(), "2".into())]);
+        set_map(
+            &mut t,
+            "headers",
+            &[
+                ("X-A".into(), "1".into()),
+                ("  ".into(), "dropped".into()),
+                ("X-B".into(), "2".into()),
+            ],
+        );
+        assert_eq!(
+            get_map(&t, "headers"),
+            [("X-A".to_owned(), "1".to_owned()), ("X-B".into(), "2".into())]
+        );
         set_map(&mut t, "headers", &[]);
         assert!(t.get("headers").is_none());
         assert!(get_map(&t, "nothing").is_empty());
@@ -482,7 +586,9 @@ mod tests {
 
     #[test]
     fn secret_references_and_plain_text_are_told_apart() {
-        let t = table("type='s3'\nbucket='b'\naccess_key_id='keyring:my-key'\nsecret_access_key='oops-plain'\n");
+        let t = table(
+            "type='s3'\nbucket='b'\naccess_key_id='keyring:my-key'\nsecret_access_key='oops-plain'\n",
+        );
         assert_eq!(secret_refs(UploaderKind::S3, &t), [("access_key_id", "my-key".to_owned())]);
         assert_eq!(has_plaintext_secret(UploaderKind::S3, &t), ["secret_access_key"]);
         assert!(has_plaintext_secret(UploaderKind::Local, &Table::new()).is_empty());

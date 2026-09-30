@@ -12,13 +12,7 @@ use std::{
 use egui::{Event, Modifiers, PointerButton, Pos2, Vec2, pos2};
 use egui_kittest::{Harness, kittest::Queryable};
 use ssx_core::settings::{Paths, Settings};
-use ssx_settings_ui::{
-    SettingsApp,
-    host::Host,
-    model::SettingsModel,
-    nav::Page,
-    task::no_wake,
-};
+use ssx_settings_ui::{SettingsApp, host::Host, model::SettingsModel, nav::Page, task::no_wake};
 
 /// A window in a temp folder, with the temp folder kept alive.
 pub struct Fixture {
@@ -59,7 +53,11 @@ pub fn app_with(page: Page, settings: Settings) -> (SettingsApp, Fixture) {
 }
 
 /// Like [`app_with`], letting the test replace parts of the (sandboxed) host first.
-pub fn app_custom(page: Page, settings: Settings, customise: impl FnOnce(&mut Host, &Path)) -> (SettingsApp, Fixture) {
+pub fn app_custom(
+    page: Page,
+    settings: Settings,
+    customise: impl FnOnce(&mut Host, &Path),
+) -> (SettingsApp, Fixture) {
     let fx = Fixture { dir: tempfile::tempdir().unwrap() };
     let mut host = Host::sandboxed(fx.root());
     customise(&mut host, fx.root());
@@ -197,14 +195,24 @@ pub fn click_and_copied(h: &mut Harness<'_, SettingsApp>, label: &str) -> Vec<St
 pub fn drag(h: &mut Harness<'_, SettingsApp>, from: Pos2, to: Pos2) {
     h.hover_at(from);
     h.step();
-    h.event(Event::PointerButton { pos: from, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
+    h.event(Event::PointerButton {
+        pos: from,
+        button: PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
     h.step();
     for i in 1..=6 {
         let t = i as f32 / 6.0;
         h.hover_at(pos2(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t));
         h.step();
     }
-    h.event(Event::PointerButton { pos: to, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
+    h.event(Event::PointerButton {
+        pos: to,
+        button: PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
     h.step();
     settle(h);
 }

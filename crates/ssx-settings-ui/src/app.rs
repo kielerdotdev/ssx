@@ -75,12 +75,24 @@ pub enum Tone {
 }
 
 /// The footer sentence for the current state, and its tone.
-pub fn footer_status(dirty: &[Page], errors: usize, warnings: usize, conflict: bool) -> (String, Tone) {
+pub fn footer_status(
+    dirty: &[Page],
+    errors: usize,
+    warnings: usize,
+    conflict: bool,
+) -> (String, Tone) {
     if conflict {
-        return ("settings.toml changed on disk: choose Reload or Overwrite above".to_owned(), Tone::Blocked);
+        return (
+            "settings.toml changed on disk: choose Reload or Overwrite above".to_owned(),
+            Tone::Blocked,
+        );
     }
     if errors > 0 {
-        let s = if errors == 1 { "1 problem must be fixed before saving".to_owned() } else { format!("{errors} problems must be fixed before saving") };
+        let s = if errors == 1 {
+            "1 problem must be fixed before saving".to_owned()
+        } else {
+            format!("{errors} problems must be fixed before saving")
+        };
         return (s, Tone::Blocked);
     }
     if dirty.is_empty() {
@@ -141,7 +153,10 @@ pub struct SettingsApp {
 
 impl std::fmt::Debug for SettingsApp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SettingsApp").field("page", &self.page).field("outcome", &self.outcome).finish_non_exhaustive()
+        f.debug_struct("SettingsApp")
+            .field("page", &self.page)
+            .field("outcome", &self.outcome)
+            .finish_non_exhaustive()
     }
 }
 
@@ -195,7 +210,11 @@ impl SettingsApp {
 
     /// The finished outcome (with the page that was showing).
     pub fn outcome(&self) -> Outcome {
-        Outcome { page: Some(self.page), discarded: self.outcome.discarded || (self.model.is_dirty() && self.force_close), ..self.outcome.clone() }
+        Outcome {
+            page: Some(self.page),
+            discarded: self.outcome.discarded || (self.model.is_dirty() && self.force_close),
+            ..self.outcome.clone()
+        }
     }
 
     // ---- actions -----------------------------------------------------------------------
@@ -208,14 +227,16 @@ impl SettingsApp {
                 self.outcome.saved = true;
                 self.outcome.writes += 1;
                 self.save_error = None;
-                self.toasts.success(now, "Saved. The running ssx picks the new settings up by itself.");
+                self.toasts
+                    .success(now, "Saved. The running ssx picks the new settings up by itself.");
                 true
             }
             Err(SaveError::Blocked { count, first }) => {
                 if let Some(p) = self.model.issues().first_page_with_error() {
                     self.page = p;
                 }
-                self.toasts.error(now, format!("Not saved: {count} problem(s) to fix first ({first})"));
+                self.toasts
+                    .error(now, format!("Not saved: {count} problem(s) to fix first ({first})"));
                 false
             }
             Err(SaveError::Conflict) => {
@@ -292,8 +313,14 @@ impl SettingsApp {
             let next = i.consume_key(egui::Modifiers::COMMAND, egui::Key::PageDown);
             let prev = i.consume_key(egui::Modifiers::COMMAND, egui::Key::PageUp);
             let keys = [
-                egui::Key::Num1, egui::Key::Num2, egui::Key::Num3, egui::Key::Num4,
-                egui::Key::Num5, egui::Key::Num6, egui::Key::Num7, egui::Key::Num8,
+                egui::Key::Num1,
+                egui::Key::Num2,
+                egui::Key::Num3,
+                egui::Key::Num4,
+                egui::Key::Num5,
+                egui::Key::Num6,
+                egui::Key::Num7,
+                egui::Key::Num8,
             ];
             let jump = keys.iter().position(|k| i.consume_key(egui::Modifiers::COMMAND, *k));
             (apply, next, prev, jump)
@@ -317,24 +344,39 @@ impl SettingsApp {
     /// Draws the whole window.
     pub fn show(&mut self, ui: &mut Ui) {
         let ctx = ui.ctx().clone();
-        let registry = self.registry.get(self.model.working(), &self.host.paths.config_dir, &self.host.vault.store());
-        let issues = self.model.issues().clone().without_known_uploader_hints(|n| registry.get(n).is_some());
+        let registry = self.registry.get(
+            self.model.working(),
+            &self.host.paths.config_dir,
+            &self.host.vault.store(),
+        );
+        let issues =
+            self.model.issues().clone().without_known_uploader_hints(|n| registry.get(n).is_some());
         let dirty_pages = self.model.dirty_pages();
 
         egui::Panel::left("nav")
             .exact_size(200.0)
             .resizable(false)
             .show_separator_line(false)
-            .frame(egui::Frame::new().fill(theme::BAR_BG).inner_margin(egui::Margin::symmetric(10, 12)))
+            .frame(
+                egui::Frame::new()
+                    .fill(theme::BAR_BG)
+                    .inner_margin(egui::Margin::symmetric(10, 12)),
+            )
             .show(ui, |ui| self.nav(ui, &issues, &dirty_pages));
 
         egui::Panel::bottom("footer")
-            .frame(egui::Frame::new().fill(theme::BAR_BG).inner_margin(egui::Margin::symmetric(14, 8)))
+            .frame(
+                egui::Frame::new().fill(theme::BAR_BG).inner_margin(egui::Margin::symmetric(14, 8)),
+            )
             .show_separator_line(true)
             .show(ui, |ui| self.footer(ui, &issues, &dirty_pages));
 
         egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(ui_kit::PAGE_BG).inner_margin(egui::Margin::symmetric(18, 10)))
+            .frame(
+                egui::Frame::new()
+                    .fill(ui_kit::PAGE_BG)
+                    .inner_margin(egui::Margin::symmetric(18, 10)),
+            )
             .show(ui, |ui| {
                 self.banners(ui);
                 ui_kit::page_header(ui, self.page.label(), self.page.blurb());
@@ -350,7 +392,11 @@ impl SettingsApp {
         let before = self.model.working().clone();
         let mut go_to = None;
         let now = self.now();
-        let registry = self.registry.get(self.model.working(), &self.host.paths.config_dir, &self.host.vault.store());
+        let registry = self.registry.get(
+            self.model.working(),
+            &self.host.paths.config_dir,
+            &self.host.vault.store(),
+        );
         {
             let settings = self.model.working_mut();
             let mut cx = Cx {
@@ -412,14 +458,26 @@ impl SettingsApp {
         ui.add_space(14.0);
         for (n, page) in Page::ALL.into_iter().enumerate() {
             let (errors, warnings) = issues.counts_for(page);
-            let r = nav_item(ui, page, self.page == page, dirty.contains(&page), errors, warnings, n + 1);
+            let r = nav_item(
+                ui,
+                page,
+                self.page == page,
+                dirty.contains(&page),
+                errors,
+                warnings,
+                n + 1,
+            );
             if r.clicked() {
                 self.page = page;
             }
         }
         ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
             ui.add_space(2.0);
-            ui.label(RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).size(11.0).color(theme::TEXT_DIM));
+            ui.label(
+                RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                    .size(11.0)
+                    .color(theme::TEXT_DIM),
+            );
         });
     }
 
@@ -428,20 +486,35 @@ impl SettingsApp {
     fn banners(&mut self, ui: &mut Ui) {
         if let Some(c) = self.model.conflict().cloned() {
             let text = if c.deleted {
-                "settings.toml was deleted by another program while you had unsaved edits.".to_owned()
+                "settings.toml was deleted by another program while you had unsaved edits."
+                    .to_owned()
             } else if let Some(e) = &c.disk_error {
-                format!("settings.toml was changed by another program and can no longer be read ({e}).")
+                format!(
+                    "settings.toml was changed by another program and can no longer be read ({e})."
+                )
             } else {
-                "settings.toml was changed by another program while you had unsaved edits.".to_owned()
+                "settings.toml was changed by another program while you had unsaved edits."
+                    .to_owned()
             };
             let mut reload = false;
             let mut overwrite = false;
             banner(ui, ui_kit::WARN_TEXT, &text, |ui| {
                 let can_reload = !c.deleted && c.disk_error.is_none();
-                if ui_kit::button_if(ui, "Reload from disk", can_reload, "The file on disk cannot be read").on_hover_text("Discard your edits and load the file").clicked() {
+                if ui_kit::button_if(
+                    ui,
+                    "Reload from disk",
+                    can_reload,
+                    "The file on disk cannot be read",
+                )
+                .on_hover_text("Discard your edits and load the file")
+                .clicked()
+                {
                     reload = true;
                 }
-                if ui_kit::danger(ui, "Overwrite the file").on_hover_text("Keep your edits; the next Apply replaces the file on disk").clicked() {
+                if ui_kit::danger(ui, "Overwrite the file")
+                    .on_hover_text("Keep your edits; the next Apply replaces the file on disk")
+                    .clicked()
+                {
                     overwrite = true;
                 }
             });
@@ -502,12 +575,28 @@ impl SettingsApp {
                 self.page = p;
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                let why = if conflict { "Resolve the change on disk first" } else { "Fix the problems first" };
-                if ui_kit::primary(ui, "Save", !blocked).on_hover_text("Write settings.toml and close (Ctrl+S applies without closing)").clicked() && !blocked {
+                let why = if conflict {
+                    "Resolve the change on disk first"
+                } else {
+                    "Fix the problems first"
+                };
+                if ui_kit::primary(ui, "Save", !blocked)
+                    .on_hover_text("Write settings.toml and close (Ctrl+S applies without closing)")
+                    .clicked()
+                    && !blocked
+                {
                     self.save_and_close(&ctx);
                 }
-                let apply = ui_kit::button_if(ui, "Apply", is_dirty && !blocked, if is_dirty { why } else { "Nothing to apply" });
-                if apply.on_hover_text("Write settings.toml now and keep this window open").clicked() {
+                let apply = ui_kit::button_if(
+                    ui,
+                    "Apply",
+                    is_dirty && !blocked,
+                    if is_dirty { why } else { "Nothing to apply" },
+                );
+                if apply
+                    .on_hover_text("Write settings.toml now and keep this window open")
+                    .clicked()
+                {
                     self.apply(&ctx);
                 }
                 let revert = ui_kit::button_if(ui, "Revert", is_dirty, "No unsaved changes");
@@ -526,7 +615,8 @@ impl SettingsApp {
             Some(Dialog::Unsaved) => {
                 let blocked = self.model.issues().blocks_save() || self.model.conflict().is_some();
                 let mut choice = None;
-                let frame = egui::Frame::popup(&ctx.global_style()).inner_margin(egui::Margin::same(18));
+                let frame =
+                    egui::Frame::popup(&ctx.global_style()).inner_margin(egui::Margin::same(18));
                 let m = egui::Modal::new(egui::Id::new("ssx-unsaved")).frame(frame).show(ctx, |ui| {
                     ssx_editor_ui::ui::widgets::input_style(ui);
                     ui.set_width(440.0);
@@ -590,7 +680,15 @@ fn banner(ui: &mut Ui, color: Color32, text: &str, buttons: impl FnOnce(&mut Ui)
 }
 
 /// One row of the navigation rail.
-fn nav_item(ui: &mut Ui, page: Page, selected: bool, dirty: bool, errors: usize, warnings: usize, number: usize) -> egui::Response {
+fn nav_item(
+    ui: &mut Ui,
+    page: Page,
+    selected: bool,
+    dirty: bool,
+    errors: usize,
+    warnings: usize,
+    number: usize,
+) -> egui::Response {
     let size = vec2(ui.available_width(), 34.0);
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     let mut label = page.label().to_owned();
@@ -600,13 +698,18 @@ fn nav_item(ui: &mut Ui, page: Page, selected: bool, dirty: bool, errors: usize,
     if errors > 0 {
         label.push_str(&format!(", {errors} problem{}", if errors == 1 { "" } else { "s" }));
     }
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, selected, label.clone()));
+    resp.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, selected, label.clone())
+    });
     if ui.is_rect_visible(rect) {
         let r = egui::CornerRadius::same(6);
         if selected {
             ui.painter().rect_filled(rect, r, theme::ACTIVE_BG);
             ui.painter().rect_filled(
-                egui::Rect::from_min_size(rect.min + vec2(0.0, 6.0), vec2(3.0, rect.height() - 12.0)),
+                egui::Rect::from_min_size(
+                    rect.min + vec2(0.0, 6.0),
+                    vec2(3.0, rect.height() - 12.0),
+                ),
                 egui::CornerRadius::same(2),
                 theme::ACCENT,
             );
@@ -614,10 +717,18 @@ fn nav_item(ui: &mut Ui, page: Page, selected: bool, dirty: bool, errors: usize,
             ui.painter().rect_filled(rect, r, theme::HOVER_BG.gamma_multiply(0.7));
         }
         if resp.has_focus() {
-            ui.painter().rect_stroke(rect, r, egui::Stroke::new(1.5, Color32::WHITE), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(
+                rect,
+                r,
+                egui::Stroke::new(1.5, Color32::WHITE),
+                egui::StrokeKind::Inside,
+            );
         }
         let ink = if selected || resp.hovered() { Color32::WHITE } else { theme::TEXT };
-        let icon_rect = egui::Rect::from_center_size(egui::pos2(rect.left() + 20.0, rect.center().y), vec2(20.0, 20.0));
+        let icon_rect = egui::Rect::from_center_size(
+            egui::pos2(rect.left() + 20.0, rect.center().y),
+            vec2(20.0, 20.0),
+        );
         icons::paint(ui.painter(), page.icon(), icon_rect, IconColors::with_ink(ink));
         ui.painter().text(
             egui::pos2(rect.left() + 38.0, rect.center().y),
@@ -654,9 +765,15 @@ mod tests {
         assert_eq!(footer_status(&[], 0, 2, false).0, "All changes saved; 2 warnings");
         assert_eq!(footer_status(&[], 0, 1, false).0, "All changes saved; 1 warning");
         let (t, tone) = footer_status(&[Page::General, Page::Capture], 0, 0, false);
-        assert_eq!((t.as_str(), tone), ("Unsaved changes in General, Capture & HDR", Tone::Pending));
+        assert_eq!(
+            (t.as_str(), tone),
+            ("Unsaved changes in General, Capture & HDR", Tone::Pending)
+        );
         assert!(footer_status(&[Page::General], 0, 1, false).0.ends_with("; 1 warning"));
-        assert_eq!(footer_status(&[Page::General], 1, 0, false), ("1 problem must be fixed before saving".to_owned(), Tone::Blocked));
+        assert_eq!(
+            footer_status(&[Page::General], 1, 0, false),
+            ("1 problem must be fixed before saving".to_owned(), Tone::Blocked)
+        );
         assert_eq!(footer_status(&[], 3, 0, false).0, "3 problems must be fixed before saving");
         assert_eq!(footer_status(&[Page::General], 3, 0, true).1, Tone::Blocked);
         assert!(footer_status(&[], 0, 0, true).0.contains("Reload"));

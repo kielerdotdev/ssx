@@ -36,7 +36,9 @@ impl FileStamp {
     /// Fingerprint of `path`; `Ok(None)` if the file does not exist.
     pub fn read(path: &Path) -> std::io::Result<Option<FileStamp>> {
         match std::fs::read(path) {
-            Ok(bytes) => Ok(Some(FileStamp { len: bytes.len() as u64, sha256: sha256_hex(&bytes) })),
+            Ok(bytes) => {
+                Ok(Some(FileStamp { len: bytes.len() as u64, sha256: sha256_hex(&bytes) }))
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e),
         }
@@ -433,7 +435,11 @@ mod tests {
         assert!(m.conflict().is_some());
         assert!(matches!(m.save().unwrap_err(), SaveError::Conflict));
         assert_eq!(
-            Settings::load(&dir.path().join("settings.toml")).unwrap().settings.general.image_quality,
+            Settings::load(&dir.path().join("settings.toml"))
+                .unwrap()
+                .settings
+                .general
+                .image_quality,
             33,
             "the other program's file is untouched"
         );
@@ -442,7 +448,11 @@ mod tests {
         assert!(m.conflict().is_none());
         m.save().unwrap();
         assert_eq!(
-            Settings::load(&dir.path().join("settings.toml")).unwrap().settings.general.image_quality,
+            Settings::load(&dir.path().join("settings.toml"))
+                .unwrap()
+                .settings
+                .general
+                .image_quality,
             10
         );
     }
@@ -467,7 +477,8 @@ mod tests {
         let (dir, mut m) = model();
         m.save().unwrap();
         m.working_mut().general.image_quality = 10;
-        std::fs::write(dir.path().join("settings.toml"), "[general]\nimage_quality = 44\n").unwrap();
+        std::fs::write(dir.path().join("settings.toml"), "[general]\nimage_quality = 44\n")
+            .unwrap();
         assert!(matches!(m.save().unwrap_err(), SaveError::Conflict));
         assert!(m.conflict().is_some());
     }

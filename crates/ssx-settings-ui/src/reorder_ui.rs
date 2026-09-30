@@ -68,7 +68,12 @@ pub fn list(
             let hot = resp.hovered() || resp.has_focus() || dragging_this;
             paint_grip(ui, rect, hot);
             if resp.has_focus() {
-                ui.painter().rect_stroke(rect.expand(1.0), 4.0, Stroke::new(1.5, Color32::WHITE), egui::StrokeKind::Outside);
+                ui.painter().rect_stroke(
+                    rect.expand(1.0),
+                    4.0,
+                    Stroke::new(1.5, Color32::WHITE),
+                    egui::StrokeKind::Outside,
+                );
             }
             if resp.hovered() && drag.from.is_none() {
                 ui.ctx().set_cursor_icon(CursorIcon::Grab);
@@ -134,7 +139,12 @@ pub fn list(
 
 /// Applies `moved` to `items` and, for a keyboard move, makes the focus follow the row.
 /// Returns the row's new position.
-pub fn apply<T>(ui: &Ui, id_salt: impl std::hash::Hash + std::fmt::Debug, items: &mut Vec<T>, moved: Moved) -> Option<usize> {
+pub fn apply<T>(
+    ui: &Ui,
+    id_salt: impl std::hash::Hash + std::fmt::Debug,
+    items: &mut Vec<T>,
+    moved: Moved,
+) -> Option<usize> {
     let pos = moved.mv.apply(items)?;
     if moved.keyboard {
         let id = ui.make_persistent_id(id_salt);
@@ -142,4 +152,3 @@ pub fn apply<T>(ui: &Ui, id_salt: impl std::hash::Hash + std::fmt::Debug, items:
     }
     Some(pos)
 }
-

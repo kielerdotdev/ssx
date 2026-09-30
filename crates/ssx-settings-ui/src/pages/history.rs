@@ -29,7 +29,8 @@ use crate::{
     debounce::Debouncer,
     history_view::{
         DateRange, EntryActions, HistoryFilter, HistoryPage, KINDS, destination_for, entry_title,
-        format_time, format_time_relative, human_bytes, kind_label, kind_word, load_page, prune_policy,
+        format_time, format_time_relative, human_bytes, kind_label, kind_word, load_page,
+        prune_policy,
     },
     task::Slot,
     thumbs::{Cache, Loader, Request, State as ThumbState},
@@ -254,13 +255,21 @@ fn poll(st: &mut State, cx: &mut Cx<'_>, ctx: &egui::Context) {
     if let Some(r) = st.op.poll() {
         match r {
             OpResult::Deleted { entries, file_error } => {
-                cx.toasts.success(t, format!("Deleted {entries} entr{}", if entries == 1 { "y" } else { "ies" }));
+                cx.toasts.success(
+                    t,
+                    format!("Deleted {entries} entr{}", if entries == 1 { "y" } else { "ies" }),
+                );
                 if let Some(e) = file_error {
                     cx.toasts.error(t, format!("The file could not be deleted: {e}"));
                 }
             }
-            OpResult::Pruned(n) => cx.toasts.success(t, format!("Pruned {n} entr{}", if n == 1 { "y" } else { "ies" })),
-            OpResult::MissingRemoved(n) => cx.toasts.success(t, format!("Removed {n} entr{} whose file is gone", if n == 1 { "y" } else { "ies" })),
+            OpResult::Pruned(n) => {
+                cx.toasts.success(t, format!("Pruned {n} entr{}", if n == 1 { "y" } else { "ies" }))
+            }
+            OpResult::MissingRemoved(n) => cx.toasts.success(
+                t,
+                format!("Removed {n} entr{} whose file is gone", if n == 1 { "y" } else { "ies" }),
+            ),
             OpResult::Reuploaded(url) => cx.toasts.success(t, format!("Uploaded again: {url}")),
             OpResult::Failed(e) => cx.toasts.error(t, e),
         }
@@ -270,8 +279,15 @@ fn poll(st: &mut State, cx: &mut Cx<'_>, ctx: &egui::Context) {
         for r in l.drain() {
             let state = match r.result {
                 Ok(d) => {
-                    let img = ColorImage::from_rgba_unmultiplied([d.width as usize, d.height as usize], &d.rgba);
-                    ThumbState::Ready(ctx.load_texture(format!("hist-{}", r.id), img, TextureOptions::LINEAR))
+                    let img = ColorImage::from_rgba_unmultiplied(
+                        [d.width as usize, d.height as usize],
+                        &d.rgba,
+                    );
+                    ThumbState::Ready(ctx.load_texture(
+                        format!("hist-{}", r.id),
+                        img,
+                        TextureOptions::LINEAR,
+                    ))
                 }
                 Err(e) => ThumbState::Missing(e),
             };
@@ -302,7 +318,9 @@ fn start_load(st: &mut State, cx: &Cx<'_>) {
     st.requested = Some(want.clone());
     let now = cx.now;
     let d2 = db.clone();
-    st.load.start(cx.wake, move || load_page(&db, &want, now).map(|p| (want.clone(), p)).map_err(|e| e.to_string()));
+    st.load.start(cx.wake, move || {
+        load_page(&db, &want, now).map(|p| (want.clone(), p)).map_err(|e| e.to_string())
+    });
     if !st.orphan_slot.running() {
         st.orphan_slot.start(cx.wake, move || d2.find_orphans().map_err(|e| e.to_string()));
     }
@@ -319,13 +337,18 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     poll(st, cx, &ctx);
     start_load(st, cx);
     if let Some(next) = st.next_refresh {
-        ctx.request_repaint_after(next.saturating_duration_since(Instant::now()).max(Duration::from_millis(200)));
+        ctx.request_repaint_after(
+            next.saturating_duration_since(Instant::now()).max(Duration::from_millis(200)),
+        );
     }
 
     if let Some(e) = st.error.clone() {
         ui_kit::card(ui, Some("The history cannot be opened"), |ui| {
             ui.add(egui::Label::new(RichText::new(&e).color(ui_kit::ERROR_TEXT)).wrap());
-            ui_kit::hint(ui, "The file is never deleted or replaced by this window. Check its permissions, or move it aside yourself to start a new history.");
+            ui_kit::hint(
+                ui,
+                "The file is never deleted or replaced by this window. Check its permissions, or move it aside yourself to start a new history.",
+            );
             if ui_kit::button(ui, "Try again").clicked() {
                 st.error = None;
                 st.reset_source();
@@ -343,13 +366,19 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 12.0;
         ui.allocate_ui(vec2((total_w - detail_w - 30.0).max(300.0), avail.max(200.0)), |ui| {
-            egui::ScrollArea::vertical().id_salt("history-scroll").auto_shrink([false, false]).show(ui, |ui| match st.view {
-                View::Grid => grid(ui, st, cx),
-                View::List => list(ui, st, cx),
-            });
+            egui::ScrollArea::vertical()
+                .id_salt("history-scroll")
+                .auto_shrink([false, false])
+                .show(ui, |ui| match st.view {
+                    View::Grid => grid(ui, st, cx),
+                    View::List => list(ui, st, cx),
+                });
         });
         ui.allocate_ui(vec2(detail_w, avail.max(200.0)), |ui| {
-            egui::ScrollArea::vertical().id_salt("history-detail").auto_shrink([false, false]).show(ui, |ui| detail(ui, st, cx));
+            egui::ScrollArea::vertical()
+                .id_salt("history-detail")
+                .auto_shrink([false, false])
+                .show(ui, |ui| detail(ui, st, cx));
         });
     });
     paging(ui, st);
@@ -361,7 +390,13 @@ fn toolbar(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
             input_style(ui);
-            let r = ui_kit::text_input(ui, "Search the history", &mut st.search_edit, "Search names, links, titles, notes...", 260.0);
+            let r = ui_kit::text_input(
+                ui,
+                "Search the history",
+                &mut st.search_edit,
+                "Search names, links, titles, notes...",
+                260.0,
+            );
             let _ = r;
             for k in KINDS {
                 if ui_kit::chip(ui, kind_label(k), st.filter.has_kind(k)).clicked() {
@@ -372,14 +407,18 @@ fn toolbar(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing = egui::vec2(8.0, 6.0);
             input_style(ui);
-            let range = egui::ComboBox::from_id_salt("history-range").selected_text(st.filter.range.label()).show_ui(ui, |ui| {
-                for r in DateRange::ALL {
-                    if ui.selectable_label(st.filter.range == r, r.label()).clicked() {
-                        st.filter.set_range(r);
+            let range = egui::ComboBox::from_id_salt("history-range")
+                .selected_text(st.filter.range.label())
+                .show_ui(ui, |ui| {
+                    for r in DateRange::ALL {
+                        if ui.selectable_label(st.filter.range == r, r.label()).clicked() {
+                            st.filter.set_range(r);
+                        }
                     }
-                }
+                });
+            range.response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, "Date range")
             });
-            range.response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, "Date range"));
             if st.filter.range == DateRange::Custom {
                 ui_kit::text_input(ui, "From date", &mut st.filter.from_text, "2025-01-01", 96.0);
                 ui.label("to");
@@ -401,12 +440,15 @@ fn toolbar(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                         st.filter.set_uploader(None);
                     }
                     for n in &names {
-                        if ui.selectable_label(selected.as_deref() == Some(n.as_str()), n).clicked() {
+                        if ui.selectable_label(selected.as_deref() == Some(n.as_str()), n).clicked()
+                        {
                             st.filter.set_uploader(Some(n.clone()));
                         }
                     }
                 });
-            up.response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, "Uploader"));
+            up.response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, "Uploader")
+            });
             let mut only = st.filter.uploaded_only;
             if ui_kit::switch(ui, "Uploaded only", &mut only).changed() {
                 st.filter.set_uploaded_only(only);
@@ -428,11 +470,26 @@ fn toolbar(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             }
             let policy = prune_policy(&cx.settings.history);
             let limited = policy.max_entries.is_some() || policy.max_age.is_some();
-            if ui_kit::button_if(ui, "Prune now...", limited, "No limits are set: see History on the General page").on_hover_text("Remove entries beyond the retention limits").clicked() {
+            if ui_kit::button_if(
+                ui,
+                "Prune now...",
+                limited,
+                "No limits are set: see History on the General page",
+            )
+            .on_hover_text("Remove entries beyond the retention limits")
+            .clicked()
+            {
                 st.confirm = Some(Confirm::Prune);
             }
             let n = st.orphan_count();
-            if ui_kit::button_if(ui, &format!("Remove {n} with missing files..."), n > 0, "Every entry's file still exists").clicked() {
+            if ui_kit::button_if(
+                ui,
+                &format!("Remove {n} with missing files..."),
+                n > 0,
+                "Every entry's file still exists",
+            )
+            .clicked()
+            {
                 st.confirm = Some(Confirm::RemoveMissing);
             }
         });
@@ -445,7 +502,11 @@ fn paging(ui: &mut Ui, st: &mut State) {
     ui.horizontal(|ui| {
         input_style(ui);
         let text = if total == 0 {
-            if st.load.running() || st.page.is_none() { "Loading...".to_owned() } else { "Nothing here".to_owned() }
+            if st.load.running() || st.page.is_none() {
+                "Loading...".to_owned()
+            } else {
+                "Nothing here".to_owned()
+            }
         } else {
             let from = st.filter.page * st.filter.page_size + 1;
             let to = (from + st.page.as_ref().map_or(0, |p| p.entries.len())).saturating_sub(1);
@@ -453,13 +514,22 @@ fn paging(ui: &mut Ui, st: &mut State) {
         };
         ui.label(RichText::new(text).color(theme::TEXT));
         if st.page.as_ref().is_some_and(|p| p.truncated) {
-            ui_kit::hint(ui, &format!("(the uploader filter looked at the newest {} entries)", crate::history_view::SCAN_LIMIT));
+            ui_kit::hint(
+                ui,
+                &format!(
+                    "(the uploader filter looked at the newest {} entries)",
+                    crate::history_view::SCAN_LIMIT
+                ),
+            );
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui_kit::button_if(ui, "Next", st.filter.page + 1 < pages, "Last page").clicked() {
                 st.filter.page += 1;
             }
-            ui.label(RichText::new(format!("Page {} of {pages}", st.filter.page + 1)).color(theme::TEXT_DIM));
+            ui.label(
+                RichText::new(format!("Page {} of {pages}", st.filter.page + 1))
+                    .color(theme::TEXT_DIM),
+            );
             if ui_kit::button_if(ui, "Previous", st.filter.page > 0, "First page").clicked() {
                 st.filter.page -= 1;
             }
@@ -497,14 +567,30 @@ fn paint_thumb(ui: &mut Ui, st: &mut State, e: &Entry, rect: egui::Rect) {
             let size = tex.size_vec2();
             let scale = (rect.width() / size.x).min(rect.height() / size.y);
             let r = egui::Rect::from_center_size(rect.center(), size * scale);
-            ui.painter().image(tex.id(), r, egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
+            ui.painter().image(
+                tex.id(),
+                r,
+                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                Color32::WHITE,
+            );
         }
         Some(ThumbState::Pending) | None => {
-            ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, "...", egui::FontId::proportional(14.0), theme::TEXT_DIM);
+            ui.painter().text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                "...",
+                egui::FontId::proportional(14.0),
+                theme::TEXT_DIM,
+            );
         }
         Some(ThumbState::Missing(_)) => {
             let s = rect.height().min(34.0);
-            icons::paint(ui.painter(), kind_icon(e.kind), egui::Rect::from_center_size(rect.center(), vec2(s, s)), IconColors::with_ink(theme::TEXT_DIM));
+            icons::paint(
+                ui.painter(),
+                kind_icon(e.kind),
+                egui::Rect::from_center_size(rect.center(), vec2(s, s)),
+                IconColors::with_ink(theme::TEXT_DIM),
+            );
         }
     }
 }
@@ -536,24 +622,59 @@ fn grid(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             let (rect, resp) = ui.allocate_exact_size(card, egui::Sense::click());
             let selected = st.selected == Some(e.id);
             let title = entry_title(e);
-            resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, selected, format!("{} {title}", kind_word(e.kind))));
+            resp.widget_info(|| {
+                egui::WidgetInfo::selected(
+                    egui::WidgetType::RadioButton,
+                    true,
+                    selected,
+                    format!("{} {title}", kind_word(e.kind)),
+                )
+            });
             if resp.clicked() {
                 st.selected = Some(e.id);
             }
             let hovered = resp.hovered();
-            let fill = if selected { theme::ACTIVE_BG } else if hovered { theme::HOVER_BG } else { ui_kit::CARD_BG };
+            let fill = if selected {
+                theme::ACTIVE_BG
+            } else if hovered {
+                theme::HOVER_BG
+            } else {
+                ui_kit::CARD_BG
+            };
             ui.painter().rect_filled(rect, 6.0, fill);
-            ui.painter().rect_stroke(rect, 6.0, egui::Stroke::new(1.0, if selected { theme::ACCENT } else { ui_kit::CARD_STROKE }), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(
+                rect,
+                6.0,
+                egui::Stroke::new(1.0, if selected { theme::ACCENT } else { ui_kit::CARD_STROKE }),
+                egui::StrokeKind::Inside,
+            );
             if resp.has_focus() {
-                ui.painter().rect_stroke(rect.expand(1.0), 7.0, egui::Stroke::new(1.5, Color32::WHITE), egui::StrokeKind::Outside);
+                ui.painter().rect_stroke(
+                    rect.expand(1.0),
+                    7.0,
+                    egui::Stroke::new(1.5, Color32::WHITE),
+                    egui::StrokeKind::Outside,
+                );
             }
-            let thumb = egui::Rect::from_min_size(rect.min + vec2(6.0, 6.0), vec2(card.x - 12.0, 96.0));
+            let thumb =
+                egui::Rect::from_min_size(rect.min + vec2(6.0, 6.0), vec2(card.x - 12.0, 96.0));
             paint_thumb(ui, st, e, thumb);
             badges(ui, st, e, thumb);
             let text_pos = egui::pos2(rect.left() + 8.0, thumb.bottom() + 6.0);
-            let title_galley = ui.painter().layout_job(ui_kit::truncated(&title, egui::FontId::proportional(12.5), if selected { Color32::WHITE } else { theme::TEXT }, card.x - 16.0));
+            let title_galley = ui.painter().layout_job(ui_kit::truncated(
+                &title,
+                egui::FontId::proportional(12.5),
+                if selected { Color32::WHITE } else { theme::TEXT },
+                card.x - 16.0,
+            ));
             ui.painter().galley(text_pos, title_galley, theme::TEXT);
-            ui.painter().text(text_pos + vec2(0.0, 20.0), egui::Align2::LEFT_TOP, subtitle(e, cx.now), egui::FontId::proportional(11.0), if selected { Color32::from_rgb(200, 210, 230) } else { theme::TEXT_DIM });
+            ui.painter().text(
+                text_pos + vec2(0.0, 20.0),
+                egui::Align2::LEFT_TOP,
+                subtitle(e, cx.now),
+                egui::FontId::proportional(11.0),
+                if selected { Color32::from_rgb(200, 210, 230) } else { theme::TEXT_DIM },
+            );
             resp.on_hover_text(title);
         }
     });
@@ -562,7 +683,8 @@ fn grid(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
 fn badges(ui: &mut Ui, st: &State, e: &Entry, thumb: egui::Rect) {
     let mut x = thumb.right() - 4.0;
     let mut put = |ui: &mut Ui, text: &str, color: Color32, left: bool| {
-        let g = ui.painter().layout_no_wrap(text.to_owned(), egui::FontId::proportional(10.5), color);
+        let g =
+            ui.painter().layout_no_wrap(text.to_owned(), egui::FontId::proportional(10.5), color);
         let w = g.size().x + 10.0;
         let r = if left {
             egui::Rect::from_min_size(thumb.min + vec2(4.0, 4.0), vec2(w, 16.0))
@@ -598,24 +720,54 @@ fn list(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         return;
     }
     for e in &page.entries {
-        let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), egui::Sense::click());
+        let (rect, resp) =
+            ui.allocate_exact_size(vec2(ui.available_width(), 44.0), egui::Sense::click());
         let selected = st.selected == Some(e.id);
         let title = entry_title(e);
-        resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, selected, format!("{} {title}", kind_word(e.kind))));
+        resp.widget_info(|| {
+            egui::WidgetInfo::selected(
+                egui::WidgetType::RadioButton,
+                true,
+                selected,
+                format!("{} {title}", kind_word(e.kind)),
+            )
+        });
         if resp.clicked() {
             st.selected = Some(e.id);
         }
-        let fill = if selected { theme::ACTIVE_BG } else if resp.hovered() { theme::HOVER_BG } else { ui_kit::CARD_BG };
+        let fill = if selected {
+            theme::ACTIVE_BG
+        } else if resp.hovered() {
+            theme::HOVER_BG
+        } else {
+            ui_kit::CARD_BG
+        };
         ui.painter().rect_filled(rect, 5.0, fill);
         if resp.has_focus() {
-            ui.painter().rect_stroke(rect, 5.0, egui::Stroke::new(1.5, Color32::WHITE), egui::StrokeKind::Inside);
+            ui.painter().rect_stroke(
+                rect,
+                5.0,
+                egui::Stroke::new(1.5, Color32::WHITE),
+                egui::StrokeKind::Inside,
+            );
         }
         let thumb = egui::Rect::from_min_size(rect.min + vec2(5.0, 4.0), vec2(56.0, 36.0));
         paint_thumb(ui, st, e, thumb);
         let x = thumb.right() + 10.0;
-        let g = ui.painter().layout_job(ui_kit::truncated(&title, egui::FontId::proportional(13.0), if selected { Color32::WHITE } else { theme::TEXT }, (rect.right() - x - 190.0).max(80.0)));
+        let g = ui.painter().layout_job(ui_kit::truncated(
+            &title,
+            egui::FontId::proportional(13.0),
+            if selected { Color32::WHITE } else { theme::TEXT },
+            (rect.right() - x - 190.0).max(80.0),
+        ));
         ui.painter().galley(egui::pos2(x, rect.top() + 7.0), g, theme::TEXT);
-        ui.painter().text(egui::pos2(x, rect.top() + 25.0), egui::Align2::LEFT_TOP, subtitle(e, cx.now), egui::FontId::proportional(11.0), theme::TEXT_DIM);
+        ui.painter().text(
+            egui::pos2(x, rect.top() + 25.0),
+            egui::Align2::LEFT_TOP,
+            subtitle(e, cx.now),
+            egui::FontId::proportional(11.0),
+            theme::TEXT_DIM,
+        );
         let mut rx = rect.right() - 10.0;
         for (text, color) in [
             (st.is_orphan(e.id).then_some("file missing"), ui_kit::WARN_TEXT),
@@ -623,7 +775,11 @@ fn list(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             (Some(kind_word(e.kind)), theme::TEXT_DIM),
         ] {
             if let Some(t) = text {
-                let g = ui.painter().layout_no_wrap(t.to_owned(), egui::FontId::proportional(11.5), color);
+                let g = ui.painter().layout_no_wrap(
+                    t.to_owned(),
+                    egui::FontId::proportional(11.5),
+                    color,
+                );
                 rx -= g.size().x;
                 ui.painter().galley(egui::pos2(rx, rect.center().y - g.size().y / 2.0), g, color);
                 rx -= 14.0;
@@ -639,7 +795,9 @@ fn empty(ui: &mut Ui, st: &State) {
     ui.add_space(24.0);
     ui.vertical_centered(|ui| {
         if st.filter.is_filtering() {
-            ui.label(RichText::new("No entry matches these filters.").size(15.0).color(theme::TEXT));
+            ui.label(
+                RichText::new("No entry matches these filters.").size(15.0).color(theme::TEXT),
+            );
             ui_kit::hint(ui, "Try fewer words, or clear the filters.");
         } else {
             ui.label(RichText::new("The history is empty.").size(15.0).color(theme::TEXT));
@@ -713,7 +871,16 @@ fn detail(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         if actions.orphan {
             ui.horizontal_top(|ui| {
                 ui_kit::severity_icon(ui, ssx_core::settings::Severity::Warning);
-                ui.add(egui::Label::new(RichText::new("The file was moved or deleted. The entry and its link are still here.").size(12.0).color(ui_kit::WARN_TEXT)).wrap());
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(
+                            "The file was moved or deleted. The entry and its link are still here.",
+                        )
+                        .size(12.0)
+                        .color(ui_kit::WARN_TEXT),
+                    )
+                    .wrap(),
+                );
             });
         }
     });
@@ -721,35 +888,53 @@ fn detail(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         let t = cx.time(ui.ctx());
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
-            if ui_kit::button_if(ui, "Copy link", actions.copy_url, "This entry has no link").clicked()
+            if ui_kit::button_if(ui, "Copy link", actions.copy_url, "This entry has no link")
+                .clicked()
                 && let Some(u) = &e.upload_url
             {
                 ui.ctx().copy_text(u.clone());
                 cx.toasts.success(t, "Link copied");
             }
-            if ui_kit::button_if(ui, "Open link", actions.open_url, "This entry has no web link").clicked()
+            if ui_kit::button_if(ui, "Open link", actions.open_url, "This entry has no web link")
+                .clicked()
                 && let Some(u) = &e.upload_url
                 && let Err(err) = cx.host.opener.open_url(u)
             {
                 cx.toasts.error(t, err);
             }
-            if ui_kit::button_if(ui, "Open file", actions.open_file, "The file does not exist").clicked()
+            if ui_kit::button_if(ui, "Open file", actions.open_file, "The file does not exist")
+                .clicked()
                 && let Some(p) = &e.local_path
                 && let Err(err) = cx.host.opener.open_path(p)
             {
                 cx.toasts.error(t, err);
             }
-            if ui_kit::button_if(ui, "Open folder", actions.open_folder, "The folder does not exist").clicked()
+            if ui_kit::button_if(
+                ui,
+                "Open folder",
+                actions.open_folder,
+                "The folder does not exist",
+            )
+            .clicked()
                 && let Some(d) = e.local_path.as_deref().and_then(Path::parent)
                 && let Err(err) = cx.host.opener.open_path(d)
             {
                 cx.toasts.error(t, err);
             }
-            if ui_kit::button_if(ui, "Upload again...", actions.reupload, "There is no file to upload").clicked() {
+            if ui_kit::button_if(
+                ui,
+                "Upload again...",
+                actions.reupload,
+                "There is no file to upload",
+            )
+            .clicked()
+            {
                 st.reupload = Some(Reupload { id: e.id, ..Reupload::default() });
             }
             if actions.has_deletion_url
-                && ui_kit::button(ui, "Open delete link").on_hover_text("Open the link that removes the uploaded copy").clicked()
+                && ui_kit::button(ui, "Open delete link")
+                    .on_hover_text("Open the link that removes the uploaded copy")
+                    .clicked()
                 && let Some(u) = &e.deletion_url
                 && let Err(err) = cx.host.opener.open_url(u)
             {
@@ -840,7 +1025,9 @@ fn confirm_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
             match c {
                 Confirm::Delete(id) => {
                     let path = entry.and_then(|e| e.local_path);
-                    st.op.start(cx.wake, move || delete_entry(&db, id, path.as_deref().filter(|_| also_file)));
+                    st.op.start(cx.wake, move || {
+                        delete_entry(&db, id, path.as_deref().filter(|_| also_file))
+                    });
                     st.selected = None;
                 }
                 Confirm::Prune => st.op.start(cx.wake, move || match db.prune(&policy, now_ms()) {
@@ -877,8 +1064,16 @@ fn reupload_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
     let Some(mut r) = st.reupload.take() else { return };
     let Some(e) = st.entry(r.id).cloned() else { return };
     let ty = destination_for(e.kind);
-    let ext = e.local_path.as_deref().and_then(|p| p.extension()).map(|x| x.to_string_lossy().into_owned());
-    let default = cx.settings.destinations.resolve(ty, &Default::default(), ext.as_deref()).map(str::to_owned);
+    let ext = e
+        .local_path
+        .as_deref()
+        .and_then(|p| p.extension())
+        .map(|x| x.to_string_lossy().into_owned());
+    let default = cx
+        .settings
+        .destinations
+        .resolve(ty, &Default::default(), ext.as_deref())
+        .map(str::to_owned);
     let none_label = match &default {
         Some(d) => format!("Default for {} ({d})", crate::uploader_registry::type_word(ty)),
         None => format!("Default for {} (not set)", crate::uploader_registry::type_word(ty)),
@@ -896,13 +1091,28 @@ fn reupload_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
         ui.label(entry_title(&e));
         ui.add_space(8.0);
         ui.add_enabled_ui(!running, |ui| {
-            destination_picker(ui, "reupload-dest", "Destination", &mut r.destination, ty, &registry, &none_label);
+            destination_picker(
+                ui,
+                "reupload-dest",
+                "Destination",
+                &mut r.destination,
+                ty,
+                &registry,
+                &none_label,
+            );
         });
         if running {
             ui.add_space(8.0);
-            let (sent, total) = *r.progress.lock().unwrap_or_else(PoisonError::into_inner).as_ref().unwrap_or(&(0, None));
+            let (sent, total) = *r
+                .progress
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .as_ref()
+                .unwrap_or(&(0, None));
             let bar = match super::uploaders::progress_fraction(sent, total) {
-                Some(f) => egui::ProgressBar::new(f).text(super::uploaders::progress_text(sent, total)),
+                Some(f) => {
+                    egui::ProgressBar::new(f).text(super::uploaders::progress_text(sent, total))
+                }
                 None => egui::ProgressBar::new(0.0).animate(true).text("uploading..."),
             };
             ui.add(bar.desired_width(400.0));
@@ -913,7 +1123,10 @@ fn reupload_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
         }
         ui.add_space(12.0);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if !running && ui_kit::primary(ui, "Upload", chosen.is_some()).clicked() && chosen.is_some() {
+            if !running
+                && ui_kit::primary(ui, "Upload", chosen.is_some()).clicked()
+                && chosen.is_some()
+            {
                 answer = Some(Answer::Confirm);
             }
             let label = if running { "Cancel upload" } else { "Close" };
@@ -972,7 +1185,13 @@ fn start_reupload(r: &mut Reupload, cx: &Cx<'_>, dest: &str, path: &Path, ty: De
         name: dest.to_owned(),
         secrets: cx.host.vault.store(),
     };
-    let (up, path, c, p, name) = (cx.host.uploads.clone(), path.to_path_buf(), cancel.clone(), progress.clone(), dest.to_owned());
+    let (up, path, c, p, name) = (
+        cx.host.uploads.clone(),
+        path.to_path_buf(),
+        cancel.clone(),
+        progress.clone(),
+        dest.to_owned(),
+    );
     let _ = mime_for;
     r.error = None;
     r.cancel = Some(cancel);
@@ -1003,12 +1222,21 @@ mod tests {
         assert_eq!(delete_entry(&db, id, None), OpResult::Deleted { entries: 1, file_error: None });
         assert!(file.exists(), "the file stays unless asked");
         let id = db.insert(&e).unwrap();
-        assert_eq!(delete_entry(&db, id, Some(&file)), OpResult::Deleted { entries: 1, file_error: None });
+        assert_eq!(
+            delete_entry(&db, id, Some(&file)),
+            OpResult::Deleted { entries: 1, file_error: None }
+        );
         assert!(!file.exists());
         // a file that is already gone is not an error; a missing entry deletes nothing
         let id = db.insert(&e).unwrap();
-        assert_eq!(delete_entry(&db, id, Some(&file)), OpResult::Deleted { entries: 1, file_error: None });
-        assert_eq!(delete_entry(&db, 9999, None), OpResult::Deleted { entries: 0, file_error: None });
+        assert_eq!(
+            delete_entry(&db, id, Some(&file)),
+            OpResult::Deleted { entries: 1, file_error: None }
+        );
+        assert_eq!(
+            delete_entry(&db, 9999, None),
+            OpResult::Deleted { entries: 0, file_error: None }
+        );
     }
 
     #[test]
@@ -1021,7 +1249,9 @@ mod tests {
         e.local_path = Some(sub.clone());
         let id = db.insert(&e).unwrap();
         match delete_entry(&db, id, Some(&sub)) {
-            OpResult::Deleted { entries: 1, file_error: Some(msg) } => assert!(msg.contains("d"), "{msg}"),
+            OpResult::Deleted { entries: 1, file_error: Some(msg) } => {
+                assert!(msg.contains("d"), "{msg}")
+            }
             other => panic!("{other:?}"),
         }
     }
@@ -1030,7 +1260,9 @@ mod tests {
     fn subtitles_show_time_and_size() {
         let now = chrono::DateTime::parse_from_rfc3339("2025-03-15T14:30:00+02:00").unwrap();
         let mut e = NewEntry::new(EntryKind::Image);
-        e.created_at = chrono::DateTime::parse_from_rfc3339("2025-03-15T09:10:00+02:00").unwrap().timestamp_millis();
+        e.created_at = chrono::DateTime::parse_from_rfc3339("2025-03-15T09:10:00+02:00")
+            .unwrap()
+            .timestamp_millis();
         e.size_bytes = Some(2048);
         let db = History::open_in_memory().unwrap();
         let id = db.insert(&e).unwrap();

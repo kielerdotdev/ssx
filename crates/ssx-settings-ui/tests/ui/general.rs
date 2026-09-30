@@ -60,7 +60,11 @@ fn the_token_list_inserts_into_the_field_used_last() {
     h.step();
     click(&mut h, "%unix");
     assert!(working(&h).general.file_name_pattern.ends_with("%unix"));
-    assert_eq!(working(&h).general.folder_pattern, "%y-%mo%d", "the folder pattern was not touched again");
+    assert_eq!(
+        working(&h).general.folder_pattern,
+        "%y-%mo%d",
+        "the folder pattern was not touched again"
+    );
 }
 
 #[test]
@@ -98,11 +102,17 @@ fn the_save_folder_can_be_typed_browsed_and_reset() {
     let _ = &fx;
     let mut h = window(app, vec2(1120.0, 1700.0));
     set_text(&mut h, "Save folder", "/tmp/somewhere");
-    assert_eq!(working(&h).general.save_dir.as_deref(), Some(std::path::Path::new("/tmp/somewhere")));
+    assert_eq!(
+        working(&h).general.save_dir.as_deref(),
+        Some(std::path::Path::new("/tmp/somewhere"))
+    );
     assert!(has(&h, "does not exist yet"));
     click(&mut h, "Browse...");
     wait_busy(&mut h, 10);
-    assert_eq!(working(&h).general.save_dir.as_deref(), Some(std::path::Path::new("/picked/by/dialog")));
+    assert_eq!(
+        working(&h).general.save_dir.as_deref(),
+        Some(std::path::Path::new("/picked/by/dialog"))
+    );
     click(&mut h, "Use default");
     assert_eq!(working(&h).general.save_dir, None);
     // a file where a folder is needed is an error the user sees before saving
@@ -116,7 +126,8 @@ fn the_save_folder_can_be_typed_browsed_and_reset() {
 fn autostart_is_applied_immediately_through_the_os_trait_and_is_not_a_setting() {
     let fake = Arc::new(FakeAutostart::new(false));
     let f2 = fake.clone();
-    let (app, fx) = app_custom(Page::General, Settings::default(), move |host, _| host.autostart = f2);
+    let (app, fx) =
+        app_custom(Page::General, Settings::default(), move |host, _| host.autostart = f2);
     let mut h = window(app, vec2(1120.0, 1700.0));
     click(&mut h, "Start ssx when I log in");
     assert_eq!(fake.calls(), [true]);
@@ -131,7 +142,8 @@ fn an_autostart_failure_is_shown() {
     let fake = Arc::new(FakeAutostart::new(false));
     fake.fail_with("access denied");
     let f2 = fake.clone();
-    let (app, _fx) = app_custom(Page::General, Settings::default(), move |host, _| host.autostart = f2);
+    let (app, _fx) =
+        app_custom(Page::General, Settings::default(), move |host, _| host.autostart = f2);
     let mut h = window(app, vec2(1120.0, 1700.0));
     click(&mut h, "Start ssx when I log in");
     assert!(has(&h, "access denied"));
@@ -204,7 +216,10 @@ fn a_slider_can_be_moved_with_the_keyboard_and_the_preview_follows() {
     assert!(working(&h).capture.hdr.knee < 1.0, "{}", working(&h).capture.hdr.knee);
     wait_preview(&mut h);
     let shown = h.state().capture.latest().cloned().unwrap();
-    assert!((shown.params.config.knee - working(&h).capture.hdr.knee).abs() < 1e-6, "the newest settings were rendered");
+    assert!(
+        (shown.params.config.knee - working(&h).capture.hdr.knee).abs() < 1e-6,
+        "the newest settings were rendered"
+    );
 }
 
 #[test]
@@ -235,7 +250,13 @@ fn an_out_of_range_value_pauses_the_preview_and_blocks_saving() {
 #[test]
 fn the_reset_button_returns_to_faithful() {
     let mut s = Settings::default();
-    s.capture.hdr = HdrConfig { peak: 9.0, knee: 0.3, exposure: 1.5, dither: false, operator: TonemapOperator::Clip };
+    s.capture.hdr = HdrConfig {
+        peak: 9.0,
+        knee: 0.3,
+        exposure: 1.5,
+        dither: false,
+        operator: TonemapOperator::Clip,
+    };
     let (app, _fx) = app_with(Page::Capture, s);
     let mut h = window(app, vec2(1120.0, 1700.0));
     assert_eq!(h.state().capture.preset(&working(&h).capture.hdr), HdrPreset::Custom);

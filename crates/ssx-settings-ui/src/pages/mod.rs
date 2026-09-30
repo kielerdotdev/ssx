@@ -18,11 +18,7 @@ use std::sync::Arc;
 use ssx_core::settings::Settings;
 
 use crate::{
-    host::Host,
-    nav::Page,
-    task::Waker,
-    ui_kit::Toasts,
-    uploader_registry::Registry,
+    host::Host, nav::Page, task::Waker, ui_kit::Toasts, uploader_registry::Registry,
     validation::Issues,
 };
 

@@ -290,7 +290,8 @@ pub fn explain(detection: &Detection, env: &Environment) -> StrategyInfo {
         details.push(format!("Found the sway socket at {sock}."));
     }
     if detection.candidates.len() > 1 {
-        let others: Vec<&str> = detection.candidates[1..].iter().map(|s| strategy_short(*s)).collect();
+        let others: Vec<&str> =
+            detection.candidates[1..].iter().map(|s| strategy_short(*s)).collect();
         details.push(format!("Also possible here: {}.", others.join("; ")));
     }
     StrategyInfo { desktop, session, headline, details, automatic, targets }
@@ -506,7 +507,8 @@ mod tests {
 
     #[test]
     fn unique_and_unparsable_hotkeys_are_not_duplicates() {
-        let s = settings(vec![wf("a", Some("banana")), wf("b", Some("banana")), wf("c", Some("F1"))]);
+        let s =
+            settings(vec![wf("a", Some("banana")), wf("b", Some("banana")), wf("c", Some("F1"))]);
         assert!(duplicates(&s).is_empty());
         assert!(others_using(&s, &Owner::Workflow { index: 2, name: String::new() }).is_empty());
         assert!(others_using(&s, &Owner::Workflow { index: 9, name: String::new() }).is_empty());
@@ -525,7 +527,8 @@ mod tests {
 
     #[test]
     fn strategy_for_x11_gnome_is_automatic_with_a_fallback() {
-        let (d, env) = det(&[("XDG_CURRENT_DESKTOP", "GNOME"), ("XDG_SESSION_TYPE", "x11")], Platform::Linux);
+        let (d, env) =
+            det(&[("XDG_CURRENT_DESKTOP", "GNOME"), ("XDG_SESSION_TYPE", "x11")], Platform::Linux);
         let i = explain(&d, &env);
         assert!(i.automatic);
         assert_eq!((i.desktop, i.session), ("GNOME", "X11"));
@@ -537,23 +540,36 @@ mod tests {
     #[test]
     fn strategy_for_wayland_gnome_and_kde_uses_the_portal() {
         for (desk, name) in [("GNOME", "GNOME"), ("KDE", "KDE Plasma")] {
-            let (d, env) = det(&[("XDG_CURRENT_DESKTOP", desk), ("XDG_SESSION_TYPE", "wayland")], Platform::Linux);
+            let (d, env) = det(
+                &[("XDG_CURRENT_DESKTOP", desk), ("XDG_SESSION_TYPE", "wayland")],
+                Platform::Linux,
+            );
             let i = explain(&d, &env);
             assert!(i.automatic, "{desk}");
-            assert!(i.headline.contains("GlobalShortcuts portal") && i.headline.contains(name), "{}", i.headline);
+            assert!(
+                i.headline.contains("GlobalShortcuts portal") && i.headline.contains(name),
+                "{}",
+                i.headline
+            );
             assert_eq!(i.targets.len(), 1);
         }
     }
 
     #[test]
     fn strategy_for_sway_and_hyprland_is_a_generated_file() {
-        let (d, env) = det(&[("SWAYSOCK", "/run/sway.sock"), ("WAYLAND_DISPLAY", "wayland-1")], Platform::Linux);
+        let (d, env) = det(
+            &[("SWAYSOCK", "/run/sway.sock"), ("WAYLAND_DISPLAY", "wayland-1")],
+            Platform::Linux,
+        );
         let i = explain(&d, &env);
         assert!(!i.automatic);
         assert_eq!(i.targets, [Target::Sway]);
         assert!(i.details.iter().any(|l| l.contains("config.d/ssx.conf")));
         assert!(i.details.iter().any(|l| l.contains("/run/sway.sock")));
-        let (d, env) = det(&[("HYPRLAND_INSTANCE_SIGNATURE", "abc"), ("WAYLAND_DISPLAY", "w")], Platform::Linux);
+        let (d, env) = det(
+            &[("HYPRLAND_INSTANCE_SIGNATURE", "abc"), ("WAYLAND_DISPLAY", "w")],
+            Platform::Linux,
+        );
         let i = explain(&d, &env);
         assert_eq!(i.targets, [Target::Hyprland]);
         assert!(i.headline.contains("Hyprland"));
@@ -577,7 +593,11 @@ mod tests {
         let dirs = Dirs::under(tmp.path());
         let cfg = dirs.config_home.join("sway/config");
         std::fs::create_dir_all(cfg.parent().unwrap()).unwrap();
-        std::fs::write(&cfg, "set $mod Mod4\nbindsym Ctrl+Print exec grim\nbindsym $mod+Return exec foot\n").unwrap();
+        std::fs::write(
+            &cfg,
+            "set $mod Mod4\nbindsym Ctrl+Print exec grim\nbindsym $mod+Return exec foot\n",
+        )
+        .unwrap();
         let (d, _) = det(&[("SWAYSOCK", "/s"), ("WAYLAND_DISPLAY", "w")], Platform::Linux);
         let s = Settings::default();
         match check_session(&d, Some(&dirs), &s) {
@@ -594,8 +614,14 @@ mod tests {
 
     #[test]
     fn session_check_is_honest_about_what_it_cannot_see() {
-        let (d, _) = det(&[("XDG_CURRENT_DESKTOP", "GNOME"), ("XDG_SESSION_TYPE", "wayland")], Platform::Linux);
-        assert!(matches!(check_session(&d, None, &Settings::default()), SessionCheck::NotDetectable(_)));
+        let (d, _) = det(
+            &[("XDG_CURRENT_DESKTOP", "GNOME"), ("XDG_SESSION_TYPE", "wayland")],
+            Platform::Linux,
+        );
+        assert!(matches!(
+            check_session(&d, None, &Settings::default()),
+            SessionCheck::NotDetectable(_)
+        ));
         let (d, _) = det(&[], Platform::Windows);
         match check_session(&d, None, &Settings::default()) {
             SessionCheck::NotDetectable(why) => assert!(why.contains("registering it fails")),
@@ -632,9 +658,16 @@ mod tests {
         fn run(&self, program: &str, args: &[String]) -> io::Result<RunOutput> {
             let line = format!("{program} {}", args.join(" "));
             self.calls.borrow_mut().push(line.clone());
-            if line.starts_with("gsettings get") && line.contains(SCHEMA) && line.ends_with("custom-keybindings") {
+            if line.starts_with("gsettings get")
+                && line.contains(SCHEMA)
+                && line.ends_with("custom-keybindings")
+            {
                 let l = self.list.borrow();
-                return Ok(RunOutput::ok(if l.is_empty() { "@as []".to_owned() } else { l.clone() }));
+                return Ok(RunOutput::ok(if l.is_empty() {
+                    "@as []".to_owned()
+                } else {
+                    l.clone()
+                }));
             }
             if line.starts_with("gsettings get") {
                 return Ok(RunOutput::failed("no such key"));
@@ -655,7 +688,11 @@ mod tests {
         let out = apply(&s, Target::Sway, "ssx", &dirs, &runner, false).unwrap();
         let include = dirs.config_home.join("sway/config.d/ssx.conf");
         assert!(include.is_file());
-        assert_eq!(std::fs::read_to_string(&main).unwrap(), "# mine\n", "the user's config is untouched");
+        assert_eq!(
+            std::fs::read_to_string(&main).unwrap(),
+            "# mine\n",
+            "the user's config is untouched"
+        );
         assert!(out.manual_step.as_deref().unwrap().starts_with("include "));
         assert!(runner.calls.borrow().is_empty());
         // explicit opt-in adds the marked block, and removal restores the original text
@@ -723,8 +760,15 @@ mod tests {
             }
         }
         let tmp = tempfile::tempdir().unwrap();
-        let e = apply(&Settings::default(), Target::Gnome, "ssx", &Dirs::under(tmp.path()), &Missing, false)
-            .unwrap_err();
+        let e = apply(
+            &Settings::default(),
+            Target::Gnome,
+            "ssx",
+            &Dirs::under(tmp.path()),
+            &Missing,
+            false,
+        )
+        .unwrap_err();
         assert!(matches!(e, BindingError::ToolMissing(..)), "{e}");
     }
 }

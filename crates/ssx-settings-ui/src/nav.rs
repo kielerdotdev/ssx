@@ -75,7 +75,9 @@ impl Page {
         match self {
             Page::General => "Where files go, how they are named, and what is kept.",
             Page::Capture => "Cursor, delay and how HDR screens are converted to SDR.",
-            Page::Workflows => "What happens after a capture or an upload, and which key starts it.",
+            Page::Workflows => {
+                "What happens after a capture or an upload, and which key starts it."
+            }
             Page::Hotkeys => "Global shortcuts and how this desktop delivers them.",
             Page::Uploaders => "Where screenshots, text, files and videos are sent.",
             Page::History => "Everything captured and uploaded so far.",

@@ -17,10 +17,10 @@ use crate::{
     ui_kit::{self, Answer, Field},
     validation::{Issues, workflow_path},
     workflow_edit::{
-        CAPTURE_STEPS, DESTINATION_ROWS, INPUT_KINDS, RUN_COMMAND_PLACEHOLDERS, addable_capture_steps,
-        addable_upload_steps, capture_step_blurb, capture_step_label, delete, duplicate, input_blurb,
-        input_label, instantiate, others_with_cli, others_with_id, set_destination, set_input, templates,
-        upload_step_blurb, upload_step_label,
+        CAPTURE_STEPS, DESTINATION_ROWS, INPUT_KINDS, RUN_COMMAND_PLACEHOLDERS,
+        addable_capture_steps, addable_upload_steps, capture_step_blurb, capture_step_label,
+        delete, duplicate, input_blurb, input_label, instantiate, others_with_cli, others_with_id,
+        set_destination, set_input, templates, upload_step_blurb, upload_step_label,
     },
 };
 
@@ -133,7 +133,9 @@ fn list_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                 }
             }
         });
-        menu.response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "New workflow"));
+        menu.response.widget_info(|| {
+            egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "New workflow")
+        });
         let has = !cx.settings.workflows.is_empty();
         if ui_kit::button_if(ui, "Duplicate", has, "No workflow selected").clicked()
             && let Some(i) = duplicate(&mut cx.settings.workflows, st.selected)
@@ -159,9 +161,17 @@ fn list_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             |ui, i| {
                 let w = &cx.settings.workflows[i];
                 ui.set_min_width(240.0);
-                let title = if w.name.trim().is_empty() { "(unnamed)".to_owned() } else { w.name.clone() };
+                let title =
+                    if w.name.trim().is_empty() { "(unnamed)".to_owned() } else { w.name.clone() };
                 let marker = cx.issues.worst_at(&workflow_path(i));
-                let r = ui_kit::list_item(ui, st.selected == i, &title, &subtitle(w), marker, &format!("Workflow {title}"));
+                let r = ui_kit::list_item(
+                    ui,
+                    st.selected == i,
+                    &title,
+                    &subtitle(w),
+                    marker,
+                    &format!("Workflow {title}"),
+                );
                 if r.clicked() {
                     st.select(i);
                 }
@@ -170,14 +180,21 @@ fn list_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         );
         if let Some(m) = moved {
             let sel_before = st.selected;
-            if let Some(pos) = reorder_ui::apply(ui, "workflow-list", &mut cx.settings.workflows, m) {
+            if let Some(pos) = reorder_ui::apply(ui, "workflow-list", &mut cx.settings.workflows, m)
+            {
                 st.selected = follow(sel_before, m.mv.from, pos);
             }
         }
     });
-    ui_kit::hint(ui, "Drag the dots to reorder, or focus them and press Alt+Up / Alt+Down. The order only matters for menus and the list here.");
+    ui_kit::hint(
+        ui,
+        "Drag the dots to reorder, or focus them and press Alt+Up / Alt+Down. The order only matters for menus and the list here.",
+    );
     ui.add_space(10.0);
-    if ui_kit::button(ui, "Reset to defaults...").on_hover_text("Replace all workflows with the ones ssx ships").clicked() {
+    if ui_kit::button(ui, "Reset to defaults...")
+        .on_hover_text("Replace all workflows with the ones ssx ships")
+        .clicked()
+    {
         st.confirm = Some(Confirm::Reset);
     }
 }
@@ -191,7 +208,9 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         let w = &cx.settings.workflows[i];
         others_using(cx.settings, &Owner::Workflow { index: i, name: w.name.clone() })
     };
-    let names_of = |ix: Vec<usize>| -> Vec<String> { ix.into_iter().map(|k| cx.settings.workflows[k].name.clone()).collect() };
+    let names_of = |ix: Vec<usize>| -> Vec<String> {
+        ix.into_iter().map(|k| cx.settings.workflows[k].name.clone()).collect()
+    };
     let cli_clash = names_of(others_with_cli(&cx.settings.workflows, i));
     let id_clash = names_of(others_with_id(&cx.settings.workflows, i));
     let (defaults, workflow) = {
@@ -233,12 +252,27 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             });
         ui.add_space(3.0);
         Field::new("Hotkey").issues(&issues, &format!("{p}.trigger.hotkey")).show(ui, |ui| {
-            hotkey_field(ui, ("wf-hotkey", i), &format!("Hotkey of {}", workflow.name), &mut workflow.trigger.hotkey);
+            hotkey_field(
+                ui,
+                ("wf-hotkey", i),
+                &format!("Hotkey of {}", workflow.name),
+                &mut workflow.trigger.hotkey,
+            );
             if !others.is_empty() {
                 let names: Vec<String> = others.iter().map(Owner::label).collect();
                 ui.horizontal_top(|ui| {
                     ui_kit::severity_icon(ui, Severity::Error);
-                    ui.add(egui::Label::new(RichText::new(format!("Also used by {}. A hotkey can start only one thing.", names.join(", "))).size(12.0).color(ui_kit::ERROR_TEXT)).wrap());
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(format!(
+                                "Also used by {}. A hotkey can start only one thing.",
+                                names.join(", ")
+                            ))
+                            .size(12.0)
+                            .color(ui_kit::ERROR_TEXT),
+                        )
+                        .wrap(),
+                    );
                 });
             }
         });
@@ -246,20 +280,32 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         Field::new("Starts with").help(input_blurb(workflow.input)).show(ui, |ui| {
             input_style(ui);
             let mut chosen = None;
-            let combo = egui::ComboBox::from_id_salt(("wf-input", i)).width(300.0).selected_text(input_label(workflow.input)).show_ui(ui, |ui| {
-                for (kind, label, blurb) in INPUT_KINDS {
-                    if ui.selectable_label(workflow.input == kind, label).on_hover_text(blurb).clicked() {
-                        chosen = Some(kind);
+            let combo = egui::ComboBox::from_id_salt(("wf-input", i))
+                .width(300.0)
+                .selected_text(input_label(workflow.input))
+                .show_ui(ui, |ui| {
+                    for (kind, label, blurb) in INPUT_KINDS {
+                        if ui
+                            .selectable_label(workflow.input == kind, label)
+                            .on_hover_text(blurb)
+                            .clicked()
+                        {
+                            chosen = Some(kind);
+                        }
                     }
-                }
+                });
+            combo.response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, "Input")
             });
-            combo.response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, "Input"));
             if let Some(k) = chosen {
                 let dropped = set_input(workflow, k);
                 if !dropped.is_empty() {
                     let names: Vec<&str> = dropped.iter().map(|s| capture_step_label(*s)).collect();
                     let t = ui.input(|inp| inp.time);
-                    cx.toasts.info(t, format!("Removed {} (they only work on images)", names.join(", ")));
+                    cx.toasts.info(
+                        t,
+                        format!("Removed {} (they only work on images)", names.join(", ")),
+                    );
                 }
             }
         });
@@ -269,24 +315,40 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     upload_steps_card(ui, i, &p, workflow, &issues);
 
     ui_kit::card(ui, Some("Where it uploads"), |ui| {
-        ui_kit::hint(ui, "Each kind of content goes to the destination set on the Uploaders page. Pick one here to send this workflow's content somewhere else.");
+        ui_kit::hint(
+            ui,
+            "Each kind of content goes to the destination set on the Uploaders page. Pick one here to send this workflow's content somewhere else.",
+        );
         ui.add_space(6.0);
         for (ty, label, help) in DESTINATION_ROWS {
             let mut cur = workflow.destination.get(ty).map(str::to_owned);
             let global = defaults.default_for(ty).map(str::to_owned);
             let none_label = match (ty, &global) {
-                (ssx_core::settings::DestinationType::Video, None) => match defaults.file.as_deref() {
-                    Some(f) => format!("Same as the file destination ({f})"),
-                    None => "Same as the file destination (not set)".to_owned(),
-                },
+                (ssx_core::settings::DestinationType::Video, None) => {
+                    match defaults.file.as_deref() {
+                        Some(f) => format!("Same as the file destination ({f})"),
+                        None => "Same as the file destination (not set)".to_owned(),
+                    }
+                }
                 (_, Some(g)) => format!("Default ({g})"),
                 (_, None) => "Default (not set)".to_owned(),
             };
-            Field::new(label).help(help).issues(&issues, &format!("{p}.destination.{}", dest_key(ty))).show(ui, |ui| {
-                if destination_picker(ui, ("wf-dest", i, label), &format!("{label} destination"), &mut cur, ty, &registry, &none_label) {
-                    set_destination(workflow, ty, cur.clone());
-                }
-            });
+            Field::new(label)
+                .help(help)
+                .issues(&issues, &format!("{p}.destination.{}", dest_key(ty)))
+                .show(ui, |ui| {
+                    if destination_picker(
+                        ui,
+                        ("wf-dest", i, label),
+                        &format!("{label} destination"),
+                        &mut cur,
+                        ty,
+                        &registry,
+                        &none_label,
+                    ) {
+                        set_destination(workflow, ty, cur.clone());
+                    }
+                });
             ui.add_space(2.0);
         }
     });
@@ -299,7 +361,17 @@ fn clash_line(ui: &mut Ui, what: &str, others: &[String]) {
     }
     ui.horizontal_top(|ui| {
         ui_kit::severity_icon(ui, Severity::Error);
-        ui.add(egui::Label::new(RichText::new(format!("The {what} is also used by {}; it must be unique.", others.join(", "))).size(12.0).color(ui_kit::ERROR_TEXT)).wrap());
+        ui.add(
+            egui::Label::new(
+                RichText::new(format!(
+                    "The {what} is also used by {}; it must be unique.",
+                    others.join(", ")
+                ))
+                .size(12.0)
+                .color(ui_kit::ERROR_TEXT),
+            )
+            .wrap(),
+        );
     });
 }
 
@@ -317,9 +389,13 @@ fn dest_key(ty: ssx_core::settings::DestinationType) -> &'static str {
 
 fn capture_steps_card(ui: &mut Ui, i: usize, p: &str, w: &mut Workflow, issues: &Issues) {
     ui_kit::card(ui, Some("After capture"), |ui| {
-        ui_kit::hint(ui, "These run in this order, top to bottom. Drag a step by its dots to change the order.");
+        ui_kit::hint(
+            ui,
+            "These run in this order, top to bottom. Drag a step by its dots to change the order.",
+        );
         ui.add_space(4.0);
-        let labels: Vec<String> = w.after_capture.iter().map(|s| capture_step_label(*s).to_owned()).collect();
+        let labels: Vec<String> =
+            w.after_capture.iter().map(|s| capture_step_label(*s).to_owned()).collect();
         let mut remove = None;
         let mut nudge = None;
         let n = labels.len();
@@ -331,15 +407,38 @@ fn capture_steps_card(ui: &mut Ui, i: usize, p: &str, w: &mut Workflow, issues: 
             |k| labels[k].clone(),
             |ui, k| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(capture_step_label(steps[k])).strong().color(Color32::WHITE));
+                    ui.label(
+                        RichText::new(capture_step_label(steps[k])).strong().color(Color32::WHITE),
+                    );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui_kit::mini_icon_button(ui, Icon::Close, &format!("Remove {}", labels[k]), true).clicked() {
+                        if ui_kit::mini_icon_button(
+                            ui,
+                            Icon::Close,
+                            &format!("Remove {}", labels[k]),
+                            true,
+                        )
+                        .clicked()
+                        {
                             remove = Some(k);
                         }
-                        if ui_kit::mini_icon_button(ui, Icon::ChevronDown, &format!("Move {} down", labels[k]), k + 1 < n).clicked() {
+                        if ui_kit::mini_icon_button(
+                            ui,
+                            Icon::ChevronDown,
+                            &format!("Move {} down", labels[k]),
+                            k + 1 < n,
+                        )
+                        .clicked()
+                        {
                             nudge = Some(crate::reorder::Move::step(k, 1));
                         }
-                        if ui_kit::mini_icon_button(ui, Icon::ChevronUp, &format!("Move {} up", labels[k]), k > 0).clicked() {
+                        if ui_kit::mini_icon_button(
+                            ui,
+                            Icon::ChevronUp,
+                            &format!("Move {} up", labels[k]),
+                            k > 0,
+                        )
+                        .clicked()
+                        {
                             nudge = Some(crate::reorder::Move::step(k, -1));
                         }
                     });
@@ -369,14 +468,20 @@ fn capture_steps_card(ui: &mut Ui, i: usize, p: &str, w: &mut Workflow, issues: 
                 ui.menu_button("Add step", |ui| {
                     ui.set_min_width(260.0);
                     for s in &addable {
-                        if ui.button(capture_step_label(*s)).on_hover_text(capture_step_blurb(*s)).clicked() {
+                        if ui
+                            .button(capture_step_label(*s))
+                            .on_hover_text(capture_step_blurb(*s))
+                            .clicked()
+                        {
                             w.after_capture.push(*s);
                             ui.close();
                         }
                     }
                 })
             });
-            menu.inner.response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Add after-capture step"));
+            menu.inner.response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Add after-capture step")
+            });
         });
     });
     let _ = CAPTURE_STEPS;
@@ -387,7 +492,8 @@ fn upload_steps_card(ui: &mut Ui, i: usize, p: &str, w: &mut Workflow, issues: &
     ui_kit::card(ui, Some("After upload"), |ui| {
         ui_kit::hint(ui, "These run once the upload succeeded and there is a URL.");
         ui.add_space(4.0);
-        let labels: Vec<String> = w.after_upload.iter().map(|s| upload_step_label(s).to_owned()).collect();
+        let labels: Vec<String> =
+            w.after_upload.iter().map(|s| upload_step_label(s).to_owned()).collect();
         let n = labels.len();
         let mut remove = None;
         let mut nudge = None;
@@ -399,22 +505,52 @@ fn upload_steps_card(ui: &mut Ui, i: usize, p: &str, w: &mut Workflow, issues: &
             |k| labels[k].clone(),
             |ui, k| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(upload_step_label(&steps[k])).strong().color(Color32::WHITE));
+                    ui.label(
+                        RichText::new(upload_step_label(&steps[k])).strong().color(Color32::WHITE),
+                    );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui_kit::mini_icon_button(ui, Icon::Close, &format!("Remove {}", labels[k]), true).clicked() {
+                        if ui_kit::mini_icon_button(
+                            ui,
+                            Icon::Close,
+                            &format!("Remove {}", labels[k]),
+                            true,
+                        )
+                        .clicked()
+                        {
                             remove = Some(k);
                         }
-                        if ui_kit::mini_icon_button(ui, Icon::ChevronDown, &format!("Move {} down", labels[k]), k + 1 < n).clicked() {
+                        if ui_kit::mini_icon_button(
+                            ui,
+                            Icon::ChevronDown,
+                            &format!("Move {} down", labels[k]),
+                            k + 1 < n,
+                        )
+                        .clicked()
+                        {
                             nudge = Some(crate::reorder::Move::step(k, 1));
                         }
-                        if ui_kit::mini_icon_button(ui, Icon::ChevronUp, &format!("Move {} up", labels[k]), k > 0).clicked() {
+                        if ui_kit::mini_icon_button(
+                            ui,
+                            Icon::ChevronUp,
+                            &format!("Move {} up", labels[k]),
+                            k > 0,
+                        )
+                        .clicked()
+                        {
                             nudge = Some(crate::reorder::Move::step(k, -1));
                         }
                     });
                 });
                 ui_kit::hint(ui, upload_step_blurb(&steps[k]));
                 if let AfterUpload::RunCommand { program, args } = &mut steps[k] {
-                    run_command_editor(ui, (i, k), program, args, issues, &format!("{p}.after_upload[{k}]"));
+                    run_command_editor(
+                        ui,
+                        (i, k),
+                        program,
+                        args,
+                        issues,
+                        &format!("{p}.after_upload[{k}]"),
+                    );
                 }
                 ui_kit::issue_lines(ui, issues, &format!("{p}.after_upload[{k}]"));
             },
@@ -439,14 +575,20 @@ fn upload_steps_card(ui: &mut Ui, i: usize, p: &str, w: &mut Workflow, issues: &
                 ui.menu_button("Add step", |ui| {
                     ui.set_min_width(260.0);
                     for s in addable {
-                        if ui.button(upload_step_label(&s)).on_hover_text(upload_step_blurb(&s)).clicked() {
+                        if ui
+                            .button(upload_step_label(&s))
+                            .on_hover_text(upload_step_blurb(&s))
+                            .clicked()
+                        {
                             w.after_upload.push(s);
                             ui.close();
                         }
                     }
                 })
             });
-            menu.inner.response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Add after-upload step"));
+            menu.inner.response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::Button, true, "Add after-upload step")
+            });
         });
     });
 }
@@ -474,7 +616,14 @@ fn run_command_editor(
                 Field::new(&format!("Argument {}", k + 1)).show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui_kit::text_input(ui, &format!("Argument {}", k + 1), a, "", 300.0);
-                        if ui_kit::mini_icon_button(ui, Icon::Close, &format!("Remove argument {}", k + 1), true).clicked() {
+                        if ui_kit::mini_icon_button(
+                            ui,
+                            Icon::Close,
+                            &format!("Remove argument {}", k + 1),
+                            true,
+                        )
+                        .clicked()
+                        {
                             remove = Some(k);
                         }
                     });
@@ -488,8 +637,15 @@ fn run_command_editor(
                     args.push(String::new());
                 }
             });
-            let ph: Vec<String> = RUN_COMMAND_PLACEHOLDERS.iter().map(|(p, d)| format!("{p} {d}")).collect();
-            ui_kit::hint(ui, &format!("Each argument is passed as it is; no shell runs. Placeholders: {}.", ph.join(", ")));
+            let ph: Vec<String> =
+                RUN_COMMAND_PLACEHOLDERS.iter().map(|(p, d)| format!("{p} {d}")).collect();
+            ui_kit::hint(
+                ui,
+                &format!(
+                    "Each argument is passed as it is; no shell runs. Placeholders: {}.",
+                    ph.join(", ")
+                ),
+            );
             let _ = id;
         });
 }
@@ -502,7 +658,9 @@ fn dialogs(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
                 ctx,
                 "wf-delete",
                 "Delete this workflow?",
-                &format!("\"{name}\" will be removed from the settings when you save. Its history entries stay."),
+                &format!(
+                    "\"{name}\" will be removed from the settings when you save. Its history entries stay."
+                ),
                 "Delete",
                 true,
             ) {
@@ -564,7 +722,11 @@ mod tests {
                     for sel in 0..n {
                         let mut v: Vec<usize> = (0..n).collect();
                         if crate::reorder::move_to(&mut v, from, to).is_some() {
-                            assert_eq!(v[follow(sel, from, to)], sel, "n={n} from={from} to={to} sel={sel}");
+                            assert_eq!(
+                                v[follow(sel, from, to)],
+                                sel,
+                                "n={n} from={from} to={to} sel={sel}"
+                            );
                         } else {
                             assert_eq!(follow(sel, from, to.min(n - 1)), sel);
                         }

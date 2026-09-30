@@ -4,15 +4,15 @@
 use std::path::Path;
 
 use egui::{Color32, RichText, Ui};
-use ssx_core::settings::{Severity, Settings};
+use ssx_core::settings::{Settings, Severity};
 use ssx_editor_ui::ui::{theme, widgets::input_style};
 use ssx_hotkeys::bindings::{Dirs, Target, files};
 
 use super::Cx;
 use crate::{
     hotkey_plan::{
-        ApplyOutcome, Owner, SessionCheck, Snippet, SnippetError, apply, check_session, duplicates, explain,
-        installed_state, others_using, remove, session_target, snippet,
+        ApplyOutcome, Owner, SessionCheck, Snippet, SnippetError, apply, check_session, duplicates,
+        explain, installed_state, others_using, remove, session_target, snippet,
     },
     hotkey_widget::hotkey_field,
     ui_kit::{self, Answer, Field},
@@ -104,7 +104,10 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
 
 fn shortcuts_card(ui: &mut Ui, cx: &mut Cx<'_>) {
     ui_kit::card(ui, Some("Workflow shortcuts"), |ui| {
-        ui_kit::hint(ui, "The key that starts each workflow. Click Record and press the keys, or set them with the buttons.");
+        ui_kit::hint(
+            ui,
+            "The key that starts each workflow. Click Record and press the keys, or set them with the buttons.",
+        );
         ui.add_space(6.0);
         let issues = cx.issues.clone();
         for i in 0..cx.settings.workflows.len() {
@@ -113,7 +116,8 @@ fn shortcuts_card(ui: &mut Ui, cx: &mut Cx<'_>) {
                 others_using(cx.settings, &Owner::Workflow { index: i, name: w.name.clone() })
             };
             let w = &mut cx.settings.workflows[i];
-            let name = if w.name.is_empty() { format!("Workflow {}", i + 1) } else { w.name.clone() };
+            let name =
+                if w.name.is_empty() { format!("Workflow {}", i + 1) } else { w.name.clone() };
             let path = format!("{}.trigger.hotkey", workflow_path(i));
             Field::new(&name).label_width(250.0).issues(&issues, &path).show(ui, |ui| {
                 hotkey_field(ui, ("hk-wf", i), &format!("Hotkey of {name}"), &mut w.trigger.hotkey);
@@ -121,7 +125,14 @@ fn shortcuts_card(ui: &mut Ui, cx: &mut Cx<'_>) {
                     let names: Vec<String> = others.iter().map(Owner::label).collect();
                     ui.horizontal_top(|ui| {
                         ui_kit::severity_icon(ui, Severity::Error);
-                        ui.add(egui::Label::new(RichText::new(format!("Also used by {}", names.join(", "))).size(12.0).color(ui_kit::ERROR_TEXT)).wrap());
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(format!("Also used by {}", names.join(", ")))
+                                    .size(12.0)
+                                    .color(ui_kit::ERROR_TEXT),
+                            )
+                            .wrap(),
+                        );
                     });
                 }
             });
@@ -154,7 +165,11 @@ fn strategy_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         ui.horizontal(|ui| {
             ui_kit::badge(ui, info.desktop, theme::ACCENT);
             ui_kit::badge(ui, info.session, theme::ACCENT);
-            ui_kit::badge(ui, if info.automatic { "automatic" } else { "needs setup" }, if info.automatic { ui_kit::OK_TEXT } else { ui_kit::WARN_TEXT });
+            ui_kit::badge(
+                ui,
+                if info.automatic { "automatic" } else { "needs setup" },
+                if info.automatic { ui_kit::OK_TEXT } else { ui_kit::WARN_TEXT },
+            );
         });
         ui.add_space(6.0);
         ui.label(RichText::new(&info.headline).strong().color(Color32::WHITE));
@@ -202,13 +217,24 @@ fn conflicts_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                 if conflicts.is_empty() {
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("\u{2714}").color(ui_kit::OK_TEXT));
-                        ui.label(format!("None of your shortcuts is already bound in your {target} config."));
+                        ui.label(format!(
+                            "None of your shortcuts is already bound in your {target} config."
+                        ));
                     });
                 }
                 for c in conflicts {
                     ui.horizontal_top(|ui| {
                         ui_kit::severity_icon(ui, Severity::Warning);
-                        ui.add(egui::Label::new(RichText::new(format!("{} is already bound in your {target} config, line {}: {}", c.chord, c.line_number, c.line)).color(ui_kit::WARN_TEXT)).wrap());
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(format!(
+                                    "{} is already bound in your {target} config, line {}: {}",
+                                    c.chord, c.line_number, c.line
+                                ))
+                                .color(ui_kit::WARN_TEXT),
+                            )
+                            .wrap(),
+                        );
                     });
                 }
             }
@@ -216,7 +242,15 @@ fn conflicts_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             Some(SessionCheck::Failed(why)) => {
                 ui.horizontal_top(|ui| {
                     ui_kit::severity_icon(ui, Severity::Warning);
-                    ui.add(egui::Label::new(RichText::new(format!("Could not check your desktop's bindings: {why}")).color(ui_kit::WARN_TEXT)).wrap());
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(format!(
+                                "Could not check your desktop's bindings: {why}"
+                            ))
+                            .color(ui_kit::WARN_TEXT),
+                        )
+                        .wrap(),
+                    );
                 });
             }
             None => {}
@@ -233,11 +267,18 @@ fn bindings_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     let current = effective_target(st, &detection);
     let recommended = session_target(&detection);
     ui_kit::card(ui, Some("Desktop bindings"), |ui| {
-        ui_kit::hint(ui, "For desktops that cannot receive shortcuts from an app, ssx generates the lines your desktop needs; each runs `ssx run <workflow>`. Nothing is written until you press Apply and confirm.");
+        ui_kit::hint(
+            ui,
+            "For desktops that cannot receive shortcuts from an app, ssx generates the lines your desktop needs; each runs `ssx run <workflow>`. Nothing is written until you press Apply and confirm.",
+        );
         ui.add_space(6.0);
         ui.horizontal_wrapped(|ui| {
             for t in TARGETS {
-                let label = if Some(t) == recommended { format!("{t} (this desktop)") } else { t.to_string() };
+                let label = if Some(t) == recommended {
+                    format!("{t} (this desktop)")
+                } else {
+                    t.to_string()
+                };
                 if ui_kit::chip(ui, &label, t == current).clicked() {
                     st.target = Some(t);
                 }
@@ -247,7 +288,14 @@ fn bindings_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         let exe = cx.host.ssx_exe.display().to_string();
         match snippet(cx.settings, current, &exe) {
             Ok(Snippet { text, skipped, bindings, .. }) => {
-                ui.label(RichText::new(format!("{bindings} binding{} for {current}", if bindings == 1 { "" } else { "s" })).strong().color(Color32::WHITE));
+                ui.label(
+                    RichText::new(format!(
+                        "{bindings} binding{} for {current}",
+                        if bindings == 1 { "" } else { "s" }
+                    ))
+                    .strong()
+                    .color(Color32::WHITE),
+                );
                 ui.add_space(4.0);
                 if ui_kit::code_block(ui, &format!("snippet-{current:?}"), &text, 260.0) {
                     let t = cx.time(ui.ctx());
@@ -256,12 +304,18 @@ fn bindings_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                 for s in skipped {
                     ui.horizontal_top(|ui| {
                         ui_kit::severity_icon(ui, Severity::Warning);
-                        ui.add(egui::Label::new(RichText::new(s).size(12.0).color(ui_kit::WARN_TEXT)).wrap());
+                        ui.add(
+                            egui::Label::new(RichText::new(s).size(12.0).color(ui_kit::WARN_TEXT))
+                                .wrap(),
+                        );
                     });
                 }
             }
             Err(SnippetError::NoBindings) => {
-                ui_kit::hint(ui, "No workflow has a shortcut yet. Set one above and the bindings appear here.");
+                ui_kit::hint(
+                    ui,
+                    "No workflow has a shortcut yet. Set one above and the bindings appear here.",
+                );
             }
             Err(e) => {
                 ui.label(RichText::new(e.to_string()).color(ui_kit::ERROR_TEXT));
@@ -276,20 +330,39 @@ fn bindings_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             if let Some(s) = installed_state(dirs, current)
                 && matches!(current, Target::Sway | Target::Hyprland)
             {
-                ui_kit::hint(ui, &format!(
-                    "Now: bindings file {}; your config {}.",
-                    if s.include_file_exists { "written" } else { "not written" },
-                    if s.block_installed { "loads it (ssx block)" } else if s.manually_included { "loads it (by hand)" } else { "does not load it" },
-                ));
+                ui_kit::hint(
+                    ui,
+                    &format!(
+                        "Now: bindings file {}; your config {}.",
+                        if s.include_file_exists { "written" } else { "not written" },
+                        if s.block_installed {
+                            "loads it (ssx block)"
+                        } else if s.manually_included {
+                            "loads it (by hand)"
+                        } else {
+                            "does not load it"
+                        },
+                    ),
+                );
             }
         }
         ui.add_space(6.0);
         let usable = cx.host.hotkey_dirs.is_some() && snippet(cx.settings, current, &exe).is_ok();
         ui.horizontal(|ui| {
-            if ui_kit::button_if(ui, "Apply...", usable, "Give a workflow a shortcut first").on_hover_text("Write these bindings after you confirm").clicked() {
+            if ui_kit::button_if(ui, "Apply...", usable, "Give a workflow a shortcut first")
+                .on_hover_text("Write these bindings after you confirm")
+                .clicked()
+            {
                 st.confirm = Some(Confirm::Apply(current));
             }
-            if ui_kit::button_if(ui, "Remove...", cx.host.hotkey_dirs.is_some(), "No home directory").clicked() {
+            if ui_kit::button_if(
+                ui,
+                "Remove...",
+                cx.host.hotkey_dirs.is_some(),
+                "No home directory",
+            )
+            .clicked()
+            {
                 st.confirm = Some(Confirm::Remove(current));
             }
         });
@@ -334,11 +407,14 @@ fn dialogs(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
         Confirm::Apply(target) => {
             let lines = describe_apply(target, &dirs, st.add_main_include);
             let mut answer = None;
-            let frame = egui::Frame::popup(&ctx.global_style()).inner_margin(egui::Margin::same(18));
+            let frame =
+                egui::Frame::popup(&ctx.global_style()).inner_margin(egui::Margin::same(18));
             let m = egui::Modal::new(egui::Id::new("hk-apply")).frame(frame).show(ctx, |ui| {
                 input_style(ui);
                 ui.set_width(480.0);
-                ui.label(RichText::new(format!("Apply the bindings for {target}?")).heading().strong());
+                ui.label(
+                    RichText::new(format!("Apply the bindings for {target}?")).heading().strong(),
+                );
                 ui.add_space(6.0);
                 for l in &lines {
                     ui.add(egui::Label::new(l).wrap());
@@ -346,7 +422,11 @@ fn dialogs(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
                 }
                 if matches!(target, Target::Sway | Target::Hyprland) {
                     ui.add_space(6.0);
-                    ui_kit::switch(ui, "Also add the include block to my own config", &mut st.add_main_include);
+                    ui_kit::switch(
+                        ui,
+                        "Also add the include block to my own config",
+                        &mut st.add_main_include,
+                    );
                 }
                 ui.add_space(12.0);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -364,8 +444,15 @@ fn dialogs(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
             match answer {
                 Some(Answer::Confirm) => {
                     st.last = Some(
-                        apply(cx.settings, target, &exe, &dirs, &*cx.host.hotkey_runner, st.add_main_include)
-                            .map_err(|e| e.to_string()),
+                        apply(
+                            cx.settings,
+                            target,
+                            &exe,
+                            &dirs,
+                            &*cx.host.hotkey_runner,
+                            st.add_main_include,
+                        )
+                        .map_err(|e| e.to_string()),
                     );
                     st.session = None;
                     st.confirm = None;
@@ -380,9 +467,18 @@ fn dialogs(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
                 Target::Gnome => "Removes the ssx custom keybindings from GNOME's settings. Your other shortcuts stay.".to_owned(),
                 Target::Kde => "Removes the ssx launchers and their registered shortcuts. Your other shortcuts stay.".to_owned(),
             };
-            match ui_kit::confirm(ctx, "hk-remove", &format!("Remove the ssx bindings for {target}?"), &body, "Remove", true) {
+            match ui_kit::confirm(
+                ctx,
+                "hk-remove",
+                &format!("Remove the ssx bindings for {target}?"),
+                &body,
+                "Remove",
+                true,
+            ) {
                 Some(Answer::Confirm) => {
-                    st.last = Some(remove(target, &dirs, &*cx.host.hotkey_runner).map_err(|e| e.to_string()));
+                    st.last = Some(
+                        remove(target, &dirs, &*cx.host.hotkey_runner).map_err(|e| e.to_string()),
+                    );
                     st.session = None;
                     st.confirm = None;
                 }
@@ -406,12 +502,25 @@ mod tests {
 
     #[test]
     fn the_target_defaults_to_what_the_session_recommends() {
-        let d = detect(&Environment::from_pairs([("SWAYSOCK", "/s"), ("WAYLAND_DISPLAY", "w")]), Platform::Linux);
+        let d = detect(
+            &Environment::from_pairs([("SWAYSOCK", "/s"), ("WAYLAND_DISPLAY", "w")]),
+            Platform::Linux,
+        );
         assert_eq!(effective_target(&State::default(), &d), Target::Sway);
-        let d = detect(&Environment::from_pairs([("HYPRLAND_INSTANCE_SIGNATURE", "x"), ("WAYLAND_DISPLAY", "w")]), Platform::Linux);
+        let d = detect(
+            &Environment::from_pairs([
+                ("HYPRLAND_INSTANCE_SIGNATURE", "x"),
+                ("WAYLAND_DISPLAY", "w"),
+            ]),
+            Platform::Linux,
+        );
         assert_eq!(effective_target(&State::default(), &d), Target::Hyprland);
         let d = detect(&Environment::default(), Platform::Windows);
-        assert_eq!(effective_target(&State::default(), &d), Target::Sway, "nothing to recommend: sway is just the first tab");
+        assert_eq!(
+            effective_target(&State::default(), &d),
+            Target::Sway,
+            "nothing to recommend: sway is just the first tab"
+        );
         let st = State { target: Some(Target::Kde), ..State::default() };
         assert_eq!(effective_target(&st, &d), Target::Kde, "the user's choice wins");
     }
@@ -427,9 +536,16 @@ mod tests {
     fn the_apply_description_says_exactly_what_is_written() {
         let d = dirs();
         let no = describe_apply(Target::Sway, &d, false).join("\n");
-        assert!(no.contains("~/.config/sway/config.d/ssx.conf") && no.contains("Does not touch ~/.config/sway/config"), "{no}");
+        assert!(
+            no.contains("~/.config/sway/config.d/ssx.conf")
+                && no.contains("Does not touch ~/.config/sway/config"),
+            "{no}"
+        );
         let yes = describe_apply(Target::Sway, &d, true).join("\n");
-        assert!(yes.contains("Adds one marked block") && yes.contains("restores the text exactly"), "{yes}");
+        assert!(
+            yes.contains("Adds one marked block") && yes.contains("restores the text exactly"),
+            "{yes}"
+        );
         let h = describe_apply(Target::Hyprland, &d, false).join("\n");
         assert!(h.contains("hypr"), "{h}");
         assert!(describe_apply(Target::Gnome, &d, true).join(" ").contains("gsettings"));

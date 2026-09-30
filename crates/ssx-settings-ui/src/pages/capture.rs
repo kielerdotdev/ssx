@@ -11,7 +11,7 @@ use ssx_editor_ui::ui::theme;
 use super::Cx;
 use crate::{
     hdr_scene::{
-        DEFAULT_SDR_WHITE, HdrPreset, Readout, SDR_WHITE_CHOICES, SCENE_H, SCENE_W, operator_blurb,
+        DEFAULT_SDR_WHITE, HdrPreset, Readout, SCENE_H, SCENE_W, SDR_WHITE_CHOICES, operator_blurb,
         operator_label,
     },
     preview_engine::{DEFAULT_DELAY, PreviewEngine, PreviewParams, PreviewResult},
@@ -107,7 +107,11 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
 fn capture_card(ui: &mut Ui, cx: &mut Cx<'_>) {
     ui_kit::card(ui, Some("Capture"), |ui| {
         Field::new("Mouse cursor").show(ui, |ui| {
-            ui_kit::switch(ui, "Include the cursor in screenshots", &mut cx.settings.capture.show_cursor);
+            ui_kit::switch(
+                ui,
+                "Include the cursor in screenshots",
+                &mut cx.settings.capture.show_cursor,
+            );
         });
         ui.add_space(4.0);
         Field::new("Delay").issues(cx.issues, "capture.delay_ms")
@@ -133,12 +137,16 @@ fn capture_card(ui: &mut Ui, cx: &mut Cx<'_>) {
 
 fn hdr_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     ui_kit::card(ui, Some("HDR screens"), |ui| {
-        ui_kit::hint(ui, "When Windows HDR is on, the screen is brighter than an ordinary picture can be. These settings decide how it is squeezed into a normal (SDR) screenshot. They do nothing on screens without HDR.");
+        ui_kit::hint(
+            ui,
+            "When Windows HDR is on, the screen is brighter than an ordinary picture can be. These settings decide how it is squeezed into a normal (SDR) screenshot. They do nothing on screens without HDR.",
+        );
         ui.add_space(8.0);
         let cfg = &mut cx.settings.capture.hdr;
         let current = st.preset(cfg);
         Field::new("Preset").help(current.blurb()).show(ui, |ui| {
-            let options: Vec<(HdrPreset, &str)> = HdrPreset::ALL.iter().map(|p| (*p, p.label())).collect();
+            let options: Vec<(HdrPreset, &str)> =
+                HdrPreset::ALL.iter().map(|p| (*p, p.label())).collect();
             if let Some(p) = ui_kit::segmented_row(ui, current, &options) {
                 st.choose(cfg, p);
             }
@@ -147,7 +155,10 @@ fn hdr_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         ui_kit::divider(ui);
         Field::new("Operator").help(operator_blurb(cfg.operator)).show(ui, |ui| {
             let options = [
-                (TonemapOperator::ReinhardExtended, operator_label(TonemapOperator::ReinhardExtended)),
+                (
+                    TonemapOperator::ReinhardExtended,
+                    operator_label(TonemapOperator::ReinhardExtended),
+                ),
                 (TonemapOperator::Bt2390, operator_label(TonemapOperator::Bt2390)),
                 (TonemapOperator::AcesFit, operator_label(TonemapOperator::AcesFit)),
                 (TonemapOperator::Clip, operator_label(TonemapOperator::Clip)),
@@ -185,7 +196,14 @@ fn hdr_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     });
 }
 
-fn slider(ui: &mut Ui, label: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str, log: bool) {
+fn slider(
+    ui: &mut Ui,
+    label: &str,
+    v: &mut f32,
+    range: std::ops::RangeInclusive<f32>,
+    suffix: &str,
+    log: bool,
+) {
     ssx_editor_ui::ui::widgets::input_style(ui);
     let mut s = egui::Slider::new(v, range)
         .trailing_fill(true)
@@ -203,7 +221,10 @@ fn slider(ui: &mut Ui, label: &str, v: &mut f32, range: std::ops::RangeInclusive
 
 fn preview_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     ui_kit::card(ui, Some("Live preview"), |ui| {
-        ui_kit::hint(ui, "A made-up HDR picture (a brightness ramp to 8x SDR white, colours, skin, sky, a sun and a window made only of ordinary colours) run through the same conversion the capture uses.");
+        ui_kit::hint(
+            ui,
+            "A made-up HDR picture (a brightness ramp to 8x SDR white, colours, skin, sky, a sun and a window made only of ordinary colours) run through the same conversion the capture uses.",
+        );
         ui.add_space(6.0);
         Field::new("SDR white level").help("The \"SDR content brightness\" slider of Windows, in nits. Ordinary white sits here.").show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
@@ -220,7 +241,10 @@ fn preview_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         let cfg = cx.settings.capture.hdr;
         let valid = config_is_valid(&cfg);
         if valid {
-            st.engine.request(PreviewParams { config: cfg, sdr_white_nits: st.sdr_white }, Instant::now());
+            st.engine.request(
+                PreviewParams { config: cfg, sdr_white_nits: st.sdr_white },
+                Instant::now(),
+            );
         }
         if let Some(wait) = st.engine.tick(Instant::now()) {
             ui.ctx().request_repaint_after(wait);
@@ -242,7 +266,10 @@ fn preview_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         if !valid {
             ui.horizontal_top(|ui| {
                 ui_kit::severity_icon(ui, ssx_core::settings::Severity::Error);
-                ui.label(RichText::new("The preview is paused until the values above are in range.").color(ui_kit::ERROR_TEXT));
+                ui.label(
+                    RichText::new("The preview is paused until the values above are in range.")
+                        .color(ui_kit::ERROR_TEXT),
+                );
             });
         }
         let Some(shown) = st.shown.clone() else {
@@ -273,7 +300,9 @@ fn preview_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                     ui.label(RichText::new(titles[i].0).strong().color(Color32::WHITE));
                     ui_kit::hint(ui, titles[i].1);
                     let r = ui.add(egui::Image::new((tex[i].id(), vec2(w, h))).corner_radius(4.0));
-                    r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Image, true, titles[i].0));
+                    r.widget_info(|| {
+                        egui::WidgetInfo::labeled(egui::WidgetType::Image, true, titles[i].0)
+                    });
                     readout(ui, &rendered.readouts[i]);
                 });
             }
@@ -281,15 +310,27 @@ fn preview_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         ui.add_space(8.0);
         let r = &rendered.readouts[0];
         ui.horizontal_top(|ui| {
-            let (ok, color) = if r.ui_untouched() { ("\u{2714}", ui_kit::OK_TEXT) } else { ("\u{25CF}", ui_kit::WARN_TEXT) };
+            let (ok, color) = if r.ui_untouched() {
+                ("\u{2714}", ui_kit::OK_TEXT)
+            } else {
+                ("\u{25CF}", ui_kit::WARN_TEXT)
+            };
             ui.label(RichText::new(ok).color(color));
-            ui.add(egui::Label::new(RichText::new(format!("Your settings: {}", r.headline())).color(theme::TEXT)).wrap());
+            ui.add(
+                egui::Label::new(
+                    RichText::new(format!("Your settings: {}", r.headline())).color(theme::TEXT),
+                )
+                .wrap(),
+            );
         });
-        ui_kit::hint(ui, &format!(
-            "Rendered in {} ms at {:.0} nits SDR white.",
-            shown.took.as_millis(),
-            shown.params.sdr_white_nits
-        ));
+        ui_kit::hint(
+            ui,
+            &format!(
+                "Rendered in {} ms at {:.0} nits SDR white.",
+                shown.took.as_millis(),
+                shown.params.sdr_white_nits
+            ),
+        );
     });
 }
 
@@ -298,7 +339,10 @@ fn readout(ui: &mut Ui, r: &Readout) {
     let (text, color) = if r.ui_untouched() {
         ("UI white: 255, untouched".to_owned(), ui_kit::OK_TEXT)
     } else {
-        (format!("UI white: {} ({:.1} % darker)", r.white_out[0], r.white_dimming_percent()), ui_kit::WARN_TEXT)
+        (
+            format!("UI white: {} ({:.1} % darker)", r.white_out[0], r.white_dimming_percent()),
+            ui_kit::WARN_TEXT,
+        )
     };
     ui.label(RichText::new(text).size(12.0).color(color));
     ui.label(
@@ -347,7 +391,10 @@ mod tests {
             assert!(!config_is_valid(&bad), "{bad:?}");
             let mut s = ssx_core::settings::Settings::default();
             s.capture.hdr = bad;
-            assert!(s.validate().iter().any(|i| i.severity == ssx_core::settings::Severity::Error), "{bad:?}");
+            assert!(
+                s.validate().iter().any(|i| i.severity == ssx_core::settings::Severity::Error),
+                "{bad:?}"
+            );
         }
     }
 

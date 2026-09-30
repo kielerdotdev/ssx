@@ -84,7 +84,8 @@ impl Registry {
             DestinationType::UrlShortener => e.shortens,
             DestinationType::UrlSharing => false,
         };
-        let mut v: Vec<&Info> = self.entries.iter().filter(|e| e.error.is_none() && accepts(e)).collect();
+        let mut v: Vec<&Info> =
+            self.entries.iter().filter(|e| e.error.is_none() && accepts(e)).collect();
         v.extend(self.entries.iter().filter(|e| e.error.is_some()));
         v
     }
@@ -184,8 +185,14 @@ pub struct RegistryCache {
 
 impl RegistryCache {
     /// The registry for `settings` and the files in `config_dir`.
-    pub fn get(&mut self, settings: &Settings, config_dir: &Path, secrets: &Arc<dyn SecretStore>) -> Arc<Registry> {
-        let key = CacheKey { tables: settings.uploaders.clone(), files: file_signature(config_dir) };
+    pub fn get(
+        &mut self,
+        settings: &Settings,
+        config_dir: &Path,
+        secrets: &Arc<dyn SecretStore>,
+    ) -> Arc<Registry> {
+        let key =
+            CacheKey { tables: settings.uploaders.clone(), files: file_signature(config_dir) };
         if self.key.as_ref() != Some(&key) {
             self.value = Arc::new(Registry::build(settings, config_dir, secrets.clone()));
             self.key = Some(key);
@@ -266,9 +273,9 @@ pub fn import_collision(registry: &Registry, config_dir: &Path, name: &str) -> C
     }
     match registry.get(name).map(|e| (Registry::source(e), e)) {
         Some((Source::Builtin, _)) => Collision::Shadowed("a built-in destination".to_owned()),
-        Some((Source::Table, _)) => {
-            Collision::Shadowed("a [uploaders.*] table in settings.toml, which takes precedence".to_owned())
-        }
+        Some((Source::Table, _)) => Collision::Shadowed(
+            "a [uploaders.*] table in settings.toml, which takes precedence".to_owned(),
+        ),
         _ => Collision::None,
     }
 }
@@ -356,7 +363,12 @@ pub struct RealTester;
 
 impl RealTester {
     fn service(job: &TestJob) -> UploadService {
-        UploadService::new(&job.settings, &job.config_dir, job.secrets.clone(), &RetryPolicy::default())
+        UploadService::new(
+            &job.settings,
+            &job.config_dir,
+            job.secrets.clone(),
+            &RetryPolicy::default(),
+        )
     }
 }
 
@@ -370,8 +382,9 @@ impl UploadTester for RealTester {
         progress: &dyn Fn(UploadProgress),
     ) -> Result<UploadOutcome, String> {
         let svc = Self::service(job);
-        let file_name =
-            path.file_name().map_or_else(|| "file".to_owned(), |n| n.to_string_lossy().into_owned());
+        let file_name = path
+            .file_name()
+            .map_or_else(|| "file".to_owned(), |n| n.to_string_lossy().into_owned());
         let req = UploadRequest {
             destination: &job.name,
             kind,
@@ -404,7 +417,12 @@ impl UploadTester for RealTester {
             } else if info.uploads.contains(&"text") {
                 (DestinationType::Text, "ssx-test.txt", "text/plain", b"ssx test upload\n")
             } else if info.uploads.contains(&"file") {
-                (DestinationType::File, "ssx-test.bin", "application/octet-stream", b"ssx test upload\n")
+                (
+                    DestinationType::File,
+                    "ssx-test.bin",
+                    "application/octet-stream",
+                    b"ssx test upload\n",
+                )
             } else if info.shortens {
                 return svc
                     .shorten(&job.name, "https://example.com/", cancel)
@@ -537,8 +555,13 @@ mod tests {
         std::fs::create_dir_all(dir.path().join("uploaders")).unwrap();
         std::fs::write(dir.path().join("uploaders/my-server.sxcu"), SXCU).unwrap();
         let mut s = Settings::default();
-        s.uploaders.insert("imgur".into(), r#"type='imgur'
-client_id='abc'"#.parse().unwrap());
+        s.uploaders.insert(
+            "imgur".into(),
+            r#"type='imgur'
+client_id='abc'"#
+                .parse()
+                .unwrap(),
+        );
         s.uploaders.insert("broken".into(), "type='http'".parse().unwrap());
         let r = registry_of(&s, dir.path());
         let names = r.names();
@@ -567,8 +590,14 @@ client_id='abc'"#.parse().unwrap());
         assert!(short.contains(&"is.gd".to_owned()) && short.contains(&"tinyurl".to_owned()));
         assert!(!short.contains(&"local".to_owned()));
         assert!(names(DestinationType::Video).contains(&"local".to_owned()));
-        assert!(!names(DestinationType::Video).contains(&"is.gd".to_owned()), "shorteners take no uploads");
-        assert!(names(DestinationType::Image).last() == Some(&"oops".to_owned()), "broken ones last");
+        assert!(
+            !names(DestinationType::Video).contains(&"is.gd".to_owned()),
+            "shorteners take no uploads"
+        );
+        assert!(
+            names(DestinationType::Image).last() == Some(&"oops".to_owned()),
+            "broken ones last"
+        );
         assert!(r.choices_for(DestinationType::UrlSharing).iter().all(|e| e.error.is_some()));
     }
 
@@ -655,8 +684,12 @@ client_id='abc'"#.parse().unwrap());
         let mut s = Settings::default();
         s.uploaders.insert("mine".into(), "type='local'".parse().unwrap());
         let r = registry_of(&s, dir.path());
-        assert!(matches!(import_collision(&r, dir.path(), "local"), Collision::Shadowed(w) if w.contains("built-in")));
-        assert!(matches!(import_collision(&r, dir.path(), "mine"), Collision::Shadowed(w) if w.contains("precedence")));
+        assert!(
+            matches!(import_collision(&r, dir.path(), "local"), Collision::Shadowed(w) if w.contains("built-in"))
+        );
+        assert!(
+            matches!(import_collision(&r, dir.path(), "mine"), Collision::Shadowed(w) if w.contains("precedence"))
+        );
         assert_eq!(import_collision(&r, dir.path(), "fresh"), Collision::None);
     }
 
@@ -715,7 +748,9 @@ client_id='abc'"#.parse().unwrap());
     fn the_real_tester_reports_unknown_and_broken_destinations() {
         let dir = tempfile::tempdir().unwrap();
         let cancel = CancelToken::new();
-        let e = RealTester.test(&job(Settings::default(), "nope", dir.path()), &cancel, &|_| {}).unwrap_err();
+        let e = RealTester
+            .test(&job(Settings::default(), "nope", dir.path()), &cancel, &|_| {})
+            .unwrap_err();
         assert!(e.contains("no destination"), "{e}");
         let mut s = Settings::default();
         s.uploaders.insert("oops".into(), "type='http'".parse().unwrap());
@@ -729,12 +764,17 @@ client_id='abc'"#.parse().unwrap());
         let f = FakeTester::default();
         let seen = Mutex::new(Vec::new());
         let out = f
-            .test(&job(Settings::default(), "x", dir.path()), &CancelToken::new(), &|p| seen.lock().unwrap().push(p.sent))
+            .test(&job(Settings::default(), "x", dir.path()), &CancelToken::new(), &|p| {
+                seen.lock().unwrap().push(p.sent)
+            })
             .unwrap();
         assert!(out.url.contains("ssx-test"));
         assert_eq!(*seen.lock().unwrap(), [0, 500, 1000]);
         let c = CancelToken::new();
         c.cancel();
-        assert_eq!(f.test(&job(Settings::default(), "x", dir.path()), &c, &|_| {}).unwrap_err(), "cancelled");
+        assert_eq!(
+            f.test(&job(Settings::default(), "x", dir.path()), &c, &|_| {}).unwrap_err(),
+            "cancelled"
+        );
     }
 }

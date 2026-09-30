@@ -11,5 +11,7 @@ mod general;
 mod hotkeys;
 #[path = "ui/shell.rs"]
 mod shell;
+#[path = "ui/uploaders.rs"]
+mod uploaders;
 #[path = "ui/workflows.rs"]
 mod workflows;

@@ -14,7 +14,11 @@ fn editing_and_applying_writes_exactly_the_edit() {
     set_text(&mut h, "File name pattern", "shot-%y%mo%d");
     click(&mut h, "JPEG");
     assert!(h.state().model.is_dirty());
-    assert_eq!(fx.load().general.file_name_pattern, "Screenshot_%y-%mo-%d_%h-%mi-%s", "nothing is written before Apply");
+    assert_eq!(
+        fx.load().general.file_name_pattern,
+        "Screenshot_%y-%mo-%d_%h-%mi-%s",
+        "nothing is written before Apply"
+    );
     click(&mut h, "Apply");
     let saved = fx.load();
     assert_eq!(saved.general.file_name_pattern, "shot-%y%mo%d");
@@ -241,9 +245,15 @@ fn load_warnings_are_shown_and_can_be_dismissed() {
     let fx = tempfile::tempdir().unwrap();
     let host = ssx_settings_ui::host::Host::sandboxed(fx.path());
     std::fs::create_dir_all(&host.paths.config_dir).unwrap();
-    std::fs::write(host.paths.settings_file(), "[general]\nimage_quality = 80\nmystery_key = 1\n").unwrap();
+    std::fs::write(host.paths.settings_file(), "[general]\nimage_quality = 80\nmystery_key = 1\n")
+        .unwrap();
     let model = ssx_settings_ui::model::SettingsModel::load(host.paths.settings_file()).unwrap();
-    let app = ssx_settings_ui::SettingsApp::new(model, host, Page::General, ssx_settings_ui::task::no_wake());
+    let app = ssx_settings_ui::SettingsApp::new(
+        model,
+        host,
+        Page::General,
+        ssx_settings_ui::task::no_wake(),
+    );
     let mut h = window(app, vec2(1120.0, 1700.0));
     assert!(has(&h, "unknown setting `general.mystery_key`"));
     click(&mut h, "Dismiss");

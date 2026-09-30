@@ -96,7 +96,9 @@ pub fn templates() -> Vec<Template> {
             ..Workflow::default()
         },
     }];
-    v.extend(builtin_workflows().into_iter().map(|w| Template { label: w.name.clone(), workflow: w }));
+    v.extend(
+        builtin_workflows().into_iter().map(|w| Template { label: w.name.clone(), workflow: w }),
+    );
     v
 }
 
@@ -123,11 +125,8 @@ pub fn duplicate(list: &mut Vec<Workflow>, index: usize) -> Option<usize> {
     copy.id = unique_id(&format!("{}-copy", src.id), list);
     copy.name = unique_name(&format!("{} (copy)", src.name), list);
     copy.trigger.hotkey = None;
-    copy.trigger.cli_name = src
-        .trigger
-        .cli_name
-        .as_deref()
-        .map(|c| unique_cli(&format!("{c}-copy"), list));
+    copy.trigger.cli_name =
+        src.trigger.cli_name.as_deref().map(|c| unique_cli(&format!("{c}-copy"), list));
     list.insert(index + 1, copy);
     Some(index + 1)
 }
@@ -143,10 +142,14 @@ pub fn delete(list: &mut Vec<Workflow>, index: usize) -> Option<usize> {
 
 /// The other workflows (by index) that have the same command name as `list[index]`.
 pub fn others_with_cli(list: &[Workflow], index: usize) -> Vec<usize> {
-    let Some(mine) = list.get(index).and_then(|w| w.trigger.cli_name.as_deref()).filter(|c| !c.is_empty()) else {
+    let Some(mine) =
+        list.get(index).and_then(|w| w.trigger.cli_name.as_deref()).filter(|c| !c.is_empty())
+    else {
         return Vec::new();
     };
-    (0..list.len()).filter(|i| *i != index && list[*i].trigger.cli_name.as_deref() == Some(mine)).collect()
+    (0..list.len())
+        .filter(|i| *i != index && list[*i].trigger.cli_name.as_deref() == Some(mine))
+        .collect()
 }
 
 /// The other workflows (by index) that have the same id as `list[index]`.
@@ -165,10 +168,22 @@ pub const INPUT_KINDS: [(InputKind, &str, &str); 9] = [
     (InputKind::CaptureFullscreen, "Capture screen", "The whole virtual desktop."),
     (InputKind::CaptureMonitor, "Capture monitor", "The monitor under the mouse cursor."),
     (InputKind::CaptureWindow, "Capture active window", "The window that has focus."),
-    (InputKind::CaptureLastRegion, "Repeat last region", "The previous region, without the overlay."),
-    (InputKind::RecordScreen, "Record screen", "Screen recording to a video file; the hotkey starts and stops."),
+    (
+        InputKind::CaptureLastRegion,
+        "Repeat last region",
+        "The previous region, without the overlay.",
+    ),
+    (
+        InputKind::RecordScreen,
+        "Record screen",
+        "Screen recording to a video file; the hotkey starts and stops.",
+    ),
     (InputKind::RecordGif, "Record GIF", "Screen recording to an animated GIF."),
-    (InputKind::Files, "Files", "Files you pass in (right-click menu, `ssx post-file`, drag and drop)."),
+    (
+        InputKind::Files,
+        "Files",
+        "Files you pass in (right-click menu, `ssx post-file`, drag and drop).",
+    ),
     (InputKind::Clipboard, "Clipboard", "Whatever is on the clipboard: image, text or files."),
 ];
 
@@ -184,14 +199,30 @@ pub fn input_blurb(k: InputKind) -> &'static str {
 
 /// Every after-capture step with its label and description.
 pub const CAPTURE_STEPS: [(AfterCapture, &str, &str); 8] = [
-    (AfterCapture::OpenEditor, "Open editor", "Edit the image first; closing the editor cancels the workflow."),
-    (AfterCapture::CopyImageToClipboard, "Copy image to clipboard", "Put the image on the clipboard."),
-    (AfterCapture::SaveToFile, "Save to file", "Save into the save folder using the file name pattern."),
+    (
+        AfterCapture::OpenEditor,
+        "Open editor",
+        "Edit the image first; closing the editor cancels the workflow.",
+    ),
+    (
+        AfterCapture::CopyImageToClipboard,
+        "Copy image to clipboard",
+        "Put the image on the clipboard.",
+    ),
+    (
+        AfterCapture::SaveToFile,
+        "Save to file",
+        "Save into the save folder using the file name pattern.",
+    ),
     (AfterCapture::SaveAsDialog, "Ask where to save", "Show a Save As dialog."),
     (AfterCapture::PinToScreen, "Pin to screen", "Keep the image in an always-on-top window."),
     (AfterCapture::Ocr, "Recognise text (OCR)", "Copy the text found in the image."),
     (AfterCapture::Upload, "Upload", "Send it to the destination for its type."),
-    (AfterCapture::DeleteLocalFile, "Delete local file", "Remove the saved file, but only after a confirmed upload."),
+    (
+        AfterCapture::DeleteLocalFile,
+        "Delete local file",
+        "Remove the saved file, but only after a confirmed upload.",
+    ),
 ];
 
 /// The label of an after-capture step.
@@ -307,11 +338,7 @@ pub const DESTINATION_ROWS: [(DestinationType, &str, &str); 6] = [
     (DestinationType::Image, "Image", "Screenshots and images."),
     (DestinationType::Text, "Text", "Text snippets, OCR results."),
     (DestinationType::File, "File", "Any other file."),
-    (
-        DestinationType::Video,
-        "Video",
-        "Recordings. When unset, videos go to the File destination.",
-    ),
+    (DestinationType::Video, "Video", "Recordings. When unset, videos go to the File destination."),
     (DestinationType::UrlShortener, "URL shortener", "Used by the Shorten URL steps."),
     (DestinationType::UrlSharing, "URL sharing", "Posts the link to a service."),
 ];
@@ -426,7 +453,11 @@ mod tests {
             let w = instantiate(&t.workflow, &s.workflows);
             s.workflows.push(w);
         }
-        let errs: Vec<_> = s.validate().into_iter().filter(|i| i.severity == ssx_core::settings::Severity::Error).collect();
+        let errs: Vec<_> = s
+            .validate()
+            .into_iter()
+            .filter(|i| i.severity == ssx_core::settings::Severity::Error)
+            .collect();
         assert!(errs.is_empty(), "{errs:#?}");
     }
 
@@ -513,7 +544,10 @@ mod tests {
         assert!(set_input(&mut w, InputKind::CaptureWindow).is_empty());
         assert_eq!(w.input, InputKind::CaptureWindow);
         // the result validates
-        let s = Settings { workflows: vec![Workflow { id: "a".into(), name: "A".into(), ..w }], ..Settings::default() };
+        let s = Settings {
+            workflows: vec![Workflow { id: "a".into(), name: "A".into(), ..w }],
+            ..Settings::default()
+        };
         assert!(!s.validate().iter().any(|i| i.severity == ssx_core::settings::Severity::Error));
     }
 

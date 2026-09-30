@@ -154,8 +154,13 @@ pub fn key_from_egui(k: egui::Key) -> Result<Key, String> {
                     .to_owned(),
             );
         }
-        E::Plus | E::Colon | E::Pipe | E::Questionmark | E::Exclamationmark
-        | E::OpenCurlyBracket | E::CloseCurlyBracket => {
+        E::Plus
+        | E::Colon
+        | E::Pipe
+        | E::Questionmark
+        | E::Exclamationmark
+        | E::OpenCurlyBracket
+        | E::CloseCurlyBracket => {
             return Err(
                 "that symbol needs Shift on most keyboards; hold Shift together with the key underneath it, or pick the key from the list"
                     .to_owned(),
@@ -231,10 +236,7 @@ pub fn chord_error_text(e: &ChordError) -> String {
 pub fn settings_string(chord: &Chord) -> Result<String, String> {
     let text = chord.to_string();
     let hk: Hotkey = text.parse().map_err(|_| {
-        format!(
-            "{} cannot be stored in settings.toml yet; choose another key",
-            chord.key().name()
-        )
+        format!("{} cannot be stored in settings.toml yet; choose another key", chord.key().name())
     })?;
     let canonical = hk.to_string();
     match canonical.parse::<Chord>() {
@@ -376,10 +378,19 @@ mod tests {
 
     #[test]
     fn letters_digits_function_keys_translate() {
-        assert_eq!(translate(E::S, mods(true, false, true), false), Translated::Chord(chord("Ctrl+Shift+S")));
-        assert_eq!(translate(E::Num5, mods(false, true, false), false), Translated::Chord(chord("Alt+5")));
+        assert_eq!(
+            translate(E::S, mods(true, false, true), false),
+            Translated::Chord(chord("Ctrl+Shift+S"))
+        );
+        assert_eq!(
+            translate(E::Num5, mods(false, true, false), false),
+            Translated::Chord(chord("Alt+5"))
+        );
         assert_eq!(translate(E::F9, egui::Modifiers::NONE, false), Translated::Chord(chord("F9")));
-        assert_eq!(translate(E::F24, mods(true, false, false), false), Translated::Chord(chord("Ctrl+F24")));
+        assert_eq!(
+            translate(E::F24, mods(true, false, false), false),
+            Translated::Chord(chord("Ctrl+F24"))
+        );
     }
 
     #[test]
@@ -397,7 +408,10 @@ mod tests {
     fn modifier_keys_alone_keep_waiting_and_report_what_is_held() {
         for k in [E::ShiftLeft, E::ControlRight, E::AltLeft, E::SuperLeft, E::SuperRight] {
             assert!(is_modifier_key(k));
-            assert!(matches!(translate(k, mods(true, false, false), false), Translated::ModifiersHeld(_)));
+            assert!(matches!(
+                translate(k, mods(true, false, false), false),
+                Translated::ModifiersHeld(_)
+            ));
         }
         match translate(E::ControlLeft, mods(true, false, false), false) {
             Translated::ModifiersHeld(m) => assert_eq!(m, Modifiers::CTRL),
@@ -412,7 +426,10 @@ mod tests {
         assert_eq!(translate(E::Backspace, egui::Modifiers::NONE, false), Translated::Clear);
         assert_eq!(translate(E::Delete, egui::Modifiers::NONE, false), Translated::Clear);
         // with a modifier they are ordinary keys (Ctrl+Escape, Ctrl+Delete)
-        assert!(matches!(translate(E::Delete, mods(true, false, false), false), Translated::Chord(_)));
+        assert!(matches!(
+            translate(E::Delete, mods(true, false, false), false),
+            Translated::Chord(_)
+        ));
     }
 
     #[test]
@@ -423,12 +440,25 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
-        assert!(matches!(translate(E::Space, egui::Modifiers::NONE, false), Translated::Rejected(_)));
+        assert!(matches!(
+            translate(E::Space, egui::Modifiers::NONE, false),
+            Translated::Rejected(_)
+        ));
     }
 
     #[test]
     fn keys_without_a_hotkey_meaning_are_rejected() {
-        for k in [E::Copy, E::Cut, E::Paste, E::Plus, E::Colon, E::Pipe, E::BrowserBack, E::F30, E::IntlBackslash] {
+        for k in [
+            E::Copy,
+            E::Cut,
+            E::Paste,
+            E::Plus,
+            E::Colon,
+            E::Pipe,
+            E::BrowserBack,
+            E::F30,
+            E::IntlBackslash,
+        ] {
             assert!(
                 matches!(translate(k, mods(true, false, false), false), Translated::Rejected(_)),
                 "{k:?}"

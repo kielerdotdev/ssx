@@ -42,30 +42,35 @@ pub fn destination_picker(
         None => none_label.to_owned(),
         Some(n) => describe(registry, n),
     };
-    let combo = egui::ComboBox::from_id_salt(id_salt).width(320.0).selected_text(selected_text).show_ui(ui, |ui| {
-        if ui.selectable_label(current.is_none(), none_label).clicked() && current.is_some() {
-            *current = None;
-            changed = true;
-        }
-        for e in registry.choices_for(ty) {
-            let text = describe(registry, &e.name);
-            if ui.selectable_label(current.as_deref() == Some(e.name.as_str()), text).clicked()
-                && current.as_deref() != Some(e.name.as_str())
-            {
-                *current = Some(e.name.clone());
+    let combo = egui::ComboBox::from_id_salt(id_salt)
+        .width(320.0)
+        .selected_text(selected_text)
+        .show_ui(ui, |ui| {
+            if ui.selectable_label(current.is_none(), none_label).clicked() && current.is_some() {
+                *current = None;
                 changed = true;
             }
-        }
-        // A name that is not in the registry (typed in the file, or its table was removed)
-        // stays selectable, so it is visible and can be replaced.
-        if let Some(n) = current.clone()
-            && registry.get(&n).is_none()
-        {
-            let _ = ui.selectable_label(true, format!("{n}  (unknown)"));
-        }
-    });
+            for e in registry.choices_for(ty) {
+                let text = describe(registry, &e.name);
+                if ui.selectable_label(current.as_deref() == Some(e.name.as_str()), text).clicked()
+                    && current.as_deref() != Some(e.name.as_str())
+                {
+                    *current = Some(e.name.clone());
+                    changed = true;
+                }
+            }
+            // A name that is not in the registry (typed in the file, or its table was removed)
+            // stays selectable, so it is visible and can be replaced.
+            if let Some(n) = current.clone()
+                && registry.get(&n).is_none()
+            {
+                let _ = ui.selectable_label(true, format!("{n}  (unknown)"));
+            }
+        });
     let shown = current.as_deref().map_or_else(|| none_label.to_owned(), |n| describe(registry, n));
-    combo.response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, format!("{label}: {shown}")));
+    combo.response.widget_info(|| {
+        egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, format!("{label}: {shown}"))
+    });
     if let Some(n) = current.as_deref()
         && let Some(p) = registry.problem_for(ty, n)
     {

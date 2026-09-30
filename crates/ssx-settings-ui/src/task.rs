@@ -47,7 +47,6 @@ impl<T: Send + 'static> Task<T> {
         let _ = spawned;
         Self { rx, done: false }
     }
-
 }
 
 impl<T> Task<T> {
@@ -106,7 +105,9 @@ impl<T> Default for Slot<T> {
 
 impl<T> fmt::Debug for Slot<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Slot").field("running", &self.task.as_ref().is_some_and(Task::is_running)).finish()
+        f.debug_struct("Slot")
+            .field("running", &self.task.as_ref().is_some_and(Task::is_running))
+            .finish()
     }
 }
 
@@ -118,7 +119,6 @@ impl<T: Send + 'static> Slot<T> {
 }
 
 impl<T> Slot<T> {
-
     /// The result, once, when ready.
     pub fn poll(&mut self) -> Option<T> {
         let t = self.task.as_mut()?;

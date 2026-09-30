@@ -27,7 +27,12 @@ struct Memory {
 /// Draws the editor for `value` (the stored text, or `None`). Returns `true` when it changed.
 ///
 /// `label` names the widget for screen readers ("Hotkey of Capture region").
-pub fn hotkey_field(ui: &mut Ui, id_salt: impl std::hash::Hash + std::fmt::Debug, label: &str, value: &mut Option<String>) -> bool {
+pub fn hotkey_field(
+    ui: &mut Ui,
+    id_salt: impl std::hash::Hash + std::fmt::Debug,
+    label: &str,
+    value: &mut Option<String>,
+) -> bool {
     let id = ui.make_persistent_id(id_salt);
     let mut mem: Memory = ui.data(|d| d.get_temp(id)).unwrap_or_default();
     let mut changed = false;
@@ -63,7 +68,13 @@ pub fn hotkey_field(ui: &mut Ui, id_salt: impl std::hash::Hash + std::fmt::Debug
                 } else {
                     ui.label(RichText::new(&text).monospace().color(Color32::WHITE))
                 };
-                r.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, format!("{label}: {}", if text.is_empty() { "not set" } else { &text })));
+                r.widget_info(|| {
+                    WidgetInfo::labeled(
+                        WidgetType::Label,
+                        true,
+                        format!("{label}: {}", if text.is_empty() { "not set" } else { &text }),
+                    )
+                });
             });
 
         // Modifiers.
@@ -103,12 +114,26 @@ pub fn hotkey_field(ui: &mut Ui, id_salt: impl std::hash::Hash + std::fmt::Debug
                 ui.add_space(4.0);
             }
         });
-        menu.response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, format!("{label}: choose the key from a list")));
+        menu.response.widget_info(|| {
+            WidgetInfo::labeled(
+                WidgetType::Button,
+                true,
+                format!("{label}: choose the key from a list"),
+            )
+        });
 
         // Record.
-        let rec_text = if mem.recording { "Press the shortcut...  (Esc cancels)" } else { "Record" };
+        let rec_text =
+            if mem.recording { "Press the shortcut...  (Esc cancels)" } else { "Record" };
         let rec = ui_kit::chip_compact(ui, rec_text, mem.recording);
-        rec.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, mem.recording, format!("{label}: record a shortcut by pressing it")));
+        rec.widget_info(|| {
+            WidgetInfo::selected(
+                WidgetType::Button,
+                true,
+                mem.recording,
+                format!("{label}: record a shortcut by pressing it"),
+            )
+        });
         if rec.clicked() {
             mem.recording = !mem.recording;
             mem.error = None;
@@ -121,7 +146,12 @@ pub fn hotkey_field(ui: &mut Ui, id_salt: impl std::hash::Hash + std::fmt::Debug
             ui.memory_mut(|m| {
                 m.set_focus_lock_filter(
                     rec.id,
-                    EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true },
+                    EventFilter {
+                        tab: true,
+                        horizontal_arrows: true,
+                        vertical_arrows: true,
+                        escape: true,
+                    },
                 );
             });
             if rec.lost_focus() && !rec.clicked() {
@@ -129,7 +159,9 @@ pub fn hotkey_field(ui: &mut Ui, id_salt: impl std::hash::Hash + std::fmt::Debug
             }
             let events = ui.input(|i| i.events.clone());
             for ev in events {
-                let egui::Event::Key { key, physical_key, pressed, repeat, modifiers } = ev else { continue };
+                let egui::Event::Key { key, physical_key, pressed, repeat, modifiers } = ev else {
+                    continue;
+                };
                 let k = physical_key.unwrap_or(key);
                 if is_super_key(k) {
                     mem.super_held = pressed;
@@ -169,7 +201,12 @@ pub fn hotkey_field(ui: &mut Ui, id_salt: impl std::hash::Hash + std::fmt::Debug
 
         // Clear.
         if value.is_some() || mem.draft.is_some() {
-            let r = ui_kit::mini_icon_button(ui, ssx_editor_ui::icons::Icon::Close, &format!("{label}: remove the shortcut"), true);
+            let r = ui_kit::mini_icon_button(
+                ui,
+                ssx_editor_ui::icons::Icon::Close,
+                &format!("{label}: remove the shortcut"),
+                true,
+            );
             if r.clicked() {
                 *value = None;
                 changed = true;
@@ -180,7 +217,10 @@ pub fn hotkey_field(ui: &mut Ui, id_salt: impl std::hash::Hash + std::fmt::Debug
         }
     });
     if mem.recording {
-        ui_kit::hint(ui, "PrintScreen, Pause and the Windows key cannot be recorded on every system: choose the key from the Key list and switch modifiers on with the buttons.");
+        ui_kit::hint(
+            ui,
+            "PrintScreen, Pause and the Windows key cannot be recorded on every system: choose the key from the Key list and switch modifiers on with the buttons.",
+        );
     }
     if let Some(e) = &mem.error {
         ui.horizontal_top(|ui| {

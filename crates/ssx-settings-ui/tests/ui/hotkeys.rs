@@ -14,7 +14,9 @@ fn home(fx: &Fixture) -> PathBuf {
     fx.root().join("home")
 }
 
-fn open_with(customise: impl FnOnce(&mut ssx_settings_ui::host::Host, &std::path::Path)) -> (Harness<'static, SettingsApp>, Fixture) {
+fn open_with(
+    customise: impl FnOnce(&mut ssx_settings_ui::host::Host, &std::path::Path),
+) -> (Harness<'static, SettingsApp>, Fixture) {
     let (app, fx) = app_custom(Page::Hotkeys, Settings::default(), customise);
     (window(app, vec2(1120.0, 2400.0)), fx)
 }
@@ -46,12 +48,18 @@ fn the_strategy_is_explained_for_sway() {
 #[test]
 fn the_strategy_is_explained_for_x11_wayland_portals_and_windows() {
     let (h, _fx) = open_with(|host, _| {
-        host.hotkey_env = Environment::from_pairs([("XDG_CURRENT_DESKTOP", "GNOME"), ("XDG_SESSION_TYPE", "x11")]);
+        host.hotkey_env = Environment::from_pairs([
+            ("XDG_CURRENT_DESKTOP", "GNOME"),
+            ("XDG_SESSION_TYPE", "x11"),
+        ]);
     });
     assert!(has(&h, "ssx registers your shortcuts itself"));
     assert!(has_exact(&h, "automatic"));
     let (h, _fx) = open_with(|host, _| {
-        host.hotkey_env = Environment::from_pairs([("XDG_CURRENT_DESKTOP", "KDE"), ("XDG_SESSION_TYPE", "wayland")]);
+        host.hotkey_env = Environment::from_pairs([
+            ("XDG_CURRENT_DESKTOP", "KDE"),
+            ("XDG_SESSION_TYPE", "wayland"),
+        ]);
     });
     assert!(has(&h, "GlobalShortcuts portal"));
     let (h, _fx) = open_with(|host, _| {
@@ -71,7 +79,10 @@ fn the_snippet_is_generated_from_the_workflows_and_can_be_copied() {
     assert!(has(&h, "bindsym Ctrl+Print exec /usr/local/bin/ssx run region"));
     assert!(has(&h, "4 bindings for sway"));
     let copied = click_and_copied(&mut h, "Copy");
-    assert!(copied.iter().any(|t| t.contains("bindsym Ctrl+Print exec")), "the snippet went to the clipboard: {copied:?}");
+    assert!(
+        copied.iter().any(|t| t.contains("bindsym Ctrl+Print exec")),
+        "the snippet went to the clipboard: {copied:?}"
+    );
     click(&mut h, "Hyprland");
     assert!(has(&h, "bind = CTRL, Print, exec, /usr/local/bin/ssx run region"));
     click(&mut h, "GNOME");
@@ -108,8 +119,16 @@ fn apply_needs_a_confirmation_and_writes_only_ssxs_own_file() {
     settle(&mut h);
     let include = home(&fx).join(".config/sway/config.d/ssx.conf");
     assert!(include.is_file());
-    assert!(std::fs::read_to_string(&include).unwrap().contains("bindsym Ctrl+Print exec /usr/local/bin/ssx run region"));
-    assert_eq!(std::fs::read_to_string(home(&fx).join(".config/sway/config")).unwrap(), "# my config\n", "the user's own config is untouched");
+    assert!(
+        std::fs::read_to_string(&include)
+            .unwrap()
+            .contains("bindsym Ctrl+Print exec /usr/local/bin/ssx run region")
+    );
+    assert_eq!(
+        std::fs::read_to_string(home(&fx).join(".config/sway/config")).unwrap(),
+        "# my config\n",
+        "the user's own config is untouched"
+    );
     assert!(has(&h, "wrote"));
     assert!(has(&h, "include "), "the line the user must add is shown");
 }
@@ -150,7 +169,10 @@ fn duplicates_inside_the_settings_are_listed_by_name() {
     s.workflows[1].trigger.hotkey = Some("ctrl+printscreen".into());
     let (app, _fx) = app_with(Page::Hotkeys, s);
     let h = window(app, vec2(1120.0, 2400.0));
-    assert!(has(&h, "Ctrl+PrintScreen is used by Capture region, save, copy and upload and Capture region, edit, save and upload"));
+    assert!(has(
+        &h,
+        "Ctrl+PrintScreen is used by Capture region, save, copy and upload and Capture region, edit, save and upload"
+    ));
 }
 
 #[test]
@@ -159,7 +181,10 @@ fn gnome_bindings_go_through_gsettings_with_a_confirmation_and_nothing_else() {
     let r2 = runner.clone();
     let (mut h, fx) = open_with(move |host, _| {
         host.hotkey_runner = r2;
-        host.hotkey_env = Environment::from_pairs([("XDG_CURRENT_DESKTOP", "GNOME"), ("XDG_SESSION_TYPE", "wayland")]);
+        host.hotkey_env = Environment::from_pairs([
+            ("XDG_CURRENT_DESKTOP", "GNOME"),
+            ("XDG_SESSION_TYPE", "wayland"),
+        ]);
     });
     click(&mut h, "Apply...");
     assert!(runner.calls.lock().unwrap().is_empty(), "the dialog alone runs nothing");
@@ -183,7 +208,10 @@ fn a_missing_tool_is_reported_in_the_page() {
     }
     let (mut h, _fx) = open_with(|host, _| {
         host.hotkey_runner = Arc::new(Missing);
-        host.hotkey_env = Environment::from_pairs([("XDG_CURRENT_DESKTOP", "GNOME"), ("XDG_SESSION_TYPE", "wayland")]);
+        host.hotkey_env = Environment::from_pairs([
+            ("XDG_CURRENT_DESKTOP", "GNOME"),
+            ("XDG_SESSION_TYPE", "wayland"),
+        ]);
     });
     click(&mut h, "Apply...");
     top_most(&h, "Apply").click();
