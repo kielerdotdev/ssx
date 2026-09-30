@@ -5,7 +5,7 @@
 //!
 //! * polling backends (X11, wlroots screencopy) sleep to their frame grid inside
 //!   [`FrameSource::next_frame`] and capture one frame per call;
-//! * event-driven backends (PipeWire, Windows Graphics Capture) run their own thread or
+//! * event-driven backends (`PipeWire`, Windows Graphics Capture) run their own thread or
 //!   callback and hand the newest frame over through a one-slot mailbox; `next_frame`
 //!   waits on it and returns [`SourceEvent::Timeout`] when the screen did not change
 //!   (damage-driven variable frame rate). The session's pacer then repeats the last
@@ -25,6 +25,7 @@ use crate::{
 };
 
 pub mod synthetic;
+pub mod wgc_logic;
 
 #[cfg(all(unix, not(target_vendor = "apple")))]
 pub mod x11;
