@@ -2,15 +2,15 @@
 
 [[mgr.prepend_keymap]]
 on   = [ "<C-s>", "U" ]
-run  = "shell -- '/usr/bin/ssx' 'post-file' -- \"$@\""
+run  = "shell -- /usr/bin/ssx post-file -- \"$@\""
 desc = "Upload with ssx"
 
 [[mgr.prepend_keymap]]
 on   = [ "<C-s>", "E" ]
-run  = "shell -- '/usr/bin/ssx' 'edit' -- \"$@\""
+run  = "shell -- /usr/bin/ssx edit -- \"$@\""
 desc = "Edit image with ssx"
 
 [[mgr.prepend_keymap]]
 on   = [ "<C-s>", "V" ]
-run  = "shell -- '/usr/bin/ssx' 'post-video' -- \"$@\""
+run  = "shell -- /usr/bin/ssx post-video -- \"$@\""
 desc = "Upload video with ssx"

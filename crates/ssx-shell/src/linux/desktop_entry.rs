@@ -70,6 +70,15 @@ impl DesktopEntries {
     }
 
     fn files(&self, ctx: &Context) -> Result<Vec<ManagedFile>> {
+        // GLib checks that the program in `Exec=` exists *before* decoding `%%`, so a literal
+        // '%' in the path (correctly written `%%`) makes the whole entry unloadable. Fail
+        // loudly instead of installing an entry that silently never appears.
+        if ctx.exe_str()?.contains('%') {
+            return Err(crate::error::ShellError::InvalidExe {
+                path: ctx.ssx_exe.clone(),
+                reason: "GLib cannot load desktop entries whose Exec path contains '%'; install ssx to a path without it".into(),
+            });
+        }
         ctx.actions
             .iter()
             .map(|a| {
