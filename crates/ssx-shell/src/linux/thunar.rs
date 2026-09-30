@@ -24,7 +24,7 @@ use crate::context::{Context, Platform};
 use crate::error::{Result, ShellError};
 use crate::fsutil::{prune_empty_dirs, write_atomic};
 use crate::integration::{Description, Detection, InstallOutcome, Integration, UninstallOutcome};
-use crate::quote::{shell_word_with_field_codes, xml_escape};
+use crate::quote::{shell_word_with_field_codes, xml_escape_text};
 
 const ID_PREFIX: &str = "ssx-shell-";
 
@@ -188,12 +188,12 @@ pub(crate) fn action_block(ctx: &Context, a: &Action) -> Result<String> {
          \t<patterns>{patterns}</patterns>\n\
          {conditions}\
          </action>",
-        icon = xml_escape(&a.icon),
-        name = xml_escape(&a.label),
+        icon = xml_escape_text(&a.icon),
+        name = xml_escape_text(&a.label),
         id = a.id,
-        command = xml_escape(&command),
-        desc = xml_escape(&a.description),
-        patterns = xml_escape(&patterns),
+        command = xml_escape_text(&command),
+        desc = xml_escape_text(&a.description),
+        patterns = xml_escape_text(&patterns),
     ))
 }
 

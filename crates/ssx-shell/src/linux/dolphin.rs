@@ -1,8 +1,8 @@
 //! Dolphin (KDE) service menus.
 //!
-//! One `.desktop` file per action in `~/.local/share/kio/servicemenus/` (the location used by
-//! KDE Frameworks 5.? and 6; Plasma 6 dropped the older `kservices5/ServiceMenus` scan, which
-//! is optionally written too for KDE 4/early-5 systems). One file per action because a
+//! One `.desktop` file per action in `~/.local/share/kio/servicemenus/` (read by KDE
+//! Frameworks 5 and 6; Plasma 6 no longer scans the older `kservices5/ServiceMenus`, which is
+//! optionally written too for KDE 4 and early-KF5 systems). One file per action because a
 //! service-menu file has a single `MimeType=` for all of its `[Desktop Action]`s, and our
 //! actions have different type filters.
 //!

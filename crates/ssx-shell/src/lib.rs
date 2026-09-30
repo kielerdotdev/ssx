@@ -26,6 +26,8 @@ pub mod quote;
 pub mod windows;
 
 mod fsutil;
+#[cfg(test)]
+mod hostile_tests;
 
 use std::sync::Arc;
 

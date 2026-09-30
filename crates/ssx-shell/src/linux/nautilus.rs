@@ -20,7 +20,7 @@ use crate::context::{Context, Platform};
 use crate::error::{Result, ShellError};
 use crate::fsutil::{MARKER, ManagedFile, files_current, install_files, uninstall_files};
 use crate::integration::{Description, Detection, InstallOutcome, Integration, UninstallOutcome};
-use crate::quote::{py_str, sh_case_ext_pattern, sh_single_quote};
+use crate::quote::{py_str, sh_case_ext_pattern, sh_single_quote, sh_word};
 
 /// Which Nautilus mechanism to install.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -206,14 +206,6 @@ impl Integration for Nautilus {
             )
             .note("for top-level, type-filtered entries install nautilus-python and reinstall")
         }
-    }
-}
-
-fn sh_word(s: &str) -> String {
-    if !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)) {
-        s.to_owned()
-    } else {
-        sh_single_quote(s)
     }
 }
 

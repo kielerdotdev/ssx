@@ -1,0 +1,19 @@
+# Add to ~/.config/lf/lfrc
+cmd ssx-upload %{{
+    set -f
+    IFS="$(printf '\n\t')"
+    '/usr/bin/ssx' 'post-file' -- $fx
+}}
+map <c-s>u ssx-upload   # Upload with ssx
+cmd ssx-edit %{{
+    set -f
+    IFS="$(printf '\n\t')"
+    '/usr/bin/ssx' 'edit' -- $fx
+}}
+map <c-s>e ssx-edit   # Edit image with ssx
+cmd ssx-upload-video %{{
+    set -f
+    IFS="$(printf '\n\t')"
+    '/usr/bin/ssx' 'post-video' -- $fx
+}}
+map <c-s>v ssx-upload-video   # Upload video with ssx

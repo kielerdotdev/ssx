@@ -1,0 +1,16 @@
+# Add to ~/.config/yazi/keymap.toml (use [[manager.prepend_keymap]] on yazi < 25.5)
+
+[[mgr.prepend_keymap]]
+on   = [ "<C-s>", "U" ]
+run  = "shell -- '/usr/bin/ssx' 'post-file' -- \"$@\""
+desc = "Upload with ssx"
+
+[[mgr.prepend_keymap]]
+on   = [ "<C-s>", "E" ]
+run  = "shell -- '/usr/bin/ssx' 'edit' -- \"$@\""
+desc = "Edit image with ssx"
+
+[[mgr.prepend_keymap]]
+on   = [ "<C-s>", "V" ]
+run  = "shell -- '/usr/bin/ssx' 'post-video' -- \"$@\""
+desc = "Upload video with ssx"

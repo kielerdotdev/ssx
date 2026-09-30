@@ -6,7 +6,7 @@
 //! and newline-only `IFS`) after a `--`.
 
 use crate::action::Action;
-use crate::quote::sh_single_quote;
+use crate::quote::sh_word;
 
 fn key_for(action: &Action) -> &'static str {
     match action.id.as_str() {
@@ -18,7 +18,7 @@ fn key_for(action: &Action) -> &'static str {
 }
 
 fn args_for(action: &Action) -> String {
-    action.exec_args.iter().map(|a| sh_single_quote(a)).collect::<Vec<_>>().join(" ")
+    action.exec_args.iter().map(|a| sh_word(a)).collect::<Vec<_>>().join(" ")
 }
 
 /// A snippet for yazi's `keymap.toml`.
@@ -26,7 +26,7 @@ fn args_for(action: &Action) -> String {
 /// yazi ≥ 25.5 calls the table `[mgr]` (older: `[manager]`); `$@` expands to the selected
 /// files, or the hovered one when nothing is selected.
 pub fn yazi(ssx_exe: &str, actions: &[Action]) -> String {
-    let exe = sh_single_quote(ssx_exe);
+    let exe = sh_word(ssx_exe);
     let mut s = String::from(
         "# Add to ~/.config/yazi/keymap.toml (use [[manager.prepend_keymap]] on yazi < 25.5)\n",
     );
@@ -48,7 +48,7 @@ pub fn yazi(ssx_exe: &str, actions: &[Action]) -> String {
 
 /// A snippet for ranger's `rc.conf`. `%s` is the marked files, quoted by ranger.
 pub fn ranger(ssx_exe: &str, actions: &[Action]) -> String {
-    let exe = sh_single_quote(ssx_exe);
+    let exe = sh_word(ssx_exe);
     let mut s = String::from("# Add to ~/.config/ranger/rc.conf\n");
     for a in actions {
         let key = key_for(a);
@@ -68,7 +68,7 @@ pub fn ranger(ssx_exe: &str, actions: &[Action]) -> String {
 /// A snippet for lf's `lfrc`. `$fx` is the newline-separated selection; with `IFS` set to
 /// newline and globbing off, `$fx` splits exactly at file boundaries.
 pub fn lf(ssx_exe: &str, actions: &[Action]) -> String {
-    let exe = sh_single_quote(ssx_exe);
+    let exe = sh_word(ssx_exe);
     let mut s = String::from("# Add to ~/.config/lf/lfrc\n");
     for a in actions {
         let key = key_for(a);

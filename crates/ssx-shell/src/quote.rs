@@ -69,13 +69,27 @@ pub fn desktop_exec_arg(arg: &str) -> String {
     keyfile_value(&word)
 }
 
-/// A word for `g_shell_parse_argv`-style command strings (Thunar `<command>`, Nemo `Exec=`
-/// before key-file escaping): single-quoted, with `%` doubled so it is not a field code.
-pub fn shell_word_with_field_codes(arg: &str) -> String {
-    sh_single_quote(arg).replace('%', "%%")
+/// A shell word left bare when it only has safe characters, single-quoted otherwise.
+pub fn sh_word(s: &str) -> String {
+    if !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_.+/@:,=".contains(&b)) {
+        s.to_owned()
+    } else {
+        sh_single_quote(s)
+    }
 }
 
-/// Escapes text for XML character data / attribute values.
+/// A word for `g_shell_parse_argv`-style command strings (Thunar `<command>`, Nemo `Exec=`
+/// before key-file escaping): quoted when needed, with `%` doubled so it is not a field code.
+pub fn shell_word_with_field_codes(arg: &str) -> String {
+    sh_word(arg).replace('%', "%%")
+}
+
+/// Escapes text for XML character data (element content): `&`, `<`, `>` only.
+pub fn xml_escape_text(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+/// Escapes text for XML attribute values (and, conservatively, anything else).
 pub fn xml_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -216,17 +230,6 @@ pub(crate) mod reference {
                             in_word = false;
                         }
                     }
-                    '%' => {
-                        in_word = true;
-                        match it.next() {
-                            Some('%') => cur.push('%'),
-                            Some(n) => {
-                                cur.push('%');
-                                cur.push(n);
-                            }
-                            None => panic!("dangling %"),
-                        }
-                    }
                     c => {
                         assert!(
                             !"'\\><~|&;$*?#()`".contains(c),
@@ -242,7 +245,8 @@ pub(crate) mod reference {
         if in_word {
             args.push(cur);
         }
-        args
+        // Field codes are expanded after quoting is undone, so `%%` -> `%` applies to all words.
+        args.into_iter().map(|a| a.replace("%%", "%")).collect()
     }
 
     /// Minimal `g_shell_parse_argv` (POSIX word splitting, no expansion). `%%` is

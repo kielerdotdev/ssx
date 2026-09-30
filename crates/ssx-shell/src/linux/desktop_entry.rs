@@ -6,8 +6,7 @@
 //! which the launcher expands to one argv element per file, so names are never re-parsed.
 //! `--` precedes them. Entries are *not* `NoDisplay` by default: several launchers hide
 //! `NoDisplay` apps from "Open With" as well, which would defeat the purpose; set
-//! [`DesktopEntries::hide_from_menus`] to opt in (they then use `OnlyShowIn` to stay out of
-//! application launchers instead).
+//! [`DesktopEntries::hide_from_menus`] to opt in to `NoDisplay=true` anyway.
 //!
 //! We deliberately do not touch `mimeapps.list`: an "Open With" candidate needs only a matching
 //! `MimeType=`, and rewriting the user's default-application choices is not our business.
@@ -83,7 +82,7 @@ impl DesktopEntries {
             .collect()
     }
 
-    fn source(&self, ctx: &Context, action: &Action) -> Result<String> {
+    pub(crate) fn source(&self, ctx: &Context, action: &Action) -> Result<String> {
         let exe = desktop_exec_arg(ctx.exe_str()?);
         let args: Vec<String> = action.exec_args.iter().map(|a| desktop_exec_arg(a)).collect();
         let code = if action.multi_select { "%F" } else { "%f" };
