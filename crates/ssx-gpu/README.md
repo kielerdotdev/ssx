@@ -189,7 +189,27 @@ which CI sets so a broken runner cannot skip silently. On Linux CI install
 
 ## Benchmarks (llvmpipe, software Vulkan, 4 cores; real GPUs are far faster)
 
-BENCH_PLACEHOLDER
+`cargo test --release -p ssx-gpu -- --ignored --nocapture` on the CI-class box (4 cores,
+llvmpipe LLVM 20.1.2, Vulkan). "CPU reference" is `ssx-hdr` / the crate's CPU references on
+the same cores, for scale. These numbers are for the *software* rasteriser; a real GPU
+runs the dispatches in well under a millisecond and is limited by upload/readback.
+
+| Operation (3840x2160 unless noted) | GPU path (llvmpipe) | CPU reference |
+|---|---|---|
+| HDR tonemap, upload + dispatch + readback | 209 ms/frame | 614 ms |
+| HDR tonemap, dispatch only (GPU resident `TonemapPass`) | 179 ms/frame | - |
+| BGRA to NV12, upload + convert + readback | 153 ms | 83 ms (single thread) |
+| HDR tonemap + NV12 in one dispatch, upload + readback | 335 ms | - |
+| Blur 1080p, sigma 8 | 489 ms | 626 ms |
+| Pixelate 1080p, block 16 | 42 ms | 54 ms |
+| Lanczos-3, 4K to 480x270 | 172 ms | 312 ms |
+| Bilinear, 4K to 1080p | 194 ms | 379 ms |
+| Tonemap 8K (7680x4320) | 1.4 s | - |
+| Tonemap 16K wide (16384x2160) | 1.5 s | - |
+| Tonemap 15360x8640 (133 Mpixel, tiled) | 4.1 s | - |
+
+Parity at scale (the three large frames above, 201 Mpixel in total): 7004 pixels differ
+(0.0035 %), all by one code value.
 
 ## Known gaps
 
