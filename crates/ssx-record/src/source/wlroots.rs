@@ -295,6 +295,8 @@ struct SlotEvents {
     generation: u64,
     /// ext: constraints were invalidated; wait for a batch newer than this one.
     await_batch: Option<u32>,
+    /// ext: the constraint batch the outstanding frame was requested with.
+    batch_at_request: u32,
 }
 
 struct State {
@@ -546,6 +548,7 @@ pub struct WlrootsSource {
     cfg: SourceConfig,
     target: Target,
     force: Option<Protocol>,
+    allow_damage: bool,
     stream: Option<Stream>,
     clock: Option<Clock>,
     next_due: Duration,
@@ -574,6 +577,7 @@ impl WlrootsSource {
             cfg,
             target: Target::Env,
             force: None,
+            allow_damage: true,
             stream: None,
             clock: None,
             next_due: Duration::ZERO,
@@ -594,6 +598,13 @@ impl WlrootsSource {
     /// Forces a protocol instead of picking the best advertised one.
     pub fn with_protocol(mut self, p: Protocol) -> Self {
         self.force = Some(p);
+        self
+    }
+
+    /// Disables damage-driven capture: every request completes at the next output refresh
+    /// even when nothing changed (used to measure the raw capture rate).
+    pub fn without_damage(mut self) -> Self {
+        self.allow_damage = false;
         self
     }
 
@@ -905,7 +916,8 @@ impl FrameSource for WlrootsSource {
             });
             s.st.slots.push(SlotEvents::default());
         }
-        s.damage = s.slots.len() == 1
+        s.damage = self.allow_damage
+            && s.slots.len() == 1
             && match s.protocol {
                 Protocol::Ext => true,
                 Protocol::Wlr => s.st.wlr.as_ref().is_some_and(|m| m.version() >= 2),
@@ -1101,7 +1113,7 @@ impl Stream {
         if let Some(b) = &self.slots[i].buf {
             frame.attach_buffer(&b.buffer);
         }
-        if !self.slots[i].primed {
+        if !self.slots[i].primed || !self.damage {
             // A fresh (or stale) buffer: everything is out of date, capture immediately.
             frame.damage_buffer(
                 0,
@@ -1269,7 +1281,9 @@ impl Stream {
                 )));
             }
             // Constraints changed (resolution switch): wait for the new ones, then retry.
-            self.st.slots[i].await_batch = Some(self.st.slots[i].ext.batches);
+            // New constraints may already have arrived (before the failure): then the
+            // check below re-requests right away.
+            self.st.slots[i].await_batch = Some(self.st.slots[i].batch_at_request);
             self.st.slots[i].ext.failed = None;
             self.slots[i].in_flight = true;
             return Ok(());

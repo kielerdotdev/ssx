@@ -112,5 +112,16 @@ directories = { version = "6", optional = true }
 [dev-dependencies]
 tempfile = "3"
 
+[target.'cfg(all(unix, not(target_vendor = "apple")))'.dev-dependencies]
+x11rb = "0.14"
+
+# The wayland tests reuse ssx-capture-wayland's test harness (headless sway launcher and a
+# mock compositor) by path, which needs the server side of the protocol crates.
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+wayland-server = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "server", "staging", "unstable"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client", "server"] }
+serde_json.workspace = true
+
 [lints]
 workspace = true
