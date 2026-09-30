@@ -61,15 +61,18 @@ pub fn render(bindings: &[(Chord, Command)]) -> Result<String> {
 
 /// The line to add to the main config to load `include_file`.
 ///
-/// sway expands `~` and globs in `include`; a path with unusual characters is written as
-/// a double-quoted string.
+/// sway passes the path through `wordexp`, which splits on spaces even inside double
+/// quotes (verified: `include "/a b/c"` silently loads nothing), so unusual characters are
+/// backslash-escaped instead: `include /home/my\ user/x.conf`.
 pub fn include_line(include_file: &Path) -> String {
-    let p = include_file.display().to_string();
-    if p.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '.' | '_' | '-' | '+' | ':' | '@' | ',' | '~')) {
-        format!("include {p}")
-    } else {
-        format!("include \"{}\"", p.replace('\\', "\\\\").replace('"', "\\\""))
+    let mut out = String::from("include ");
+    for c in include_file.display().to_string().chars() {
+        if !(c.is_ascii_alphanumeric() || matches!(c, '/' | '.' | '_' | '-' | '+' | ':' | '@' | ',')) {
+            out.push('\\');
+        }
+        out.push(c);
     }
+    out
 }
 
 #[cfg(test)]
@@ -120,7 +123,7 @@ mod tests {
     #[test]
     fn include_line_quotes_only_when_needed() {
         assert_eq!(include_line(Path::new("/home/u/.config/sway/config.d/ssx.conf")), "include /home/u/.config/sway/config.d/ssx.conf");
-        assert_eq!(include_line(Path::new("/home/my user/x.conf")), "include \"/home/my user/x.conf\"");
-        assert_eq!(include_line(Path::new("/h/a\"b")), "include \"/h/a\\\"b\"");
+        assert_eq!(include_line(Path::new("/home/my user/x.conf")), "include /home/my\\ user/x.conf");
+        assert_eq!(include_line(Path::new("/h/a\"b$c")), "include /h/a\\\"b\\$c");
     }
 }

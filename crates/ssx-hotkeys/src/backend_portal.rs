@@ -224,9 +224,26 @@ async fn worker(
 ) {
     let setup = async {
         let conn = connect_bus(address.as_deref()).await?;
-        let gs = GlobalShortcuts::with_connection(conn)
+        // `ashpd` builds its proxy lazily and succeeds even when nothing answers, so ask for
+        // the interface's `version` property: this also starts an activatable portal, and
+        // fails with a clear error when the portal (or this interface) is absent.
+        let absent = |e: &dyn std::fmt::Display| {
+            format!(
+                "the GlobalShortcuts portal is not available ({e}); GNOME before 48, wlroots \
+                 and XFCE-style portals do not implement it"
+            )
+        };
+        let props = zbus::fdo::PropertiesProxy::builder(&conn)
+            .destination("org.freedesktop.portal.Desktop")
+            .and_then(|b| b.path("/org/freedesktop/portal/desktop"))
+            .map_err(|e| absent(&e))?
+            .build()
             .await
-            .map_err(|e| format!("the GlobalShortcuts portal is not available ({e}); GNOME before 48, wlroots and XFCE-style portals do not implement it"))?;
+            .map_err(|e| absent(&e))?;
+        let interface = zbus::names::InterfaceName::try_from("org.freedesktop.portal.GlobalShortcuts")
+            .map_err(|e| absent(&e))?;
+        props.get(interface, "version").await.map_err(|e| absent(&e))?;
+        let gs = GlobalShortcuts::with_connection(conn).await.map_err(|e| absent(&e))?;
         // Subscribe before anything is bound so no activation can be missed.
         let activated = gs.receive_activated().await.map_err(|e| e.to_string())?;
         let deactivated = gs.receive_deactivated().await.map_err(|e| e.to_string())?;

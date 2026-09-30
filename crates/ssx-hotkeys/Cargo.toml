@@ -26,5 +26,8 @@ futures-lite = "2"
 [dev-dependencies]
 proptest = "1"
 
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+serde.workspace = true
+
 [lints]
 workspace = true

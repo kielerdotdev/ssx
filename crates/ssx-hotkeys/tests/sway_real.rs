@@ -370,7 +370,7 @@ fn include_line_with_spaces_in_the_path_is_accepted() {
     let dirs = Dirs::under(&home);
     let b = vec![(chord("Ctrl+Alt+Shift+Super+F1"), Command::new(script.display().to_string()).args(["0", "ok"]))];
     let report = files::write_include_file(&dirs, Target::Sway, &b).expect("write");
-    assert!(report.include_line.contains('"'), "{}", report.include_line);
+    assert!(report.include_line.contains("\\ "), "{}", report.include_line);
     // Prove the include was honoured by also making the included file run something at load.
     let mut text = std::fs::read_to_string(&report.path).expect("read");
     text.push_str(&format!("exec_always {}\n", sway::exec_arg(&b[0].1)));
