@@ -1,0 +1,2 @@
+# Protocol/extension names appear throughout the docs; ".." keeps the built-in list.
+doc-valid-idents = ["RandR", "XFixes", "XComposite", "XSettings", "XWayland", "SysV", "GetImage", "XRandR", "EWMH", "ICCCM", ".."]

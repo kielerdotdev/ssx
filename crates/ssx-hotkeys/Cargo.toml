@@ -1,5 +1,6 @@
 [package]
 name = "ssx-hotkeys"
+description = "Global hotkeys for every desktop: global-hotkey, the XDG GlobalShortcuts portal, and sway/Hyprland/GNOME/KDE binding generators."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +9,25 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-ssx-types.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[target.'cfg(any(windows, target_os = "macos", all(unix, not(target_vendor = "apple"))))'.dependencies]
+global-hotkey = "0.8"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# The portal client. `default-features = false` avoids ashpd's default tokio runtime;
+# `async-io` (also used by zbus below) keeps tokio out of the dependency tree.
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "global_shortcuts"] }
+zbus = { version = "5", default-features = false, features = ["async-io"] }
+async-io = "2"
+futures-lite = "2"
+
+[dev-dependencies]
+proptest = "1"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+serde.workspace = true
 
 [lints]
 workspace = true
