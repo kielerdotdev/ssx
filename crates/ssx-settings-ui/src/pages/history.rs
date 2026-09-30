@@ -365,7 +365,9 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     let detail_w = 330.0;
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 12.0;
-        ui.allocate_ui(vec2((total_w - detail_w - 30.0).max(300.0), avail.max(200.0)), |ui| {
+        // top-down inside: `allocate_ui` would inherit the row's left-to-right layout
+        let top_down = egui::Layout::top_down(egui::Align::Min);
+        ui.allocate_ui_with_layout(vec2((total_w - detail_w - 30.0).max(300.0), avail.max(200.0)), top_down, |ui| {
             egui::ScrollArea::vertical()
                 .id_salt("history-scroll")
                 .auto_shrink([false, false])
@@ -374,7 +376,7 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                     View::List => list(ui, st, cx),
                 });
         });
-        ui.allocate_ui(vec2(detail_w, avail.max(200.0)), |ui| {
+        ui.allocate_ui_with_layout(vec2(detail_w, avail.max(200.0)), top_down, |ui| {
             egui::ScrollArea::vertical()
                 .id_salt("history-detail")
                 .auto_shrink([false, false])
@@ -390,14 +392,13 @@ fn toolbar(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
             input_style(ui);
-            let r = ui_kit::text_input(
+            ui_kit::text_input(
                 ui,
                 "Search the history",
                 &mut st.search_edit,
                 "Search names, links, titles, notes...",
                 260.0,
             );
-            let _ = r;
             for k in KINDS {
                 if ui_kit::chip(ui, kind_label(k), st.filter.has_kind(k)).clicked() {
                     st.filter.toggle_kind(k);

@@ -72,6 +72,15 @@ pub fn app_custom(
 
 /// A lived-in app: uploaders, a history, detected file managers, a diagnostics report.
 pub fn demo_app(page: Page) -> (SettingsApp, Fixture) {
+    demo_app_custom(page, |_| {}, |_| {})
+}
+
+/// Like [`demo_app`], letting the test change the settings and the host first.
+pub fn demo_app_custom(
+    page: Page,
+    edit_settings: impl FnOnce(&mut Settings),
+    edit_host: impl FnOnce(&mut Host),
+) -> (SettingsApp, Fixture) {
     let fx = Fixture { dir: tempfile::tempdir().unwrap() };
     let mut host = demo::demo_host(fx.root());
     let vault = ssx_settings_ui::secrets::MemoryVault::keyring();
@@ -79,8 +88,11 @@ pub fn demo_app(page: Page) -> (SettingsApp, Fixture) {
         ssx_settings_ui::secrets::SecretVault::set(&vault, n, "demo-value").unwrap();
     }
     host.vault = Arc::new(vault);
+    edit_host(&mut host);
     std::fs::create_dir_all(&host.paths.config_dir).unwrap();
-    demo::lived_in_settings().save(&fx.settings_file()).unwrap();
+    let mut settings = demo::lived_in_settings();
+    edit_settings(&mut settings);
+    std::fs::write(fx.settings_file(), settings.to_toml_string().unwrap()).unwrap();
     let model = SettingsModel::load(fx.settings_file()).unwrap();
     let mut a = SettingsApp::new(model, host, page, no_wake());
     a.set_now(chrono::DateTime::parse_from_rfc3339("2025-03-09T14:05:06+01:00").unwrap());

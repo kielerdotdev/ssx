@@ -7,6 +7,8 @@ mod common;
 
 #[path = "ui/general.rs"]
 mod general;
+#[path = "ui/history.rs"]
+mod history;
 #[path = "ui/hotkeys.rs"]
 mod hotkeys;
 #[path = "ui/shell.rs"]
