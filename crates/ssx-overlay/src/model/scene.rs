@@ -120,9 +120,18 @@ impl Scene {
 }
 
 /// Places the dimensions label for `subject`: above its top-left corner if there is room,
-/// otherwise inside it; kept within `area`.
-pub fn place_label(subject: Rect, lines: Vec<String>, ui_scale: f32, area: Rect) -> LabelScene {
+/// otherwise inside it; kept within `area`. `None` if the label is larger than `area`
+/// (the renderer never draws outside the rectangles the scene declares).
+pub fn place_label(
+    subject: Rect,
+    lines: Vec<String>,
+    ui_scale: f32,
+    area: Rect,
+) -> Option<LabelScene> {
     let size = label_size(&lines, ui_scale);
+    if size.width > area.width || size.height > area.height {
+        return None;
+    }
     let gap = 4 * text_scale(ui_scale);
     let above_y = i64::from(subject.y) - i64::from(size.height) - i64::from(gap);
     let y = if above_y >= i64::from(area.y) {
@@ -136,21 +145,28 @@ pub fn place_label(subject: Rect, lines: Vec<String>, ui_scale: f32, area: Rect)
         i64::from(subject.x) + i64::from(size.width),
         y + i64::from(size.height),
     );
-    LabelScene { rect: clamp_inside(raw, area), lines }
+    Some(LabelScene { rect: clamp_inside(raw, area), lines })
 }
 
 /// Lays out the loupe for a pointer at `cursor` within `area` (the monitor under it).
-pub fn layout_loupe(cursor: Point, zoom: u32, ui_scale: f32, area: Rect) -> LoupeScene {
+/// The grid shrinks to fit small areas; `None` if not even one cell plus the info panel fits.
+pub fn layout_loupe(cursor: Point, zoom: u32, ui_scale: f32, area: Rect) -> Option<LoupeScene> {
     let s = text_scale(ui_scale);
     let zoom = zoom.clamp(2, 32);
+    let cell_px = zoom * s;
+    let info_h = label_size(&vec![String::new(); 3], ui_scale).height;
+    let max_side = area.width.min(area.height.saturating_sub(info_h));
     let mut cells = (128 / zoom).clamp(3, 65);
     if cells % 2 == 0 {
         cells -= 1;
     }
-    let cell_px = zoom * s;
+    while cells > 1 && cells * cell_px > max_side {
+        cells -= 2;
+    }
     let side = cells * cell_px;
-    let info_lines = vec![String::new(); 3];
-    let info_h = label_size(&info_lines, ui_scale).height;
+    if side > max_side || side < 92 * s {
+        return None;
+    }
     let (w, h) = (side, side + info_h);
     let off = i64::from(20 * s);
     let (cx, cy) = (i64::from(cursor.x), i64::from(cursor.y));
@@ -166,8 +182,9 @@ pub fn layout_loupe(cursor: Point, zoom: u32, ui_scale: f32, area: Rect) -> Loup
         super::geometry::rect_from_edges(x, y, x + i64::from(w), y + i64::from(h)),
         area,
     );
-    let grid = Rect::new(outer.x, outer.y, side.min(outer.width), side.min(outer.height));
-    LoupeScene { outer, grid, centre: cursor, cells, cell_px }
+    debug_assert_eq!((outer.width, outer.height), (w, h));
+    let grid = Rect::new(outer.x, outer.y, side, side);
+    Some(LoupeScene { outer, grid, centre: cursor, cells, cell_px })
 }
 
 /// Text lines of the loupe info panel for a pixel value at `p`.

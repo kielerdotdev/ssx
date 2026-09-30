@@ -155,14 +155,20 @@ impl Selection {
     /// Row-major 8-bit coverage mask of `rect.width * rect.height` (255 inside, 0 outside),
     /// for cropping a frame to the shape.
     pub fn mask(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(self.rect.area() as usize);
-        for y in 0..self.rect.height {
-            for x in 0..self.rect.width {
-                let p = Point::new(
-                    self.rect.x.saturating_add(x as i32),
-                    self.rect.y.saturating_add(y as i32),
-                );
-                out.push(if self.contains(p) { 255 } else { 0 });
+        use crate::model::geometry::{ellipse_span, polygon_spans};
+        let (w, h) = (self.rect.width as usize, self.rect.height as usize);
+        let mut out = vec![0u8; w * h];
+        let x0 = i64::from(self.rect.x);
+        for row in 0..h {
+            let y = i64::from(self.rect.y) + row as i64;
+            let spans = match &self.shape {
+                SelectionShape::Rect => vec![(x0, x0 + w as i64)],
+                SelectionShape::Ellipse => ellipse_span(self.rect, y).into_iter().collect(),
+                SelectionShape::Freeform(pts) => polygon_spans(pts, y),
+            };
+            for (a, b) in spans {
+                let (a, b) = ((a - x0).clamp(0, w as i64) as usize, (b - x0).clamp(0, w as i64) as usize);
+                out[row * w + a..row * w + b].fill(255);
             }
         }
         out

@@ -899,13 +899,13 @@ impl SelectionModel {
                     .cursor
                     .and_then(|c| self.monitor_at(c))
                     .map_or(self.cfg.bounds, |i| self.cfg.monitors[i].rect);
-                s.label = Some(place_label(r, lines, ui, area));
+                s.label = place_label(r, lines, ui, area);
             }
         }
         if opts.show_loupe && guides_mode {
             if let Some(c) = self.cursor {
                 let area = self.monitor_at(c).map_or(self.cfg.bounds, |i| self.cfg.monitors[i].rect);
-                s.loupe = Some(layout_loupe(c, self.zoom, ui, area));
+                s.loupe = layout_loupe(c, self.zoom, ui, area);
             }
         }
         s

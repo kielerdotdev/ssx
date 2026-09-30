@@ -21,7 +21,6 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
 font8x8 = { version = "0.3", default-features = false, features = ["std"] }
 memmap2 = "0.9"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"] }

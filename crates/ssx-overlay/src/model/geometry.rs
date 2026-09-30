@@ -176,37 +176,67 @@ pub fn snap_value(v: i64, candidates: &[i64], threshold: i64) -> Option<i64> {
         .min_by_key(|c| ((c - v).abs(), *c))
 }
 
-/// Pixel-centre test against the ellipse inscribed in `rect`.
-pub fn in_ellipse(rect: Rect, p: Point) -> bool {
+/// The pixels of row `y` inside the ellipse inscribed in `rect`, as a half-open x range.
+///
+/// Pixel-centre sampling. This is the single definition of the ellipse mask: the renderer
+/// paints exactly these pixels and [`crate::Selection::contains`] agrees by construction, so
+/// what the user sees bright is what gets captured.
+pub fn ellipse_span(rect: Rect, y: i64) -> Option<(i64, i64)> {
     if rect.is_empty() {
-        return false;
+        return None;
     }
     let rx = f64::from(rect.width) / 2.0;
     let ry = f64::from(rect.height) / 2.0;
     let cx = f64::from(rect.x) + rx;
     let cy = f64::from(rect.y) + ry;
-    let dx = (f64::from(p.x) + 0.5 - cx) / rx;
-    let dy = (f64::from(p.y) + 0.5 - cy) / ry;
-    dx * dx + dy * dy <= 1.0
+    let dy = ((y as f64) + 0.5 - cy) / ry;
+    let t = 1.0 - dy * dy;
+    if t < 0.0 {
+        return None;
+    }
+    let hw = rx * t.sqrt();
+    // x is inside iff |x + 0.5 - cx| <= hw.
+    let x0 = (cx - hw - 0.5).ceil() as i64;
+    let x1 = (cx + hw - 0.5).floor() as i64 + 1;
+    (x1 > x0).then_some((x0, x1))
 }
 
-/// Even-odd pixel-centre test against a closed polygon.
-pub fn in_polygon(pts: &[Point], p: Point) -> bool {
+/// Pixel-centre test against the ellipse inscribed in `rect`.
+pub fn in_ellipse(rect: Rect, p: Point) -> bool {
+    ellipse_span(rect, i64::from(p.y)).is_some_and(|(a, b)| (a..b).contains(&i64::from(p.x)))
+}
+
+/// The pixels of row `y` inside the closed polygon (even-odd rule, pixel-centre sampling),
+/// as sorted disjoint half-open x ranges.
+pub fn polygon_spans(pts: &[Point], y: i64) -> Vec<(i64, i64)> {
     if pts.len() < 3 {
-        return false;
+        return Vec::new();
     }
-    let (px, py) = (f64::from(p.x) + 0.5, f64::from(p.y) + 0.5);
-    let mut inside = false;
+    let yc = y as f64 + 0.5;
+    let mut xs: Vec<f64> = Vec::new();
     let mut j = pts.len() - 1;
     for i in 0..pts.len() {
         let (xi, yi) = (f64::from(pts[i].x), f64::from(pts[i].y));
         let (xj, yj) = (f64::from(pts[j].x), f64::from(pts[j].y));
-        if (yi > py) != (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi {
-            inside = !inside;
+        if (yi > yc) != (yj > yc) {
+            xs.push((xj - xi) * (yc - yi) / (yj - yi) + xi);
         }
         j = i;
     }
-    inside
+    xs.sort_by(f64::total_cmp);
+    // x is inside iff an odd number of crossings lie strictly right of its centre.
+    xs.chunks_exact(2)
+        .filter_map(|c| {
+            let a = (c[0] - 0.5).ceil() as i64;
+            let b = (c[1] - 0.5).ceil() as i64;
+            (b > a).then_some((a, b))
+        })
+        .collect()
+}
+
+/// Even-odd pixel-centre test against a closed polygon.
+pub fn in_polygon(pts: &[Point], p: Point) -> bool {
+    polygon_spans(pts, i64::from(p.y)).iter().any(|&(a, b)| (a..b).contains(&i64::from(p.x)))
 }
 
 /// Bounding box of points; `None` when empty.
@@ -397,6 +427,39 @@ mod tests {
         assert_eq!(polygon_area2(&tri), 100);
         assert_eq!(bounding_points(&tri), Some(Rect::new(0, 0, 10, 10)));
         assert_eq!(bounding_points(&[]), None);
+    }
+
+    #[test]
+    fn spans_agree_with_float_predicates() {
+        // Reference: the textbook float predicates.
+        let rect = Rect::new(-7, 3, 41, 23);
+        let rx = f64::from(rect.width) / 2.0;
+        let ry = f64::from(rect.height) / 2.0;
+        for y in -5..40 {
+            for x in -20..50 {
+                let dx = (f64::from(x) + 0.5 - (f64::from(rect.x) + rx)) / rx;
+                let dy = (f64::from(y) + 0.5 - (f64::from(rect.y) + ry)) / ry;
+                let want = dx * dx + dy * dy <= 1.0;
+                assert_eq!(in_ellipse(rect, Point::new(x, y)), want, "ellipse {x},{y}");
+            }
+        }
+        let poly = [Point::new(0, 0), Point::new(30, 5), Point::new(10, 20), Point::new(25, 30), Point::new(-5, 12)];
+        for y in -3..35 {
+            for x in -10..40 {
+                let (px, py) = (f64::from(x) + 0.5, f64::from(y) + 0.5);
+                let mut inside = false;
+                let mut j = poly.len() - 1;
+                for i in 0..poly.len() {
+                    let (xi, yi) = (f64::from(poly[i].x), f64::from(poly[i].y));
+                    let (xj, yj) = (f64::from(poly[j].x), f64::from(poly[j].y));
+                    if (yi > py) != (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi {
+                        inside = !inside;
+                    }
+                    j = i;
+                }
+                assert_eq!(in_polygon(&poly, Point::new(x, y)), inside, "poly {x},{y}");
+            }
+        }
     }
 
     #[test]

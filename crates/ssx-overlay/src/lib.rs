@@ -3,6 +3,7 @@
 
 pub mod error;
 pub mod model;
+pub mod render;
 pub mod types;
 
 pub use error::{HelperError, OverlayError};
