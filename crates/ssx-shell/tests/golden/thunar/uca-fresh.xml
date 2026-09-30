@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+<action>
+	<icon>document-send</icon>
+	<name>Upload with ssx</name>
+	<unique-id>ssx-shell-upload</unique-id>
+	<command>/usr/bin/ssx post-file -- %F</command>
+	<description>Upload the selected files with ssx</description>
+	<patterns>*</patterns>
+	<directories/>
+	<audio-files/>
+	<image-files/>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+<action>
+	<icon>applications-graphics</icon>
+	<name>Edit image with ssx</name>
+	<unique-id>ssx-shell-edit</unique-id>
+	<command>/usr/bin/ssx edit -- %f</command>
+	<description>Open the selected image in the ssx editor</description>
+	<patterns>*</patterns>
+	<image-files/>
+</action>
+<action>
+	<icon>video-x-generic</icon>
+	<name>Upload video with ssx</name>
+	<unique-id>ssx-shell-upload-video</unique-id>
+	<command>/usr/bin/ssx post-video -- %f</command>
+	<description>Upload the selected video with ssx</description>
+	<patterns>*</patterns>
+	<video-files/>
+</action>
+</actions>

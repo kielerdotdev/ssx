@@ -1,0 +1,133 @@
+Software
+Software\Classes
+Software\Classes\*
+Software\Classes\*\shell
+Software\Classes\*\shell\ssx.upload
+Software\Classes\*\shell\ssx.upload|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\*\shell\ssx.upload|MUIVerb=Upload with ssx
+Software\Classes\*\shell\ssx.upload|MultiSelectModel=Player
+Software\Classes\*\shell\ssx.upload|NeverDefault=
+Software\Classes\*\shell\ssx.upload|SsxManaged=1
+Software\Classes\*\shell\ssx.upload\command
+Software\Classes\*\shell\ssx.upload\command|="C:\Program Files\ssx\ssx.exe" post-file --coalesce -- "%1"
+Software\Classes\Directory
+Software\Classes\Directory\shell
+Software\Classes\Directory\shell\ssx.upload
+Software\Classes\Directory\shell\ssx.upload|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\Directory\shell\ssx.upload|MUIVerb=Upload with ssx
+Software\Classes\Directory\shell\ssx.upload|MultiSelectModel=Player
+Software\Classes\Directory\shell\ssx.upload|NeverDefault=
+Software\Classes\Directory\shell\ssx.upload|SsxManaged=1
+Software\Classes\Directory\shell\ssx.upload\command
+Software\Classes\Directory\shell\ssx.upload\command|="C:\Program Files\ssx\ssx.exe" post-file --coalesce -- "%1"
+Software\Classes\SystemFileAssociations
+Software\Classes\SystemFileAssociations\.avif
+Software\Classes\SystemFileAssociations\.avif\shell
+Software\Classes\SystemFileAssociations\.avif\shell\ssx.edit
+Software\Classes\SystemFileAssociations\.avif\shell\ssx.edit|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\SystemFileAssociations\.avif\shell\ssx.edit|MUIVerb=Edit image with ssx
+Software\Classes\SystemFileAssociations\.avif\shell\ssx.edit|MultiSelectModel=Single
+Software\Classes\SystemFileAssociations\.avif\shell\ssx.edit|NeverDefault=
+Software\Classes\SystemFileAssociations\.avif\shell\ssx.edit|SsxManaged=1
+Software\Classes\SystemFileAssociations\.avif\shell\ssx.edit\command
+Software\Classes\SystemFileAssociations\.avif\shell\ssx.edit\command|="C:\Program Files\ssx\ssx.exe" edit -- "%1"
+Software\Classes\SystemFileAssociations\.flv
+Software\Classes\SystemFileAssociations\.flv\shell
+Software\Classes\SystemFileAssociations\.flv\shell\ssx.upload-video
+Software\Classes\SystemFileAssociations\.flv\shell\ssx.upload-video|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\SystemFileAssociations\.flv\shell\ssx.upload-video|MUIVerb=Upload video with ssx
+Software\Classes\SystemFileAssociations\.flv\shell\ssx.upload-video|MultiSelectModel=Single
+Software\Classes\SystemFileAssociations\.flv\shell\ssx.upload-video|NeverDefault=
+Software\Classes\SystemFileAssociations\.flv\shell\ssx.upload-video|SsxManaged=1
+Software\Classes\SystemFileAssociations\.flv\shell\ssx.upload-video\command
+Software\Classes\SystemFileAssociations\.flv\shell\ssx.upload-video\command|="C:\Program Files\ssx\ssx.exe" post-video -- "%1"
+Software\Classes\SystemFileAssociations\.heic
+Software\Classes\SystemFileAssociations\.heic\shell
+Software\Classes\SystemFileAssociations\.heic\shell\ssx.edit
+Software\Classes\SystemFileAssociations\.heic\shell\ssx.edit|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\SystemFileAssociations\.heic\shell\ssx.edit|MUIVerb=Edit image with ssx
+Software\Classes\SystemFileAssociations\.heic\shell\ssx.edit|MultiSelectModel=Single
+Software\Classes\SystemFileAssociations\.heic\shell\ssx.edit|NeverDefault=
+Software\Classes\SystemFileAssociations\.heic\shell\ssx.edit|SsxManaged=1
+Software\Classes\SystemFileAssociations\.heic\shell\ssx.edit\command
+Software\Classes\SystemFileAssociations\.heic\shell\ssx.edit\command|="C:\Program Files\ssx\ssx.exe" edit -- "%1"
+Software\Classes\SystemFileAssociations\.heif
+Software\Classes\SystemFileAssociations\.heif\shell
+Software\Classes\SystemFileAssociations\.heif\shell\ssx.edit
+Software\Classes\SystemFileAssociations\.heif\shell\ssx.edit|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\SystemFileAssociations\.heif\shell\ssx.edit|MUIVerb=Edit image with ssx
+Software\Classes\SystemFileAssociations\.heif\shell\ssx.edit|MultiSelectModel=Single
+Software\Classes\SystemFileAssociations\.heif\shell\ssx.edit|NeverDefault=
+Software\Classes\SystemFileAssociations\.heif\shell\ssx.edit|SsxManaged=1
+Software\Classes\SystemFileAssociations\.heif\shell\ssx.edit\command
+Software\Classes\SystemFileAssociations\.heif\shell\ssx.edit\command|="C:\Program Files\ssx\ssx.exe" edit -- "%1"
+Software\Classes\SystemFileAssociations\.m4v
+Software\Classes\SystemFileAssociations\.m4v\shell
+Software\Classes\SystemFileAssociations\.m4v\shell\ssx.upload-video
+Software\Classes\SystemFileAssociations\.m4v\shell\ssx.upload-video|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\SystemFileAssociations\.m4v\shell\ssx.upload-video|MUIVerb=Upload video with ssx
+Software\Classes\SystemFileAssociations\.m4v\shell\ssx.upload-video|MultiSelectModel=Single
+Software\Classes\SystemFileAssociations\.m4v\shell\ssx.upload-video|NeverDefault=
+Software\Classes\SystemFileAssociations\.m4v\shell\ssx.upload-video|SsxManaged=1
+Software\Classes\SystemFileAssociations\.m4v\shell\ssx.upload-video\command
+Software\Classes\SystemFileAssociations\.m4v\shell\ssx.upload-video\command|="C:\Program Files\ssx\ssx.exe" post-video -- "%1"
+Software\Classes\SystemFileAssociations\.mkv
+Software\Classes\SystemFileAssociations\.mkv\shell
+Software\Classes\SystemFileAssociations\.mkv\shell\ssx.upload-video
+Software\Classes\SystemFileAssociations\.mkv\shell\ssx.upload-video|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\SystemFileAssociations\.mkv\shell\ssx.upload-video|MUIVerb=Upload video with ssx
+Software\Classes\SystemFileAssociations\.mkv\shell\ssx.upload-video|MultiSelectModel=Single
+Software\Classes\SystemFileAssociations\.mkv\shell\ssx.upload-video|NeverDefault=
+Software\Classes\SystemFileAssociations\.mkv\shell\ssx.upload-video|SsxManaged=1
+Software\Classes\SystemFileAssociations\.mkv\shell\ssx.upload-video\command
+Software\Classes\SystemFileAssociations\.mkv\shell\ssx.upload-video\command|="C:\Program Files\ssx\ssx.exe" post-video -- "%1"
+Software\Classes\SystemFileAssociations\.ogv
+Software\Classes\SystemFileAssociations\.ogv\shell
+Software\Classes\SystemFileAssociations\.ogv\shell\ssx.upload-video
+Software\Classes\SystemFileAssociations\.ogv\shell\ssx.upload-video|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\SystemFileAssociations\.ogv\shell\ssx.upload-video|MUIVerb=Upload video with ssx
+Software\Classes\SystemFileAssociations\.ogv\shell\ssx.upload-video|MultiSelectModel=Single
+Software\Classes\SystemFileAssociations\.ogv\shell\ssx.upload-video|NeverDefault=
+Software\Classes\SystemFileAssociations\.ogv\shell\ssx.upload-video|SsxManaged=1
+Software\Classes\SystemFileAssociations\.ogv\shell\ssx.upload-video\command
+Software\Classes\SystemFileAssociations\.ogv\shell\ssx.upload-video\command|="C:\Program Files\ssx\ssx.exe" post-video -- "%1"
+Software\Classes\SystemFileAssociations\.webm
+Software\Classes\SystemFileAssociations\.webm\shell
+Software\Classes\SystemFileAssociations\.webm\shell\ssx.upload-video
+Software\Classes\SystemFileAssociations\.webm\shell\ssx.upload-video|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\SystemFileAssociations\.webm\shell\ssx.upload-video|MUIVerb=Upload video with ssx
+Software\Classes\SystemFileAssociations\.webm\shell\ssx.upload-video|MultiSelectModel=Single
+Software\Classes\SystemFileAssociations\.webm\shell\ssx.upload-video|NeverDefault=
+Software\Classes\SystemFileAssociations\.webm\shell\ssx.upload-video|SsxManaged=1
+Software\Classes\SystemFileAssociations\.webm\shell\ssx.upload-video\command
+Software\Classes\SystemFileAssociations\.webm\shell\ssx.upload-video\command|="C:\Program Files\ssx\ssx.exe" post-video -- "%1"
+Software\Classes\SystemFileAssociations\.webp
+Software\Classes\SystemFileAssociations\.webp\shell
+Software\Classes\SystemFileAssociations\.webp\shell\ssx.edit
+Software\Classes\SystemFileAssociations\.webp\shell\ssx.edit|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\SystemFileAssociations\.webp\shell\ssx.edit|MUIVerb=Edit image with ssx
+Software\Classes\SystemFileAssociations\.webp\shell\ssx.edit|MultiSelectModel=Single
+Software\Classes\SystemFileAssociations\.webp\shell\ssx.edit|NeverDefault=
+Software\Classes\SystemFileAssociations\.webp\shell\ssx.edit|SsxManaged=1
+Software\Classes\SystemFileAssociations\.webp\shell\ssx.edit\command
+Software\Classes\SystemFileAssociations\.webp\shell\ssx.edit\command|="C:\Program Files\ssx\ssx.exe" edit -- "%1"
+Software\Classes\SystemFileAssociations\image
+Software\Classes\SystemFileAssociations\image\shell
+Software\Classes\SystemFileAssociations\image\shell\ssx.edit
+Software\Classes\SystemFileAssociations\image\shell\ssx.edit|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\SystemFileAssociations\image\shell\ssx.edit|MUIVerb=Edit image with ssx
+Software\Classes\SystemFileAssociations\image\shell\ssx.edit|MultiSelectModel=Single
+Software\Classes\SystemFileAssociations\image\shell\ssx.edit|NeverDefault=
+Software\Classes\SystemFileAssociations\image\shell\ssx.edit|SsxManaged=1
+Software\Classes\SystemFileAssociations\image\shell\ssx.edit\command
+Software\Classes\SystemFileAssociations\image\shell\ssx.edit\command|="C:\Program Files\ssx\ssx.exe" edit -- "%1"
+Software\Classes\SystemFileAssociations\video
+Software\Classes\SystemFileAssociations\video\shell
+Software\Classes\SystemFileAssociations\video\shell\ssx.upload-video
+Software\Classes\SystemFileAssociations\video\shell\ssx.upload-video|Icon="C:\Program Files\ssx\ssx.exe",0
+Software\Classes\SystemFileAssociations\video\shell\ssx.upload-video|MUIVerb=Upload video with ssx
+Software\Classes\SystemFileAssociations\video\shell\ssx.upload-video|MultiSelectModel=Single
+Software\Classes\SystemFileAssociations\video\shell\ssx.upload-video|NeverDefault=
+Software\Classes\SystemFileAssociations\video\shell\ssx.upload-video|SsxManaged=1
+Software\Classes\SystemFileAssociations\video\shell\ssx.upload-video\command
+Software\Classes\SystemFileAssociations\video\shell\ssx.upload-video\command|="C:\Program Files\ssx\ssx.exe" post-video -- "%1"

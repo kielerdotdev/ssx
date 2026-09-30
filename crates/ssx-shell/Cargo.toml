@@ -6,9 +6,19 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+description = "File-manager right-click integration installers for ssx (Linux, Windows, macOS)"
 
 [dependencies]
-ssx-types.workspace = true
+quick-xml = "0.42"
+thiserror.workspace = true
+tracing.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-registry = "0.6"
+
+[dev-dependencies]
+tempfile = "3"
+plist = "1"
 
 [lints]
 workspace = true
