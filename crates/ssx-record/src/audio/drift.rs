@@ -48,10 +48,10 @@ impl DriftConfig {
     pub fn new(rate_out: u32) -> Self {
         Self {
             rate_out,
-            filter: Duration::from_millis(400),
-            settle: Duration::from_secs(3),
+            filter: Duration::from_secs(1),
+            settle: Duration::from_secs(6),
             max_correction: 0.005,
-            dead_band: Duration::from_millis(2),
+            dead_band: Duration::from_millis(4),
             resync_threshold: Duration::from_millis(80),
         }
     }
@@ -151,15 +151,27 @@ impl DriftController {
 mod tests {
     use super::*;
 
+    struct Sim {
+        /// Final smoothed error in seconds.
+        err: f64,
+        /// Mean ratio over the last 10 s.
+        mean_ratio: f64,
+        /// Largest deviation of the ratio from the ideal one after the first 20 s.
+        peak_dev: f64,
+        /// Largest deviation over the whole run.
+        peak_dev_all: f64,
+        ctl: DriftController,
+    }
+
     /// Simulates a source whose device clock runs `skew` fast (0.001 = 0.1 %), delivering
     /// 10 ms chunks, for `seconds` of shared-clock time. Timestamps carry uniform jitter
-    /// of `+-jitter_ms`. Returns the final smoothed error (s) and the mean ratio of the
-    /// last 10 s.
-    fn simulate(skew: f64, jitter_ms: f64, seconds: f64) -> (f64, f64, DriftController) {
+    /// of `+-jitter_ms`; the first chunk is stamped `first_early_ms` too early (a real
+    /// effect: device latency is unknown when the stream starts).
+    fn simulate(skew: f64, jitter_ms: f64, first_early_ms: f64, seconds: f64) -> Sim {
         let rate_in = 48_000.0;
-        let cfg = DriftConfig::new(48_000);
-        let mut c = DriftController::new(cfg);
+        let mut c = DriftController::new(DriftConfig::new(48_000));
         let chunk_in = 480.0; // frames
+        let ideal_ratio = 1.0 / (1.0 + skew);
         let mut produced = 0.0f64; // output frames so far (fractional, ideal resampler)
         let mut t_dev = 0.0f64; // device time = sample count / rate
         let mut seed = 1u64;
@@ -167,65 +179,95 @@ mod tests {
             seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
             ((seed >> 33) as f64 / f64::from(1u32 << 31)) * 2.0 - 1.0
         };
-        let mut ratio_sum = 0.0;
-        let mut ratio_n = 0;
+        let (mut ratio_sum, mut ratio_n) = (0.0, 0);
         let mut ratio = 1.0f64;
-        let mut last_err = 0.0;
+        let (mut peak, mut peak_all) = (0.0f64, 0.0f64);
+        let mut first = true;
+        // The true start of the stream is 1 s into the clock so an early stamp stays positive.
+        let base = 1.0;
         loop {
             // Shared-clock time of the chunk's first sample: the device produces samples
             // (1 + skew) times faster than real time.
-            let t_clock = t_dev / (1.0 + skew) + rnd() * jitter_ms / 1000.0;
-            if t_clock > seconds {
+            let mut t_clock = base + t_dev / (1.0 + skew) + rnd() * jitter_ms / 1000.0;
+            if first {
+                t_clock -= first_early_ms / 1000.0;
+                first = false;
+            }
+            if t_clock > base + seconds {
                 break;
             }
-            let action =
-                c.observe(Duration::from_secs_f64(t_clock.max(0.0)), produced.round() as u64);
-            match action {
+            match c.observe(Duration::from_secs_f64(t_clock), produced.round() as u64) {
                 DriftAction::Ratio(r) => ratio = r,
                 DriftAction::InsertSilence(n) => produced += n as f64,
                 DriftAction::DropInput(n) => produced -= n as f64,
             }
             produced += chunk_in * ratio;
             t_dev += chunk_in / rate_in;
-            last_err = c.error_seconds();
-            if t_clock > seconds - 10.0 {
+            let dev = (ratio - ideal_ratio).abs();
+            peak_all = peak_all.max(dev);
+            if t_clock > base + 20.0 {
+                peak = peak.max(dev);
+            }
+            if t_clock > base + seconds - 10.0 {
                 ratio_sum += ratio;
                 ratio_n += 1;
             }
         }
-        (last_err, ratio_sum / f64::from(ratio_n.max(1)), c)
+        Sim {
+            err: c.error_seconds(),
+            mean_ratio: ratio_sum / f64::from(ratio_n.max(1)),
+            peak_dev: peak,
+            peak_dev_all: peak_all,
+            ctl: c,
+        }
     }
 
     #[test]
     fn perfect_clock_needs_no_correction() {
-        let (err, ratio, c) = simulate(0.0, 0.0, 60.0);
-        assert!(err.abs() < 0.001, "{err}");
-        assert!((ratio - 1.0).abs() < 1e-4, "{ratio}");
-        assert_eq!(c.resyncs, 0);
+        let s = simulate(0.0, 0.0, 0.0, 60.0);
+        assert!(s.err.abs() < 0.001, "{}", s.err);
+        assert!((s.mean_ratio - 1.0).abs() < 1e-4, "{}", s.mean_ratio);
+        assert!(s.peak_dev_all < 1e-6, "an exact clock must never be touched: {}", s.peak_dev_all);
+        assert_eq!(s.ctl.resyncs, 0);
     }
 
     #[test]
     fn fast_and_slow_devices_are_tracked_to_sample_accuracy() {
         for skew in [0.0002, -0.0002, 0.001, -0.001, 0.003, -0.003] {
-            let (err, ratio, c) = simulate(skew, 0.0, 60.0);
+            let s = simulate(skew, 0.0, 0.0, 120.0);
             // A device running `skew` fast delivers more samples per real second, so
             // the output ratio must go *below* 1 by the same amount.
-            assert!(
-                (ratio - (1.0 - skew / (1.0 + skew))).abs() < 3e-4,
-                "skew {skew}: ratio {ratio}"
-            );
-            assert!(err.abs() < 0.008, "skew {skew}: residual error {err} s");
-            assert_eq!(c.resyncs, 0, "skew {skew}");
+            let ideal = 1.0 / (1.0 + skew);
+            assert!((s.mean_ratio - ideal).abs() < 3e-4, "skew {skew}: ratio {}", s.mean_ratio);
+            assert!(s.err.abs() < 0.008, "skew {skew}: residual error {} s", s.err);
+            assert_eq!(s.ctl.resyncs, 0, "skew {skew}");
         }
     }
 
     #[test]
-    fn callback_jitter_does_not_disturb_the_control_loop() {
+    fn callback_jitter_does_not_wobble_the_pitch() {
         for skew in [0.0, 0.001, -0.001] {
-            let (err, ratio, c) = simulate(skew, 4.0, 60.0);
-            assert!(err.abs() < 0.008, "skew {skew}: {err}");
-            assert!((ratio - (1.0 - skew / (1.0 + skew))).abs() < 5e-4, "skew {skew}: {ratio}");
-            assert_eq!(c.resyncs, 0, "jitter alone must not cause a resync");
+            let s = simulate(skew, 4.0, 0.0, 120.0);
+            assert!(s.err.abs() < 0.008, "skew {skew}: {}", s.err);
+            assert_eq!(s.ctl.resyncs, 0, "jitter alone must not cause a resync");
+            // After settling, the ratio stays within 0.1 % of the ideal despite +-4 ms
+            // timestamp noise (0.1 % is 1.7 cents of pitch, inaudible).
+            assert!(s.peak_dev < 0.001, "skew {skew}: peak deviation {}", s.peak_dev);
+        }
+    }
+
+    #[test]
+    fn a_wrong_first_timestamp_is_absorbed_gently() {
+        // Device latency is unknown at stream start, so the first chunk may be stamped
+        // several milliseconds off. For a few milliseconds the controller must not let that
+        // show as a pitch shift beyond 0.3 % (a larger error may use the full 0.5 %), and
+        // must have removed the offset a minute later.
+        for early in [7.0, -7.0, 20.0] {
+            let s = simulate(0.0, 2.0, early, 90.0);
+            let limit = if early.abs() <= 8.0 { 0.003 } else { 0.0051 };
+            assert!(s.peak_dev_all < limit, "first stamp {early} ms off: peak {}", s.peak_dev_all);
+            assert!(s.err.abs() < 0.006, "residual {} after {early} ms", s.err);
+            assert_eq!(s.ctl.resyncs, 0);
         }
     }
 

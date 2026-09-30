@@ -146,7 +146,27 @@ fn pick_device(
             .ok_or_else(|| AudioError::NoDevice("no microphone found".into()))
         }
         DeviceKind::SystemLoopback => {
-            // 1. An output device that the host lets us open as input (WASAPI, PipeWire).
+            // 1a. Duplex devices: on the PipeWire host every sink is duplex, and the
+            // `default_sink` entry follows the system's default sink. (Its `default_output`
+            // sibling is playback-only.) An input stream on a sink captures what it plays.
+            let duplex: Vec<Device> = host
+                .devices()
+                .map(|it| it.filter(|d| d.supports_input() && d.supports_output()).collect())
+                .unwrap_or_default();
+            let chosen = match sel {
+                DeviceSelector::Default => duplex
+                    .iter()
+                    .find(|d| device_name(d) == "default_sink")
+                    .or_else(|| duplex.first()),
+                DeviceSelector::Name(_) => duplex.iter().find(|d| matches(d)),
+            };
+            if let Some(d) = chosen
+                && d.default_input_config().is_ok()
+            {
+                let n = device_name(d);
+                return Ok((d.clone(), n));
+            }
+            // 1b. An output device the host lets us open as input (CoreAudio).
             let out = match sel {
                 DeviceSelector::Default => host.default_output_device(),
                 DeviceSelector::Name(_) => host
