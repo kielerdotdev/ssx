@@ -327,7 +327,17 @@ fn install(
 }
 
 fn uninstall(_app: &App, target: Option<HotkeyTarget>) -> CliResult<()> {
-    let target = choose_target(target)?;
+    // No --target and a session where ssx never installs bindings (Windows, plain X11, a
+    // terminal): there is nothing to remove, which is success, not an error. Installers and
+    // uninstall scripts call this unconditionally and must not see a failure.
+    let target = match choose_target(target) {
+        Ok(t) => t,
+        Err(_) if target.is_none() => {
+            out_line("nothing to remove: ssx does not install key bindings in this session");
+            return Ok(());
+        }
+        Err(e) => return Err(e),
+    };
     match target {
         Target::Sway | Target::Hyprland => {
             files::uninstall(&dirs()?, target).map_err(|e| binding_error(&e))?;

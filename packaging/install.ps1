@@ -60,7 +60,9 @@ if ($Uninstall) {
         Set-UserPath ($kept -join ';')
     }
     Write-Host 'Removed ssx. Your settings and history were left in place.'
-    return
+    # The best-effort `ssx ...` calls above may have left a non-zero $LASTEXITCODE behind, and a
+    # PowerShell script exits with the last native command's code unless told otherwise.
+    exit 0
 }
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -91,6 +93,8 @@ if ($Integrate) {
     Invoke-Step 'enable start at login' { & $ssx daemon autostart enable }
     Invoke-Step 'add the right-click entries' { & $ssx shell install }
 }
+
+$global:LASTEXITCODE = 0
 
 Write-Host @"
 

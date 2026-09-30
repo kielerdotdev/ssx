@@ -187,6 +187,18 @@ fn hotkeys_print_needs_a_target_or_a_known_desktop_and_a_hotkey() {
 }
 
 #[test]
+fn hotkeys_uninstall_with_nothing_installed_is_a_success() {
+    // A session without a binding generator (here: no desktop at all). `print` has nothing to
+    // print and fails, but `uninstall` has nothing to remove and must succeed quietly: the
+    // installers call it unconditionally.
+    let env = TestEnv::new();
+    let r = env.ssx(&["hotkeys", "uninstall"]).ok();
+    assert!(r.stdout.contains("nothing to remove"), "{}", r.stdout);
+    // An explicit target is still honoured (and idempotent when nothing was installed).
+    env.ssx(&["hotkeys", "uninstall", "--target", "sway"]).ok();
+}
+
+#[test]
 fn hotkeys_detect_follows_the_session() {
     let mut env = TestEnv::new();
     env.set("XDG_CURRENT_DESKTOP", "sway")
