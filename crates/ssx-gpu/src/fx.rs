@@ -74,7 +74,10 @@ impl Taps {
 /// normalised, indices clamped at the edges by the consumer.
 pub fn gaussian_taps(len: u32, sigma: f32) -> Result<Taps> {
     if !(sigma.is_finite() && sigma > 0.0 && sigma <= MAX_SIGMA) {
-        return Err(GpuError::invalid("sigma", format!("must be in (0, {MAX_SIGMA}], got {sigma}")));
+        return Err(GpuError::invalid(
+            "sigma",
+            format!("must be in (0, {MAX_SIGMA}], got {sigma}"),
+        ));
     }
     let radius = ((3.0 * f64::from(sigma)).ceil() as i32).max(1);
     let two_s2 = 2.0 * f64::from(sigma) * f64::from(sigma);
@@ -397,10 +400,14 @@ impl GpuFx {
             let pv = PassParams { dims: [dw, sh, dw, dh], taps: [ty.taps, 0, 0, 0] };
             let b_ph = buffer_with_data(h, "ssx fx params h", uniform, bytemuck::bytes_of(&ph));
             let b_pv = buffer_with_data(h, "ssx fx params v", uniform, bytemuck::bytes_of(&pv));
-            let b_sx = buffer_with_data(h, "ssx fx starts x", storage, bytemuck::cast_slice(&tx.starts));
-            let b_wx = buffer_with_data(h, "ssx fx weights x", storage, bytemuck::cast_slice(&tx.weights));
-            let b_sy = buffer_with_data(h, "ssx fx starts y", storage, bytemuck::cast_slice(&ty.starts));
-            let b_wy = buffer_with_data(h, "ssx fx weights y", storage, bytemuck::cast_slice(&ty.weights));
+            let b_sx =
+                buffer_with_data(h, "ssx fx starts x", storage, bytemuck::cast_slice(&tx.starts));
+            let b_wx =
+                buffer_with_data(h, "ssx fx weights x", storage, bytemuck::cast_slice(&tx.weights));
+            let b_sy =
+                buffer_with_data(h, "ssx fx starts y", storage, bytemuck::cast_slice(&ty.starts));
+            let b_wy =
+                buffer_with_data(h, "ssx fx weights y", storage, bytemuck::cast_slice(&ty.weights));
             let (v_src, v_inter, v_out) = (view(&src), view(&inter), view(&out));
             let bg_h = kh.bind_group(
                 h,

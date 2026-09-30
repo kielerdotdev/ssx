@@ -187,7 +187,10 @@ impl YuvPass {
             return Err(GpuError::TooLarge {
                 width: size.width,
                 height: size.height,
-                reason: format!("planes need {} bytes, pass capacity is {}", l.total_bytes, self.capacity),
+                reason: format!(
+                    "planes need {} bytes, pass capacity is {}",
+                    l.total_bytes, self.capacity
+                ),
             });
         }
         let k = self.opts.coeffs();
@@ -210,7 +213,11 @@ impl YuvPass {
     }
 
     /// Sets tonemap parameters (HDR input only; ignored otherwise).
-    pub fn set_tonemap(&self, settings: &TonemapSettings, sdr_white_nits: Option<f32>) -> Result<()> {
+    pub fn set_tonemap(
+        &self,
+        settings: &TonemapSettings,
+        sdr_white_nits: Option<f32>,
+    ) -> Result<()> {
         let p = params_bytes(settings, sdr_white_nits)?;
         if let Some(buf) = &self.tonemap_params {
             self.handle.queue().write_buffer(buf, 0, bytemuck::bytes_of(&p));
@@ -298,11 +305,7 @@ impl YuvConverter {
         } else {
             ("ssx rgb->yuv", RGB_TO_YUV_WGSL)
         };
-        let mut binds = vec![
-            (1, Bind::Uniform),
-            (2, Bind::StorageWrite),
-            (3, Bind::Texture),
-        ];
+        let mut binds = vec![(1, Bind::Uniform), (2, Bind::StorageWrite), (3, Bind::Texture)];
         if hdr {
             binds.insert(0, (0, Bind::Uniform));
             binds.push((4, Bind::Uniform));
@@ -342,6 +345,13 @@ impl YuvConverter {
 
     /// Converts an 8-bit sRGB frame (`Rgba8`/`Bgra8`) to 4:2:0 on the GPU.
     pub fn rgba_to_yuv(&self, frame: &Frame, opts: &YuvOptions) -> Result<YuvFrame> {
+        if !frame.is_sdr8() {
+            return Err(GpuError::UnsupportedFrame {
+                format: frame.format(),
+                space: frame.color_space(),
+                expected: "8-bit sRGB (Rgba8/Bgra8); use tonemap_to_yuv for HDR frames",
+            });
+        }
         self.convert(frame, None, opts)
     }
 
@@ -660,7 +670,9 @@ impl YuvConverter {
             );
             h.queue().submit([enc.finish()]);
             map_read(&h, &staging, (padded * hgt as usize) as u64, |bytes| {
-                for (dst, src) in out.chunks_exact_mut(w as usize * 4).zip(bytes.chunks_exact(padded)) {
+                for (dst, src) in
+                    out.chunks_exact_mut(w as usize * 4).zip(bytes.chunks_exact(padded))
+                {
                     dst.copy_from_slice(&src[..w as usize * 4]);
                 }
             })
@@ -690,7 +702,10 @@ fn make_pass(
     };
     let yuv_params = uniform("ssx yuv params", size_of::<YuvParamsBytes>());
     let (tonemap_params, origin) = if kind.is_hdr() {
-        (Some(uniform("ssx tonemap params", size_of::<ParamsBytes>())), Some(uniform("ssx band origin", 16)))
+        (
+            Some(uniform("ssx tonemap params", size_of::<ParamsBytes>())),
+            Some(uniform("ssx band origin", 16)),
+        )
     } else {
         (None, None)
     };
@@ -744,10 +759,9 @@ fn run_band(
         height: frame.height(),
         reason: format!("row stride {stride} does not fit in 32 bits"),
     })?;
-    let src = frame
-        .data()
-        .get(y0 as usize * stride..)
-        .ok_or_else(|| GpuError::invalid("frame", "pixel buffer shorter than its stride implies"))?;
+    let src = frame.data().get(y0 as usize * stride..).ok_or_else(|| {
+        GpuError::invalid("frame", "pixel buffer shorter than its stride implies")
+    })?;
     let size = Size::new(frame.width(), rows);
     h.queue().write_texture(
         wgpu::TexelCopyTextureInfo {
@@ -803,4 +817,71 @@ fn run_band(
             }
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::size_of;
+
+    use super::*;
+
+    /// Member names/offsets and span of a WGSL struct.
+    fn wgsl_members(src: &str, name: &str) -> (Vec<(String, u32)>, u32) {
+        let module = naga::front::wgsl::parse_str(src).expect("shader parses");
+        for (_, ty) in module.types.iter() {
+            if ty.name.as_deref() == Some(name) {
+                if let naga::TypeInner::Struct { members, span } = &ty.inner {
+                    let m = members
+                        .iter()
+                        .map(|m| (m.name.clone().unwrap_or_default(), m.offset))
+                        .collect();
+                    return (m, *span);
+                }
+            }
+        }
+        panic!("struct {name} not found");
+    }
+
+    #[test]
+    fn yuv_params_layout_matches_wgsl() {
+        let (m, span) = wgsl_members(RGB_TO_YUV_WGSL, "YuvParams");
+        let names: Vec<_> = m.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(names, ["dims", "strides", "misc", "taps", "ky", "ku", "kv", "range"]);
+        for (i, (_, off)) in m.iter().enumerate() {
+            assert_eq!(*off as usize, i * 16);
+        }
+        assert_eq!(span as usize, size_of::<YuvParamsBytes>());
+    }
+
+    #[test]
+    fn inverse_params_layout_matches_wgsl() {
+        let (m, span) = wgsl_members(YUV_TO_RGB_WGSL, "P");
+        let names: Vec<_> = m.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(names, ["dims", "offs", "strides", "inv_a", "inv_b"]);
+        assert_eq!(span as usize, size_of::<InverseParamsBytes>());
+    }
+
+    #[test]
+    fn plane_layout_arithmetic() {
+        let l = PlaneLayout::new(Size::new(5, 3), YuvLayout::Nv12);
+        assert_eq!((l.coded_width, l.coded_height), (6, 4));
+        assert_eq!((l.y_stride, l.chroma_stride), (8, 8));
+        assert_eq!(l.total_bytes, 8 * 4 + 8 * 2);
+        let l = PlaneLayout::new(Size::new(6, 4), YuvLayout::I420);
+        assert_eq!((l.y_stride, l.chroma_stride), (8, 4));
+        assert_eq!(l.u_offset, 32);
+        assert_eq!(l.v_offset, 32 + 4 * 2);
+        assert_eq!(l.total_bytes, 32 + 16);
+        for w in 1..40 {
+            for h in 1..12 {
+                for layout in [YuvLayout::Nv12, YuvLayout::I420] {
+                    let l = PlaneLayout::new(Size::new(w, h), layout);
+                    assert_eq!(l.y_stride % 4, 0);
+                    assert_eq!(l.chroma_stride % 4, 0);
+                    assert_eq!(l.u_offset % 4, 0);
+                    assert_eq!(l.v_offset % 4, 0);
+                }
+            }
+        }
+    }
 }

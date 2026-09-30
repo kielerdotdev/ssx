@@ -138,3 +138,52 @@ pub fn diff_rgba(a: &Frame, b: &Frame) -> Diff {
     }
     d
 }
+
+/// An 8-bit sRGB frame (`Rgba8`, or `Bgra8` when `bgra`) with `pad` extra bytes per row.
+pub fn rgba_frame(
+    w: u32,
+    h: u32,
+    pad: usize,
+    bgra: bool,
+    f: impl Fn(u32, u32) -> [u8; 4],
+) -> Frame {
+    let stride = w as usize * 4 + pad;
+    let mut data = vec![0x5Au8; stride * h as usize];
+    for y in 0..h {
+        for x in 0..w {
+            let p = f(x, y);
+            let px = if bgra { [p[2], p[1], p[0], p[3]] } else { p };
+            let o = y as usize * stride + x as usize * 4;
+            data[o..o + 4].copy_from_slice(&px);
+        }
+    }
+    let format = if bgra { PixelFormat::Bgra8 } else { PixelFormat::Rgba8 };
+    Frame::from_raw(Size::new(w, h), stride, format, ColorSpace::Srgb, data).unwrap()
+}
+
+/// SMPTE-style colour bars over a grey ramp: top 2/3 bars, bottom third ramp.
+pub fn colour_bars(x: u32, y: u32, w: u32, h: u32) -> [u8; 4] {
+    if y * 3 >= h * 2 {
+        let v = (x * 255 / w.max(2).saturating_sub(1).max(1)).min(255) as u8;
+        return [v, v, v, 255];
+    }
+    const BARS: [[u8; 3]; 8] = [
+        [255, 255, 255],
+        [255, 255, 0],
+        [0, 255, 255],
+        [0, 255, 0],
+        [255, 0, 255],
+        [255, 0, 0],
+        [0, 0, 255],
+        [0, 0, 0],
+    ];
+    let b = BARS[(x * 8 / w.max(1)).min(7) as usize];
+    [b[0], b[1], b[2], 255]
+}
+
+/// Smooth 2-D colour gradient.
+pub fn gradient(x: u32, y: u32, w: u32, h: u32) -> [u8; 4] {
+    let fx = x as f32 / w.max(2).saturating_sub(1).max(1) as f32;
+    let fy = y as f32 / h.max(2).saturating_sub(1).max(1) as f32;
+    [(fx * 255.0) as u8, (fy * 255.0) as u8, (((fx + fy) * 0.5) * 255.0) as u8, 255]
+}

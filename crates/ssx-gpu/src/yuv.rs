@@ -296,8 +296,7 @@ impl YuvFrame {
     /// I420's V plane; `None` for NV12.
     pub fn v(&self) -> Option<&[u8]> {
         let n = self.chroma_stride() * self.chroma_rows();
-        (self.layout == YuvLayout::I420)
-            .then(|| &self.data[self.y_len() + n..self.y_len() + 2 * n])
+        (self.layout == YuvLayout::I420).then(|| &self.data[self.y_len() + n..self.y_len() + 2 * n])
     }
 }
 
@@ -421,10 +420,7 @@ pub mod cpu {
                     }
                     YuvLayout::I420 => {
                         let o = cy * cw + cx;
-                        (
-                            i32::from(yuv.u().unwrap_or(&[])[o]),
-                            i32::from(yuv.v().unwrap_or(&[])[o]),
-                        )
+                        (i32::from(yuv.u().unwrap_or(&[])[o]), i32::from(yuv.v().unwrap_or(&[])[o]))
                     }
                 };
                 out.extend_from_slice(&yuv_pixel(&k, yy, u, v));
@@ -494,7 +490,8 @@ mod tests {
 
     #[test]
     fn full_range_and_bt601_known_values() {
-        let o = YuvOptions { matrix: ColorMatrix::Bt601, range: YuvRange::Full, ..Default::default() };
+        let o =
+            YuvOptions { matrix: ColorMatrix::Bt601, range: YuvRange::Full, ..Default::default() };
         let y = cpu::rgba_to_yuv(&solid(2, 2, [255, 0, 0]), &o).unwrap();
         // Y = 0.299*255 = 76.2, Cb = 128 - 43.0 = 85, Cr = 255 (clamped 255.5)
         assert!((i32::from(y.y()[0]) - 76).abs() <= 1);
@@ -521,7 +518,8 @@ mod tests {
         let b = cpu::rgba_to_yuv(&f, &YuvOptions { layout: YuvLayout::I420, ..Default::default() })
             .unwrap();
         assert_eq!(a.y(), b.y());
-        let uv: Vec<u8> = b.u().unwrap().iter().zip(b.v().unwrap()).flat_map(|(u, v)| [*u, *v]).collect();
+        let uv: Vec<u8> =
+            b.u().unwrap().iter().zip(b.v().unwrap()).flat_map(|(u, v)| [*u, *v]).collect();
         assert_eq!(uv, a.uv().unwrap());
     }
 
@@ -530,7 +528,8 @@ mod tests {
         for matrix in [ColorMatrix::Bt709, ColorMatrix::Bt601] {
             for range in [YuvRange::Limited, YuvRange::Full] {
                 let o = YuvOptions { matrix, range, ..Default::default() };
-                for rgb in [[0, 0, 0], [255, 255, 255], [200, 30, 90], [12, 240, 130], [90, 90, 90]] {
+                for rgb in [[0, 0, 0], [255, 255, 255], [200, 30, 90], [12, 240, 130], [90, 90, 90]]
+                {
                     let back = cpu::yuv_to_rgba(&cpu::rgba_to_yuv(&solid(4, 4, rgb), &o).unwrap())
                         .unwrap();
                     for c in 0..3 {

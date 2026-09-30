@@ -6,8 +6,11 @@
 //! embedders that build their own pipelines.
 
 /// HDR `Rgba16Float` texture to SDR `Rgba8Unorm` storage texture.
-pub const TONEMAP_WGSL: &str =
-    concat!(include_str!("shaders/tonemap_common.wgsl"), "\n", include_str!("shaders/tonemap.wgsl"));
+pub const TONEMAP_WGSL: &str = concat!(
+    include_str!("shaders/tonemap_common.wgsl"),
+    "\n",
+    include_str!("shaders/tonemap.wgsl")
+);
 
 /// 8-bit RGB(A) texture to NV12 / I420 planes (storage buffer).
 pub const RGB_TO_YUV_WGSL: &str =

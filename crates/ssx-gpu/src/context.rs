@@ -84,9 +84,8 @@ impl GpuOptions {
     /// back to wgpu's `WGPU_BACKEND`), `SSX_GPU_ADAPTER` and `SSX_GPU_FALLBACK=1`.
     pub fn from_env() -> Self {
         let mut o = Self::default();
-        let backend = std::env::var("SSX_GPU_BACKEND")
-            .ok()
-            .or_else(|| std::env::var("WGPU_BACKEND").ok());
+        let backend =
+            std::env::var("SSX_GPU_BACKEND").ok().or_else(|| std::env::var("WGPU_BACKEND").ok());
         if let Some(b) = backend {
             match BackendChoice::parse(&b) {
                 Some(c) => o.backend = c,
@@ -272,7 +271,8 @@ impl GpuContext {
         }
         let generation = self.shared.next_generation.fetch_add(1, Ordering::Relaxed);
         tracing::warn!(generation, "recreating GPU device");
-        let fresh = Arc::new(create_device(&self.shared.instance, &self.shared.options, generation)?);
+        let fresh =
+            Arc::new(create_device(&self.shared.instance, &self.shared.options, generation)?);
         match self.shared.current.write() {
             Ok(mut g) => *g = Arc::clone(&fresh),
             Err(p) => *p.into_inner() = Arc::clone(&fresh),

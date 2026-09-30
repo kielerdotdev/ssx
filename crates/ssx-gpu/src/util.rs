@@ -123,8 +123,7 @@ impl std::fmt::Debug for ComputeKernel {
 }
 
 /// Kinds of binding used by the kernels (all in bind group 0, compute stage only).
-#[derive(Debug)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum Bind {
     Uniform,
     StorageRead,

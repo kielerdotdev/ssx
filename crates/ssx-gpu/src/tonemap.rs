@@ -275,9 +275,9 @@ impl GpuTonemapper {
             let size = Size::new(a.width.min(b.width), a.height.min(b.height));
             h.queue().write_buffer(&pass.params, 0, bytemuck::bytes_of(&params));
             pass.set_region([0, 0], size);
-            let mut enc = h
-                .device()
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("ssx tonemap") });
+            let mut enc = h.device().create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("ssx tonemap"),
+            });
             pass.record(&mut enc, size);
             h.queue().submit([enc.finish()]);
             Ok(())
@@ -460,22 +460,30 @@ fn make_scratch(h: &Arc<DeviceHandle>, pipeline: Arc<Pipeline>, alloc: (u32, u32
 fn tile_size(h: &DeviceHandle, limits: &TileLimits, w: u32, hgt: u32) -> Result<(u32, u32)> {
     let max_dim = h.limits().max_texture_dimension_2d.min(limits.max_dimension).max(1);
     let max_bytes = h.limits().max_buffer_size.min(limits.max_buffer_bytes);
-    let tw = w.min(max_dim);
-    let row = align_up(tw as usize * 4, ROW_ALIGN) as u64;
-    if row > max_bytes {
+    // One padded row (256-byte aligned) must fit the staging budget: narrow the tile if not.
+    if max_bytes < ROW_ALIGN as u64 {
         return Err(GpuError::TooLarge {
             width: w,
             height: hgt,
-            reason: format!("one padded row of a {tw}-pixel tile needs {row} bytes, limit {max_bytes}"),
+            reason: format!("the {max_bytes}-byte buffer budget cannot hold one padded row"),
         });
     }
+    let by_bytes =
+        u32::try_from(max_bytes / ROW_ALIGN as u64 * (ROW_ALIGN as u64 / 4)).unwrap_or(u32::MAX);
+    let tw = w.min(max_dim).min(by_bytes).max(1);
+    let row = align_up(tw as usize * 4, ROW_ALIGN) as u64;
     let rows_by_bytes = u32::try_from(max_bytes / row).unwrap_or(u32::MAX);
     Ok((tw, hgt.min(max_dim).min(rows_by_bytes).max(1)))
 }
 
 /// Texture allocation size for tiles of `tile` inside a frame of `frame` pixels: rounded
 /// up to multiples of 64 when that still respects the limits.
-fn alloc_size(h: &DeviceHandle, limits: &TileLimits, _frame: (u32, u32), tile: (u32, u32)) -> (u32, u32) {
+fn alloc_size(
+    h: &DeviceHandle,
+    limits: &TileLimits,
+    _frame: (u32, u32),
+    tile: (u32, u32),
+) -> (u32, u32) {
     let max_dim = h.limits().max_texture_dimension_2d.min(limits.max_dimension).max(1);
     let max_bytes = h.limits().max_buffer_size.min(limits.max_buffer_bytes);
     let aw = (tile.0.div_ceil(64) * 64).min(max_dim);
@@ -498,10 +506,9 @@ fn run_tile(
         reason: format!("row stride {stride} does not fit in 32 bits"),
     })?;
     let offset = tile.y as usize * stride + tile.x as usize * 8;
-    let data = frame
-        .data()
-        .get(offset..)
-        .ok_or_else(|| GpuError::invalid("frame", "pixel buffer shorter than its stride implies"))?;
+    let data = frame.data().get(offset..).ok_or_else(|| {
+        GpuError::invalid("frame", "pixel buffer shorter than its stride implies")
+    })?;
     let extent = wgpu::Extent3d { width: tile.w, height: tile.h, depth_or_array_layers: 1 };
     h.queue().write_texture(
         wgpu::TexelCopyTextureInfo {
@@ -521,9 +528,9 @@ fn run_tile(
     let size = Size::new(tile.w, tile.h);
     s.pass.set_region([tile.x, tile.y], size);
     let padded = align_up(tile.w as usize * 4, ROW_ALIGN);
-    let mut enc = h
-        .device()
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("ssx tonemap tile") });
+    let mut enc = h.device().create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("ssx tonemap tile"),
+    });
     s.pass.record(&mut enc, size);
     enc.copy_texture_to_buffer(
         wgpu::TexelCopyTextureInfo {
@@ -553,4 +560,46 @@ fn run_tile(
             out[dst..dst + row_bytes].copy_from_slice(&src[..row_bytes]);
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::{offset_of, size_of};
+
+    use ssx_hdr::GpuParams;
+
+    use super::*;
+
+    #[test]
+    fn params_bytes_mirror_gpu_params_exactly() {
+        assert_eq!(size_of::<ParamsBytes>(), size_of::<GpuParams>());
+        assert_eq!(offset_of!(ParamsBytes, scale), offset_of!(GpuParams, scale));
+        assert_eq!(offset_of!(ParamsBytes, knee), offset_of!(GpuParams, knee));
+        assert_eq!(offset_of!(ParamsBytes, peak), offset_of!(GpuParams, peak));
+        assert_eq!(offset_of!(ParamsBytes, headroom), offset_of!(GpuParams, headroom));
+        assert_eq!(offset_of!(ParamsBytes, mode), offset_of!(GpuParams, mode));
+        assert_eq!(offset_of!(ParamsBytes, dither), offset_of!(GpuParams, dither));
+        assert_eq!(offset_of!(ParamsBytes, width), offset_of!(GpuParams, width));
+        assert_eq!(offset_of!(ParamsBytes, pad), offset_of!(GpuParams, pad));
+        assert_eq!(offset_of!(ParamsBytes, c), offset_of!(GpuParams, c));
+    }
+
+    #[test]
+    fn params_bytes_carry_the_values() {
+        let s = TonemapSettings { peak: 6.0, knee: 0.75, exposure: 2.0, ..Default::default() };
+        let p = params_bytes(&s, Some(200.0)).unwrap();
+        let g = PixelParams::new(&s, 200.0).to_gpu();
+        assert_eq!(bytemuck::bytes_of(&p).len(), 48);
+        assert!(p.scale.to_bits() == g.scale.to_bits() && p.mode == g.mode && p.c == g.c);
+    }
+
+    #[test]
+    fn invalid_inputs_are_rejected_without_a_device() {
+        let ok = TonemapSettings::default();
+        assert!(matches!(params_bytes(&ok, Some(0.0)), Err(GpuError::InvalidSdrWhite(_))));
+        assert!(matches!(params_bytes(&ok, Some(f32::NAN)), Err(GpuError::InvalidSdrWhite(_))));
+        let bad = TonemapSettings { peak: 0.5, knee: 0.9, ..ok };
+        assert!(matches!(params_bytes(&bad, Some(80.0)), Err(GpuError::Settings(_))));
+        assert!(params_bytes(&ok, None).is_ok());
+    }
 }
