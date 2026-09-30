@@ -12,7 +12,8 @@ use std::{
 use x11rb::{
     connection::Connection,
     protocol::xproto::{
-        ChangeWindowAttributesAux, ConnectionExt as _, CreateWindowAux, EventMask, Window, WindowClass,
+        ChangeWindowAttributesAux, ConnectionExt as _, CreateWindowAux, EventMask, Window,
+        WindowClass,
     },
     rust_connection::RustConnection,
 };
@@ -29,7 +30,17 @@ impl Xvfb {
     /// `None` so the test can skip.
     pub fn start(screen: &str) -> Option<Xvfb> {
         let mut child = match Command::new("Xvfb")
-            .args(["-displayfd", "1", "-screen", "0", screen, "-noreset", "-ac", "-nolisten", "tcp"])
+            .args([
+                "-displayfd",
+                "1",
+                "-screen",
+                "0",
+                screen,
+                "-noreset",
+                "-ac",
+                "-nolisten",
+                "tcp",
+            ])
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
@@ -80,8 +91,11 @@ impl Painter {
     pub fn new(display: &str) -> Self {
         let (conn, screen) = RustConnection::connect(Some(display)).expect("connect painter");
         let root = conn.setup().roots[screen].root;
-        conn.change_window_attributes(root, &ChangeWindowAttributesAux::new().background_pixel(ROOT_BG))
-            .expect("root background");
+        conn.change_window_attributes(
+            root,
+            &ChangeWindowAttributesAux::new().background_pixel(ROOT_BG),
+        )
+        .expect("root background");
         conn.clear_area(false, root, 0, 0, 0, 0).expect("clear root");
         let p = Self { conn, root };
         p.sync();
@@ -127,7 +141,13 @@ pub fn scene_server() -> Option<(Xvfb, Painter)> {
     let x = Xvfb::start("800x600x24")?;
     let p = Painter::new(&x.display);
     for (sx, sy, w, h, c) in SCENE {
-        p.window(i16::try_from(sx).expect("x"), i16::try_from(sy).expect("y"), u16::try_from(w).expect("w"), u16::try_from(h).expect("h"), c);
+        p.window(
+            i16::try_from(sx).expect("x"),
+            i16::try_from(sy).expect("y"),
+            u16::try_from(w).expect("w"),
+            u16::try_from(h).expect("h"),
+            c,
+        );
     }
     Some((x, p))
 }

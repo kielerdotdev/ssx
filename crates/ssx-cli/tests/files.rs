@@ -12,7 +12,8 @@ use std::{
 
 use common::{TestEnv, mock::HttpMock};
 use ssx_core::ipc::{
-    ErrorCode, PostAction, Request, RequestEnvelope, Response, ResponseEnvelope, decode_line, encode_line,
+    ErrorCode, PostAction, Request, RequestEnvelope, Response, ResponseEnvelope, decode_line,
+    encode_line,
 };
 use ssx_ipc::{Acquired, Instance, Location};
 
@@ -29,12 +30,13 @@ fn percent_decode(s: &str) -> String {
     let mut out = Vec::new();
     let mut i = 0;
     while i < b.len() {
-        if b[i] == b'%' && b.len() >= i + 3 {
-            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
-                out.push(v);
-                i += 3;
-                continue;
-            }
+        if b[i] == b'%'
+            && b.len() >= i + 3
+            && let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16)
+        {
+            out.push(v);
+            i += 3;
+            continue;
         }
         out.push(b[i]);
         i += 1;
@@ -100,7 +102,11 @@ fn post_file_uploads_every_file_including_hostile_names() {
     assert_eq!(r.lines().len(), HOSTILE.len(), "{}", r.stdout);
     for (line, name) in r.lines().iter().zip(HOSTILE) {
         assert!(line.starts_with(&mock.url()), "{line}");
-        assert_eq!(percent_decode(line).strip_prefix(&format!("{}/f/", mock.url())), Some(*name), "{line}");
+        assert_eq!(
+            percent_decode(line).strip_prefix(&format!("{}/f/", mock.url())),
+            Some(*name),
+            "{line}"
+        );
     }
     // The server received every file, under the exact name, with the exact bytes.
     let got = uploads(&mock);
@@ -115,7 +121,10 @@ fn post_file_uploads_every_file_including_hostile_names() {
     assert!(!work.join("PWNED").exists() && !env.path("PWNED").exists());
     assert!(!std::env::current_dir().unwrap().join("PWNED").exists());
     // History has one entry per file.
-    assert_eq!(env.ssx(&["history", "list", "--json", "-n", "50"]).ok().json().as_array().unwrap().len(), HOSTILE.len());
+    assert_eq!(
+        env.ssx(&["history", "list", "--json", "-n", "50"]).ok().json().as_array().unwrap().len(),
+        HOSTILE.len()
+    );
 }
 
 #[test]
@@ -130,7 +139,12 @@ fn a_failing_file_does_not_stop_the_others_and_fails_the_command() {
     let missing = work.join("missing.txt");
 
     let r = env
-        .ssx(&["upload", good[0].to_str().unwrap(), missing.to_str().unwrap(), good[1].to_str().unwrap()])
+        .ssx(&[
+            "upload",
+            good[0].to_str().unwrap(),
+            missing.to_str().unwrap(),
+            good[1].to_str().unwrap(),
+        ])
         .code(1);
     assert_eq!(r.lines().len(), 2, "the two good files still produced URLs: {}", r.stdout);
     assert!(r.stderr.contains("error:") && r.stderr.contains("missing.txt"), "{}", r.stderr);
@@ -142,14 +156,26 @@ fn upload_prints_bare_urls_or_json_and_honours_to() {
     let mock = HttpMock::start();
     mock.respond_to_all(200, "");
     let env = TestEnv::new(); // no settings at all: --to picks the uploader
-    env.write_settings(&format!("[uploaders.web]\ntype = \"http\"\nurl = \"{}/f/{{filename}}\"\n", mock.url()));
+    env.write_settings(&format!(
+        "[uploaders.web]\ntype = \"http\"\nurl = \"{}/f/{{filename}}\"\n",
+        mock.url()
+    ));
     let work = env.path("files");
     std::fs::create_dir(&work).unwrap();
     let files = write_files(&work, &["one.txt", "two.png"]);
 
-    let r = env.ssx(&["upload", "--to", "web", files[0].to_str().unwrap(), files[1].to_str().unwrap()]).ok();
-    assert_eq!(r.lines(), [format!("{}/f/one.txt", mock.url()), format!("{}/f/two.png", mock.url())]);
-    assert!(r.stderr.lines().all(|l| l.trim().is_empty() || l.contains("upload")), "quiet apart from progress: {}", r.stderr);
+    let r = env
+        .ssx(&["upload", "--to", "web", files[0].to_str().unwrap(), files[1].to_str().unwrap()])
+        .ok();
+    assert_eq!(
+        r.lines(),
+        [format!("{}/f/one.txt", mock.url()), format!("{}/f/two.png", mock.url())]
+    );
+    assert!(
+        r.stderr.lines().all(|l| l.trim().is_empty() || l.contains("upload")),
+        "quiet apart from progress: {}",
+        r.stderr
+    );
 
     let j = env.ssx(&["upload", "--to", "web", "--json", files[0].to_str().unwrap()]).ok().json();
     assert_eq!(j["outcome"], "success");
@@ -158,7 +184,12 @@ fn upload_prints_bare_urls_or_json_and_honours_to() {
 
     // Without a destination the error says what to configure.
     let r = env.ssx(&["upload", files[0].to_str().unwrap()]).code(1);
-    assert!(r.stderr.contains("no file uploader is configured") && r.stderr.contains("destinations.file"), "{}", r.stderr);
+    assert!(
+        r.stderr.contains("no file uploader is configured")
+            && r.stderr.contains("destinations.file"),
+        "{}",
+        r.stderr
+    );
 }
 
 #[test]
@@ -233,7 +264,9 @@ fn fake_instance(reply: Response) -> FakeInstance {
     // Unix socket paths are short: keep the runtime dir directly under the temp root.
     let tmp = tempfile::Builder::new().prefix("ssxrt").tempdir().unwrap();
     let runtime_dir = tmp.path().to_path_buf();
-    let Acquired::Primary(server) = Instance::acquire_in(&Location::in_dir(runtime_dir.join("ssx")), "ssx").unwrap() else {
+    let Acquired::Primary(server) =
+        Instance::acquire_in(&Location::in_dir(runtime_dir.join("ssx")), "ssx").unwrap()
+    else {
         panic!("expected to become the primary instance");
     };
     let lines: Arc<Mutex<Vec<String>>> = Arc::default();
@@ -264,7 +297,9 @@ fn coalesce_hands_the_paths_to_the_running_instance_verbatim() {
     let lines = inst.lines.lock().unwrap().clone();
     assert_eq!(lines.len(), 1, "one request for the whole batch");
     let env_req: RequestEnvelope = decode_line(&lines[0]).unwrap();
-    let Request::PostFiles { paths, action, wait } = env_req.request else { panic!("not post_files: {lines:?}") };
+    let Request::PostFiles { paths, action, wait } = env_req.request else {
+        panic!("not post_files: {lines:?}")
+    };
     assert_eq!(action, PostAction::Upload);
     assert!(!wait, "shell shims must not block on the upload");
     assert_eq!(paths, files, "absolute paths, unchanged, in order, hostile names included");
@@ -303,7 +338,9 @@ fn coalesce_falls_back_to_uploading_here_when_nobody_listens_or_it_refuses() {
 #[test]
 fn an_unreachable_server_is_a_clean_retryable_error() {
     let env = TestEnv::new();
-    env.write_settings("[uploaders.dead]\ntype = \"http\"\nurl = \"http://127.0.0.1:9/f/{filename}\"\n");
+    env.write_settings(
+        "[uploaders.dead]\ntype = \"http\"\nurl = \"http://127.0.0.1:9/f/{filename}\"\n",
+    );
     let f = env.path("a.txt");
     std::fs::write(&f, "x").unwrap();
     let started = std::time::Instant::now();
@@ -316,9 +353,19 @@ fn an_unreachable_server_is_a_clean_retryable_error() {
 #[test]
 fn usage_errors_exit_2() {
     let env = TestEnv::new();
-    for args in [&["upload"][..], &["post-file"], &["capture"], &["capture", "region", "--rect", "1,2,3"], &["nonsense"], &["--backend", "nonsense", "monitors"]] {
+    for args in [
+        &["upload"][..],
+        &["post-file"],
+        &["capture"],
+        &["capture", "region", "--rect", "1,2,3"],
+        &["nonsense"],
+        &["--backend", "nonsense", "monitors"],
+    ] {
         let r = env.ssx(args);
         assert_eq!(r.code, 2, "{args:?}: {}", r.stderr);
     }
-    assert_eq!(env.ssx(&["--version"]).ok().stdout.trim(), format!("ssx {}", env!("CARGO_PKG_VERSION")));
+    assert_eq!(
+        env.ssx(&["--version"]).ok().stdout.trim(),
+        format!("ssx {}", env!("CARGO_PKG_VERSION"))
+    );
 }

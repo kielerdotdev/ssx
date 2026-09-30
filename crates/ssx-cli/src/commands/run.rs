@@ -35,8 +35,11 @@ pub fn run_blocker(wf: &Workflow) -> Option<CliError> {
                 .hint(format!("run it with `ssx post-file --workflow {} PATH...`", wf.id)),
         ),
         InputKind::RecordScreen | InputKind::RecordGif => Some(
-            CliError::new(format!("workflow {:?} records the screen, which is not available yet", wf.id))
-                .hint("recording arrives with the ssx-record crate"),
+            CliError::new(format!(
+                "workflow {:?} records the screen, which is not available yet",
+                wf.id
+            ))
+            .hint("recording arrives with the ssx-record crate"),
         ),
         _ => None,
     }
@@ -53,7 +56,8 @@ pub fn run(app: &App, args: RunArgs) -> CliResult<()> {
         settings.capture.delay_ms = delay;
     }
     let session = Session::new(app, settings)?;
-    let sink = ProgressLines::new(Verbosity::from_flags(app.global.quiet, app.global.verbose), app.err, 1);
+    let sink =
+        ProgressLines::new(Verbosity::from_flags(app.global.quiet, app.global.verbose), app.err, 1);
     let report = session.engine.post_screenshot(&wf, &session.bundle(), &sink, &app.cancel);
     print_result(&RunResult::from_report(&report, &[]), args.json, app.global.quiet, app.err)
 }
@@ -67,7 +71,10 @@ mod tests {
         let s = Settings::default();
         assert_eq!(find_workflow(&s, "capture-region").unwrap().id, "capture-region");
         assert_eq!(find_workflow(&s, "region").unwrap().id, "capture-region");
-        assert_eq!(find_workflow(&s, "CAPTURE ACTIVE WINDOW, SAVE AND UPLOAD").unwrap().id, "capture-window");
+        assert_eq!(
+            find_workflow(&s, "CAPTURE ACTIVE WINDOW, SAVE AND UPLOAD").unwrap().id,
+            "capture-window"
+        );
         let e = find_workflow(&s, "nope").unwrap_err();
         let hint = e.hint.unwrap();
         assert!(hint.contains("region (capture-region)") && hint.contains("screen"), "{hint}");

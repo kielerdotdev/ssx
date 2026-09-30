@@ -54,7 +54,10 @@ pub fn findings_for(text: &str, base_dir: &Path) -> Result<Vec<Finding>, String>
             out.push(Finding {
                 severity: "error",
                 path: format!("uploaders.{name}"),
-                message: msg.strip_prefix(&format!("[uploaders.{name}]: ")).unwrap_or(&msg).to_owned(),
+                message: msg
+                    .strip_prefix(&format!("[uploaders.{name}]: "))
+                    .unwrap_or(&msg)
+                    .to_owned(),
             });
         }
     }
@@ -119,12 +122,19 @@ fn validate(app: &App, file: Option<&Path>, strict: bool, json: bool) -> CliResu
     let text = match std::fs::read_to_string(&path) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound && file.is_none() => {
-            out_line(&format!("{} does not exist; the defaults are in use, which are valid", path.display()));
+            out_line(&format!(
+                "{} does not exist; the defaults are in use, which are valid",
+                path.display()
+            ));
             return Ok(());
         }
         Err(e) => return Err(CliError::new(format!("cannot read {}: {e}", path.display()))),
     };
-    let base = if file.is_some() { path.parent().unwrap_or(Path::new(".")).to_path_buf() } else { app.paths.config_dir.clone() };
+    let base = if file.is_some() {
+        path.parent().unwrap_or(Path::new(".")).to_path_buf()
+    } else {
+        app.paths.config_dir.clone()
+    };
     let findings = findings_for(&text, &base).map_err(|msg| {
         CliError::new(format!("{} is not valid: {msg}", path.display()))
             .hint("fix the mistake, or start over with `ssx config reset`")
@@ -139,7 +149,11 @@ fn validate(app: &App, file: Option<&Path>, strict: bool, json: bool) -> CliResu
         }))?);
     } else {
         for f in &findings {
-            let tag = if f.severity == "error" { app.out.red("error:") } else { app.out.yellow("warning:") };
+            let tag = if f.severity == "error" {
+                app.out.red("error:")
+            } else {
+                app.out.yellow("warning:")
+            };
             out_line(&format!("{tag} {}: {}", f.path, f.message));
         }
         if findings.is_empty() {
@@ -147,11 +161,21 @@ fn validate(app: &App, file: Option<&Path>, strict: bool, json: bool) -> CliResu
         }
     }
     if errors > 0 {
-        return Err(CliError::new(format!("{} has {errors} error{}", path.display(), if errors == 1 { "" } else { "s" }))
-            .hint("`ssx config set KEY VALUE` changes one value safely; `ssx config edit` opens the file"));
+        return Err(CliError::new(format!(
+            "{} has {errors} error{}",
+            path.display(),
+            if errors == 1 { "" } else { "s" }
+        ))
+        .hint(
+            "`ssx config set KEY VALUE` changes one value safely; `ssx config edit` opens the file",
+        ));
     }
     if strict && warnings > 0 {
-        return Err(CliError::new(format!("{} has {warnings} warning{} (--strict)", path.display(), if warnings == 1 { "" } else { "s" })));
+        return Err(CliError::new(format!(
+            "{} has {warnings} warning{} (--strict)",
+            path.display(),
+            if warnings == 1 { "" } else { "s" }
+        )));
     }
     Ok(())
 }
@@ -170,20 +194,21 @@ fn edit(app: &App) -> CliResult<()> {
     let path = app.paths.settings_file();
     if !path.exists() {
         if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir).map_err(|e| CliError::new(format!("cannot create {}: {e}", dir.display())))?;
+            std::fs::create_dir_all(dir)
+                .map_err(|e| CliError::new(format!("cannot create {}: {e}", dir.display())))?;
         }
         std::fs::write(&path, Settings::default().to_toml_string()?)
             .map_err(|e| CliError::new(format!("cannot create {}: {e}", path.display())))?;
         err_line(&format!("created {} from the defaults", path.display()));
     }
-    let cmdline = editor_command(std::env::var("VISUAL").ok().as_deref(), std::env::var("EDITOR").ok().as_deref());
+    let cmdline = editor_command(
+        std::env::var("VISUAL").ok().as_deref(),
+        std::env::var("EDITOR").ok().as_deref(),
+    );
     if let Some(mut parts) = cmdline {
         let program = parts.remove(0);
-        let status = std::process::Command::new(&program)
-            .args(&parts)
-            .arg(&path)
-            .status()
-            .map_err(|e| {
+        let status =
+            std::process::Command::new(&program).args(&parts).arg(&path).status().map_err(|e| {
                 CliError::new(format!("cannot start the editor {program:?}: {e}"))
                     .hint("set $VISUAL or $EDITOR to a working editor")
             })?;
@@ -193,7 +218,9 @@ fn edit(app: &App) -> CliResult<()> {
     } else {
         let settings = app.load_settings().ok().unwrap_or_default();
         app.services(&settings)?.opener.open_path(&path)?;
-        err_line("opened the file with the system default program; run `ssx config validate` when you are done");
+        err_line(
+            "opened the file with the system default program; run `ssx config validate` when you are done",
+        );
         return Ok(());
     }
     validate(app, None, false, false)
@@ -201,7 +228,8 @@ fn edit(app: &App) -> CliResult<()> {
 
 fn reset(app: &App, key: Option<&str>, yes: bool) -> CliResult<()> {
     let path = app.paths.settings_file();
-    let what = key.map_or_else(|| format!("all settings in {}", path.display()), |k| format!("{k:?}"));
+    let what =
+        key.map_or_else(|| format!("all settings in {}", path.display()), |k| format!("{k:?}"));
     if !yes {
         if !std::io::stdin().is_terminal() {
             return Err(CliError::new(format!("refusing to reset {what} without confirmation"))
@@ -219,8 +247,9 @@ fn reset(app: &App, key: Option<&str>, yes: bool) -> CliResult<()> {
         None => {
             if path.exists() {
                 let backup = backup_path(&path);
-                std::fs::copy(&path, &backup)
-                    .map_err(|e| CliError::new(format!("cannot back up {}: {e}", path.display())))?;
+                std::fs::copy(&path, &backup).map_err(|e| {
+                    CliError::new(format!("cannot back up {}: {e}", path.display()))
+                })?;
                 err_line(&format!("the previous file was saved as {}", backup.display()));
             }
             ssx_core::settings::atomic_write(&path, defaults_text.as_bytes())
@@ -230,12 +259,16 @@ fn reset(app: &App, key: Option<&str>, yes: bool) -> CliResult<()> {
         Some(key) => {
             let text = settings_edit::read_text_or_default(&path)?;
             let mut doc: DocumentMut = text.parse().map_err(|e| {
-                CliError::new(format!("{} is not valid TOML: {e}", path.display())).hint("fix it with `ssx config edit`")
+                CliError::new(format!("{} is not valid TOML: {e}", path.display()))
+                    .hint("fix it with `ssx config edit`")
             })?;
-            let defaults: DocumentMut = defaults_text.parse().map_err(|e| CliError::new(format!("internal error: {e}")))?;
+            let defaults: DocumentMut =
+                defaults_text.parse().map_err(|e| CliError::new(format!("internal error: {e}")))?;
             let segs = settings_edit::parse_key(key).map_err(CliError::new)?;
             match default_value_text(&defaults, &segs) {
-                Some(v) => settings_edit::set_key(&mut doc, &defaults, key, &v).map_err(CliError::new)?,
+                Some(v) => {
+                    settings_edit::set_key(&mut doc, &defaults, key, &v).map_err(CliError::new)?;
+                }
                 None => {
                     // No default value means "unset" (an optional setting).
                     settings_edit::remove_key(&mut doc, key).map_err(CliError::new)?;
@@ -281,11 +314,16 @@ mod tests {
             good().replace("[capture]", "[capture_unused]")
         );
         let f = findings_for(&text, Path::new("/x")).unwrap();
-        let by = |path: &str| f.iter().find(|x| x.path == path).unwrap_or_else(|| panic!("{path} missing in {f:#?}"));
+        let by = |path: &str| {
+            f.iter().find(|x| x.path == path).unwrap_or_else(|| panic!("{path} missing in {f:#?}"))
+        };
         assert_eq!(by("uploaders.typo").severity, "error");
         assert!(by("uploaders.typo").message.contains("bukcet"), "{:?}", by("uploaders.typo"));
         assert_eq!(by("capture.delay_ms").severity, "error");
-        assert!(f.iter().any(|x| x.severity == "warning" && x.message.contains("capture_unused")), "unknown keys warn: {f:#?}");
+        assert!(
+            f.iter().any(|x| x.severity == "warning" && x.message.contains("capture_unused")),
+            "unknown keys warn: {f:#?}"
+        );
     }
 
     #[test]
@@ -301,7 +339,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let text = format!("{}\n[uploaders.mine]\ntype = \"sxcu\"\nfile = \"mine.sxcu\"\n", good());
         let f = findings_for(&text, dir.path()).unwrap();
-        assert!(f.iter().any(|x| x.path == "uploaders.mine" && x.message.contains("mine.sxcu")), "{f:#?}");
+        assert!(
+            f.iter().any(|x| x.path == "uploaders.mine" && x.message.contains("mine.sxcu")),
+            "{f:#?}"
+        );
         std::fs::write(
             dir.path().join("mine.sxcu"),
             r#"{"Version":"14.0.0","RequestURL":"http://127.0.0.1:9/x","Body":"MultipartFormData","FileFormName":"f","URL":"{response}"}"#,
@@ -314,9 +355,17 @@ mod tests {
     fn editor_commands_split_without_a_shell() {
         assert_eq!(editor_command(Some("code -w"), Some("vim")).unwrap(), ["code", "-w"]);
         assert_eq!(editor_command(None, Some("  nano  ")).unwrap(), ["nano"]);
-        assert_eq!(editor_command(Some(""), Some("vim")).unwrap(), ["vim"], "an empty VISUAL falls through");
+        assert_eq!(
+            editor_command(Some(""), Some("vim")).unwrap(),
+            ["vim"],
+            "an empty VISUAL falls through"
+        );
         assert!(editor_command(None, None).is_none());
-        assert_eq!(editor_command(Some("a;b $(x)"), None).unwrap(), ["a;b", "$(x)"], "no shell semantics");
+        assert_eq!(
+            editor_command(Some("a;b $(x)"), None).unwrap(),
+            ["a;b", "$(x)"],
+            "no shell semantics"
+        );
     }
 
     #[test]

@@ -86,9 +86,8 @@ impl From<ServiceError> for CliError {
     fn from(e: ServiceError) -> Self {
         match e {
             ServiceError::Cancelled => Self::cancelled(),
-            ServiceError::Unsupported(what) => {
-                Self::new(format!("{what} is not supported here")).hint("run `ssx doctor` to see what this system offers")
-            }
+            ServiceError::Unsupported(what) => Self::new(format!("{what} is not supported here"))
+                .hint("run `ssx doctor` to see what this system offers"),
             ServiceError::NotConfigured(msg) => Self::new(msg),
             other => Self::new(other.to_string()),
         }
@@ -98,9 +97,15 @@ impl From<ServiceError> for CliError {
 impl From<SettingsError> for CliError {
     fn from(e: SettingsError) -> Self {
         let hint = match &e {
-            SettingsError::Parse { .. } => Some("fix the file with `ssx config edit`, check it with `ssx config validate`"),
-            SettingsError::Invalid { .. } => Some("nothing was written; correct the value and try again"),
-            SettingsError::Migrate(_) => Some("upgrade ssx, or move the settings file aside to start from defaults"),
+            SettingsError::Parse { .. } => {
+                Some("fix the file with `ssx config edit`, check it with `ssx config validate`")
+            }
+            SettingsError::Invalid { .. } => {
+                Some("nothing was written; correct the value and try again")
+            }
+            SettingsError::Migrate(_) => {
+                Some("upgrade ssx, or move the settings file aside to start from defaults")
+            }
             _ => None,
         };
         let mut err = Self::new(e.to_string());
@@ -118,10 +123,12 @@ impl From<PathsError> for CliError {
 impl From<HistoryError> for CliError {
     fn from(e: HistoryError) -> Self {
         let hint = match &e {
-            HistoryError::Busy => Some("another ssx process is using the history; retry in a moment"),
-            HistoryError::Corrupt { .. } => {
-                Some("move the history database aside (its path is shown by `ssx config path --all`) to start a fresh one")
+            HistoryError::Busy => {
+                Some("another ssx process is using the history; retry in a moment")
             }
+            HistoryError::Corrupt { .. } => Some(
+                "move the history database aside (its path is shown by `ssx config path --all`) to start a fresh one",
+            ),
             _ => None,
         };
         let mut err = Self::new(e.to_string());

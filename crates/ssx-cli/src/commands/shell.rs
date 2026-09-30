@@ -61,11 +61,13 @@ pub fn render_states(states: &[IntegrationState], style: Style) -> String {
 
 fn context(exe: Option<PathBuf>) -> CliResult<Context> {
     let exe = match exe {
-        Some(e) => std::path::absolute(e).map_err(|e| CliError::new(format!("cannot resolve the --exe path: {e}")))?,
+        Some(e) => std::path::absolute(e)
+            .map_err(|e| CliError::new(format!("cannot resolve the --exe path: {e}")))?,
         None => exe_path()?,
     };
     Context::from_env(exe).map_err(|e| {
-        CliError::new(e.to_string()).hint("the ssx executable must have an absolute path without control characters")
+        CliError::new(e.to_string())
+            .hint("the ssx executable must have an absolute path without control characters")
     })
 }
 

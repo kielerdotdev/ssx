@@ -10,7 +10,8 @@ use common::TestEnv;
 
 fn golden(name: &str) -> String {
     let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden").join(name);
-    std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("cannot read golden {}: {e}", p.display()))
+    std::fs::read_to_string(&p)
+        .unwrap_or_else(|e| panic!("cannot read golden {}: {e}", p.display()))
 }
 
 /// Compares against a golden file; `SSX_UPDATE_GOLDEN=1` rewrites it.
@@ -21,7 +22,11 @@ fn assert_golden(name: &str, actual: &str) {
         std::fs::write(p, actual).unwrap();
         return;
     }
-    assert_eq!(actual, golden(name), "golden {name} differs (rerun with SSX_UPDATE_GOLDEN=1 to update)");
+    assert_eq!(
+        actual,
+        golden(name),
+        "golden {name} differs (rerun with SSX_UPDATE_GOLDEN=1 to update)"
+    );
 }
 
 // ---- config -----------------------------------------------------------------------------
@@ -84,7 +89,11 @@ fn config_validate_accepts_good_files_and_explains_bad_ones() {
     env.write_settings("[general]\nimage_quality = 300\n");
     env.ssx(&["config", "validate"]).code(1);
     let r = env.ssx(&["monitors"]).code(1);
-    assert!(r.stderr.contains("cannot parse settings") && r.stderr.contains("hint:"), "commands refuse broken settings: {}", r.stderr);
+    assert!(
+        r.stderr.contains("cannot parse settings") && r.stderr.contains("hint:"),
+        "commands refuse broken settings: {}",
+        r.stderr
+    );
 }
 
 #[test]
@@ -93,7 +102,9 @@ fn config_set_show_path_and_reset() {
     let path = env.ssx(&["config", "path"]).ok();
     assert_eq!(path.lines(), [env.cfg.join("settings.toml").to_str().unwrap()]);
     let all = env.ssx(&["config", "path", "--all"]).ok();
-    for label in ["config_dir", "settings", "uploaders", "data_dir", "history", "counter", "last_region"] {
+    for label in
+        ["config_dir", "settings", "uploaders", "data_dir", "history", "counter", "last_region"]
+    {
         assert!(all.stdout.contains(label), "{label} in {}", all.stdout);
     }
 
@@ -112,7 +123,11 @@ fn config_set_show_path_and_reset() {
     // Refused changes leave the file alone and explain.
     let before = std::fs::read_to_string(env.cfg.join("settings.toml")).unwrap();
     let r = env.ssx(&["config", "set", "general.image_quality", "0"]).code(1);
-    assert!(r.stderr.contains("1 to 100") && r.stderr.contains("nothing was written"), "{}", r.stderr);
+    assert!(
+        r.stderr.contains("1 to 100") && r.stderr.contains("nothing was written"),
+        "{}",
+        r.stderr
+    );
     let r = env.ssx(&["config", "set", "general.imag_quality", "1"]).code(1);
     assert!(r.stderr.contains("typo") && r.stderr.contains("image_quality"), "{}", r.stderr);
     assert_eq!(std::fs::read_to_string(env.cfg.join("settings.toml")).unwrap(), before);
@@ -129,7 +144,10 @@ fn config_set_show_path_and_reset() {
     env.ssx(&["config", "reset"]).code(1);
     let r = env.ssx(&["config", "reset", "--yes"]).ok();
     assert!(r.stderr.contains("settings.toml.bak-"), "{}", r.stderr);
-    assert_eq!(env.ssx(&["config", "show", "--json"]).ok().json()["destinations"]["image"], serde_json::Value::Null);
+    assert_eq!(
+        env.ssx(&["config", "show", "--json"]).ok().json()["destinations"]["image"],
+        serde_json::Value::Null
+    );
     let defaults = env.ssx(&["config", "show", "--defaults", "--json"]).ok().json();
     assert_eq!(defaults["general"]["image_quality"], 90);
 }
@@ -151,7 +169,11 @@ fn hotkeys_print_matches_the_golden_files() {
          [workflows.trigger]\nhotkey = \"Super+Shift+S\"\ncli_name = \"mine\"\n",
     );
     let r = env.ssx(&["hotkeys", "print", "--target", "sway", "--exe", "/opt/my apps/ssx"]).ok();
-    assert!(r.stdout.contains("bindsym Shift+Mod4+s exec \"/opt/my apps/ssx\" run mine"), "{}", r.stdout);
+    assert!(
+        r.stdout.contains("bindsym Shift+Mod4+s exec \"/opt/my apps/ssx\" run mine"),
+        "{}",
+        r.stdout
+    );
 }
 
 #[test]
@@ -167,7 +189,9 @@ fn hotkeys_print_needs_a_target_or_a_known_desktop_and_a_hotkey() {
 #[test]
 fn hotkeys_detect_follows_the_session() {
     let mut env = TestEnv::new();
-    env.set("XDG_CURRENT_DESKTOP", "sway").set("XDG_SESSION_TYPE", "wayland").set("WAYLAND_DISPLAY", "wayland-1");
+    env.set("XDG_CURRENT_DESKTOP", "sway")
+        .set("XDG_SESSION_TYPE", "wayland")
+        .set("WAYLAND_DISPLAY", "wayland-1");
     let j = env.ssx(&["hotkeys", "detect", "--json"]).ok().json();
     assert_eq!(j["desktop"], "sway");
     assert_eq!(j["session"], "Wayland");
@@ -182,7 +206,9 @@ fn hotkeys_detect_follows_the_session() {
 #[test]
 fn hotkeys_install_never_touches_your_config_without_apply() {
     let mut env = TestEnv::new();
-    env.set("XDG_CURRENT_DESKTOP", "sway").set("XDG_SESSION_TYPE", "wayland").set("WAYLAND_DISPLAY", "wayland-1");
+    env.set("XDG_CURRENT_DESKTOP", "sway")
+        .set("XDG_SESSION_TYPE", "wayland")
+        .set("WAYLAND_DISPLAY", "wayland-1");
     let sway_dir = env.home.join(".config/sway");
     std::fs::create_dir_all(&sway_dir).unwrap();
     let main = sway_dir.join("config");
@@ -202,12 +228,21 @@ fn hotkeys_install_never_touches_your_config_without_apply() {
     assert_eq!(std::fs::read_to_string(&main).unwrap(), applied, "idempotent");
 
     env.ssx(&["hotkeys", "uninstall"]).ok();
-    assert_eq!(std::fs::read_to_string(&main).unwrap(), original, "uninstall restores the config byte for byte");
+    assert_eq!(
+        std::fs::read_to_string(&main).unwrap(),
+        original,
+        "uninstall restores the config byte for byte"
+    );
     assert!(!inc.exists());
 
     // GNOME/KDE change desktop settings, so without --apply they only print the plan.
     let r = env.ssx(&["hotkeys", "install", "--target", "gnome", "--exe", "/usr/bin/ssx"]).ok();
-    assert!(r.stdout.contains("gsettings") && r.stderr.contains("nothing was changed"), "{}{}", r.stdout, r.stderr);
+    assert!(
+        r.stdout.contains("gsettings") && r.stderr.contains("nothing was changed"),
+        "{}{}",
+        r.stdout,
+        r.stderr
+    );
 }
 
 // ---- shell integration -------------------------------------------------------------------
@@ -216,7 +251,11 @@ fn hotkeys_install_never_touches_your_config_without_apply() {
 fn shell_install_dry_run_writes_nothing_and_says_what_it_would() {
     let env = TestEnv::new();
     let r = env.ssx(&["shell", "install", "--dry-run", "--force", "--exe", "/usr/bin/ssx"]).ok();
-    assert!(r.stdout.contains("would install for") && r.stdout.contains("Upload with ssx"), "{}", r.stdout);
+    assert!(
+        r.stdout.contains("would install for") && r.stdout.contains("Upload with ssx"),
+        "{}",
+        r.stdout
+    );
     assert!(r.stdout.contains("Nautilus") && r.stdout.contains("Dolphin"), "{}", r.stdout);
     assert!(r.stderr.contains("dry run: nothing was written"), "{}", r.stderr);
     assert_eq!(std::fs::read_dir(&env.home).unwrap().count(), 0, "the home directory is untouched");
@@ -255,14 +294,31 @@ fn doctor_json_has_the_documented_shape() {
     let r = env.ssx(&["doctor", "--json"]).code(1);
     let j = r.json();
     for key in [
-        "version", "os", "session", "capture", "monitors", "clipboard", "notifications", "keyring", "paths",
-        "settings", "uploaders", "editor", "shell_integrations", "hotkeys", "problems",
+        "version",
+        "os",
+        "session",
+        "capture",
+        "monitors",
+        "clipboard",
+        "notifications",
+        "keyring",
+        "paths",
+        "settings",
+        "uploaders",
+        "editor",
+        "shell_integrations",
+        "hotkeys",
+        "problems",
     ] {
         assert!(j.get(key).is_some(), "{key} missing: {}", r.stdout);
     }
     assert_eq!(j["version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(j["capture"]["ok"], false);
-    assert!(j["capture"]["error"].as_str().unwrap().contains("no graphical session"), "{}", j["capture"]);
+    assert!(
+        j["capture"]["error"].as_str().unwrap().contains("no graphical session"),
+        "{}",
+        j["capture"]
+    );
     let problems = j["problems"].as_array().unwrap();
     assert!(problems.iter().any(|p| p["severity"] == "error" && p["message"].as_str().unwrap().contains("capture")));
     assert!(problems.iter().all(|p| p["hint"].is_string()), "every problem says what to do");
@@ -271,7 +327,15 @@ fn doctor_json_has_the_documented_shape() {
     assert!(j["uploaders"].as_array().unwrap().iter().any(|u| u["name"] == "local"));
 
     let text = env.ssx(&["doctor"]).code(1).stdout;
-    for s in ["Session", "Screen capture", "Monitors", "Desktop integration", "Hotkeys", "Files", "Problems"] {
+    for s in [
+        "Session",
+        "Screen capture",
+        "Monitors",
+        "Desktop integration",
+        "Hotkeys",
+        "Files",
+        "Problems",
+    ] {
         assert!(text.contains(s), "{s} missing from\n{text}");
     }
 }
@@ -281,7 +345,14 @@ fn doctor_reports_a_broken_settings_file_instead_of_failing_to_start() {
     let env = TestEnv::new();
     env.write_settings("[general]\nimage_quality = 300\n");
     let j = env.ssx(&["doctor", "--json"]).code(1).json();
-    assert!(j["problems"].as_array().unwrap().iter().any(|p| p["message"].as_str().unwrap().contains("settings.toml")), "{j}");
+    assert!(
+        j["problems"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["message"].as_str().unwrap().contains("settings.toml")),
+        "{j}"
+    );
 }
 
 #[test]
@@ -289,7 +360,11 @@ fn completions_and_man_page() {
     let env = TestEnv::new();
     for shell in ["bash", "zsh", "fish", "elvish", "powershell"] {
         let r = env.ssx(&["completions", shell]).ok();
-        assert!(r.stdout.contains("ssx") && r.stdout.len() > 200, "{shell}: {}", &r.stdout[..r.stdout.len().min(200)]);
+        assert!(
+            r.stdout.contains("ssx") && r.stdout.len() > 200,
+            "{shell}: {}",
+            &r.stdout[..r.stdout.len().min(200)]
+        );
     }
     let bash = env.ssx(&["completions", "bash"]).ok().stdout;
     assert!(bash.contains("post-file") && bash.contains("--coalesce"));
@@ -307,7 +382,17 @@ fn help_documents_exit_codes_and_environment() {
         assert!(h.contains(s), "{s} missing from --help");
     }
     let h = env.ssx(&["capture", "--help"]).ok().stdout;
-    for s in ["fullscreen", "--rect", "--upload", "--copy", "--edit", "--delay", "--cursor", "--format", "--json"] {
+    for s in [
+        "fullscreen",
+        "--rect",
+        "--upload",
+        "--copy",
+        "--edit",
+        "--delay",
+        "--cursor",
+        "--format",
+        "--json",
+    ] {
         assert!(h.contains(s), "{s} missing from `capture --help`");
     }
 }
@@ -369,12 +454,25 @@ fn uploaders_list_import_remove_and_secrets() {
 
     // Secrets: never on the command line, no keyring here, env variables work.
     let r = env.ssx(&["uploaders", "secret", "status", "my-token"]).ok();
-    assert!(r.stdout.contains("secret store: none") && r.stdout.contains("my-token: not set"), "{}", r.stdout);
+    assert!(
+        r.stdout.contains("secret store: none") && r.stdout.contains("my-token: not set"),
+        "{}",
+        r.stdout
+    );
     let r = env.ssx_with_stdin(&["uploaders", "secret", "set", "my-token"], "hunter2\n").code(1);
-    assert!(r.stderr.contains("NOT saved") && r.stderr.contains("SSX_SECRET_MY_TOKEN"), "{}", r.stderr);
+    assert!(
+        r.stderr.contains("NOT saved") && r.stderr.contains("SSX_SECRET_MY_TOKEN"),
+        "{}",
+        r.stderr
+    );
     let mut env2 = TestEnv::new();
     env2.set("SSX_SECRET_MY_TOKEN", "from-env");
-    assert!(env2.ssx(&["uploaders", "secret", "status", "my-token"]).ok().stdout.contains("my-token: set (from environment)"));
+    assert!(
+        env2.ssx(&["uploaders", "secret", "status", "my-token"])
+            .ok()
+            .stdout
+            .contains("my-token: set (from environment)")
+    );
     assert_eq!(env.ssx(&["uploaders", "secret", "set", "bad name"]).code, 2);
 }
 
@@ -382,7 +480,12 @@ fn uploaders_list_import_remove_and_secrets() {
 fn history_commands_work_on_an_empty_and_a_populated_history() {
     let env = TestEnv::new();
     let r = env.ssx(&["history", "list"]).ok();
-    assert!(r.stdout.is_empty() && r.stderr.contains("nothing in the history"), "{}{}", r.stdout, r.stderr);
+    assert!(
+        r.stdout.is_empty() && r.stderr.contains("nothing in the history"),
+        "{}{}",
+        r.stdout,
+        r.stderr
+    );
     assert_eq!(env.ssx(&["history", "list", "--json"]).ok().json(), serde_json::json!([]));
 
     // Populate through the real upload path with the built-in local uploader.
@@ -399,17 +502,47 @@ fn history_commands_work_on_an_empty_and_a_populated_history() {
     let kinds: Vec<_> = entries.iter().map(|e| e["kind"].as_str().unwrap()).collect();
     assert!(kinds.contains(&"image") && kinds.contains(&"file"), "{kinds:?}");
 
-    assert_eq!(env.ssx(&["history", "list", "--kind", "image", "--json"]).ok().json().as_array().unwrap().len(), 1);
-    assert_eq!(env.ssx(&["history", "list", "-n", "1", "--json"]).ok().json().as_array().unwrap().len(), 1);
-    assert_eq!(env.ssx(&["history", "list", "--uploaded", "--json"]).ok().json().as_array().unwrap().len(), 2);
-    assert_eq!(env.ssx(&["history", "search", "b.txt", "--json"]).ok().json().as_array().unwrap().len(), 1);
-    assert_eq!(env.ssx(&["history", "search", "nothing-matches-this", "--json"]).ok().json().as_array().unwrap().len(), 0);
+    assert_eq!(
+        env.ssx(&["history", "list", "--kind", "image", "--json"])
+            .ok()
+            .json()
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        env.ssx(&["history", "list", "-n", "1", "--json"]).ok().json().as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(
+        env.ssx(&["history", "list", "--uploaded", "--json"]).ok().json().as_array().unwrap().len(),
+        2
+    );
+    assert_eq!(
+        env.ssx(&["history", "search", "b.txt", "--json"]).ok().json().as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(
+        env.ssx(&["history", "search", "nothing-matches-this", "--json"])
+            .ok()
+            .json()
+            .as_array()
+            .unwrap()
+            .len(),
+        0
+    );
 
     let id = entries[0]["id"].as_i64().unwrap().to_string();
     let shown = env.ssx(&["history", "show", &id, "--json"]).ok().json();
     assert_eq!(shown["id"].as_i64().unwrap().to_string(), id);
     let r = env.ssx(&["history", "delete", &id, "9999"]).code(1);
-    assert!(r.stdout.contains("deleted 1 entry") && r.stderr.contains("9999"), "{}{}", r.stdout, r.stderr);
+    assert!(
+        r.stdout.contains("deleted 1 entry") && r.stderr.contains("9999"),
+        "{}{}",
+        r.stdout,
+        r.stderr
+    );
     assert_eq!(env.ssx(&["history", "list", "--json"]).ok().json().as_array().unwrap().len(), 1);
 
     let r = env.ssx(&["history", "prune", "--max-entries", "0", "--max-age-days", "0"]).ok();
@@ -418,14 +551,22 @@ fn history_commands_work_on_an_empty_and_a_populated_history() {
     std::fs::remove_file(&b).unwrap();
     let r = env.ssx(&["history", "prune", "--orphans"]).ok();
     assert!(r.stdout.contains("whose file is gone"), "{}", r.stdout);
-    assert_eq!(env.ssx(&["history", "list", "--json"]).ok().json().as_array().unwrap().len(), 0, "entries of deleted files were pruned");
+    assert_eq!(
+        env.ssx(&["history", "list", "--json"]).ok().json().as_array().unwrap().len(),
+        0,
+        "entries of deleted files were pruned"
+    );
 }
 
 #[test]
 fn run_explains_workflows_that_cannot_run() {
     let env = TestEnv::new();
     let r = env.ssx(&["run", "nope"]).code(1);
-    assert!(r.stderr.contains("no workflow called") && r.stderr.contains("region (capture-region)"), "{}", r.stderr);
+    assert!(
+        r.stderr.contains("no workflow called") && r.stderr.contains("region (capture-region)"),
+        "{}",
+        r.stderr
+    );
     let r = env.ssx(&["run", "upload"]).code(2);
     assert!(r.stderr.contains("takes files") && r.stderr.contains("post-file"), "{}", r.stderr);
     let r = env.ssx(&["run", "record"]).code(1);
@@ -443,7 +584,11 @@ fn edit_without_the_helper_explains_where_to_get_it() {
     let frame = ssx_types::Frame::from_rgba8(2, 2, [1, 2, 3, 255].repeat(4)).unwrap();
     frame.save(&img).unwrap();
     let r = env.ssx(&["edit", "--", img.to_str().unwrap()]).code(1);
-    assert!(r.stderr.contains("ssx-editor-ui") && r.stderr.contains("SSX_EDITOR_UI"), "{}", r.stderr);
+    assert!(
+        r.stderr.contains("ssx-editor-ui") && r.stderr.contains("SSX_EDITOR_UI"),
+        "{}",
+        r.stderr
+    );
     let r = env.ssx(&["edit", env.path("missing.png").to_str().unwrap()]).code(1);
     assert!(r.stderr.contains("cannot read"), "{}", r.stderr);
     let text = env.path("t.png");

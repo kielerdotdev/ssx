@@ -7,6 +7,8 @@
 
 use std::path::PathBuf;
 
+use std::fmt::Write as _;
+
 use serde::Serialize;
 use ssx_core::settings::Settings;
 use ssx_hotkeys::detect::{Environment, Platform, detect};
@@ -323,7 +325,11 @@ pub fn derive_problems(r: &Report) -> Vec<Problem> {
         } else {
             "there is no graphical session (neither DISPLAY nor WAYLAND_DISPLAY is set): run ssx inside a desktop session"
         };
-        p.push(Problem::new(Error, "no screen-capture backend works, so ssx cannot take screenshots", hint));
+        p.push(Problem::new(
+            Error,
+            "no screen-capture backend works, so ssx cannot take screenshots",
+            hint,
+        ));
     }
     if let Some(e) = &r.monitors_error {
         let sev = if r.capture.ok { Info } else { Warning };
@@ -346,7 +352,11 @@ pub fn derive_problems(r: &Report) -> Vec<Problem> {
             "the clipboard cannot be used, so --copy and copy steps will fail",
             "install `wl-clipboard` (Wayland) or `xclip` (X11), and run inside a desktop session",
         ));
-    } else if !r.clipboard.wl_copy && !r.clipboard.xclip && r.session.session_type != "unknown" && cfg!(target_os = "linux") {
+    } else if !r.clipboard.wl_copy
+        && !r.clipboard.xclip
+        && r.session.session_type != "unknown"
+        && cfg!(target_os = "linux")
+    {
         p.push(Problem::new(
             Info,
             "no wl-copy/xclip: copies made by short-lived `ssx` commands may vanish when the command exits",
@@ -381,7 +391,11 @@ pub fn derive_problems(r: &Report) -> Vec<Problem> {
         ));
     }
     if let Some(e) = &r.settings.error {
-        p.push(Problem::new(Error, format!("settings.toml cannot be read: {e}"), "fix it with `ssx config edit` or start over with `ssx config reset`"));
+        p.push(Problem::new(
+            Error,
+            format!("settings.toml cannot be read: {e}"),
+            "fix it with `ssx config edit` or start over with `ssx config reset`",
+        ));
     } else if !r.settings.valid {
         p.push(Problem::new(
             Error,
@@ -392,7 +406,11 @@ pub fn derive_problems(r: &Report) -> Vec<Problem> {
     for u in r.uploaders.iter().filter(|u| u.error.is_some()) {
         p.push(Problem::new(
             Warning,
-            format!("uploader {:?} does not load: {}", u.name, u.error.as_deref().unwrap_or_default()),
+            format!(
+                "uploader {:?} does not load: {}",
+                u.name,
+                u.error.as_deref().unwrap_or_default()
+            ),
             "fix its [uploaders] table or .sxcu file; `ssx uploaders list` shows all",
         ));
     }
@@ -418,7 +436,9 @@ pub fn derive_problems(r: &Report) -> Vec<Problem> {
             "add them with `ssx shell install` (preview with --dry-run)",
         ));
     }
-    if r.hotkeys.bound_workflows > 0 && r.hotkeys.strategies.iter().all(|s| s.contains("bind `ssx run")) {
+    if r.hotkeys.bound_workflows > 0
+        && r.hotkeys.strategies.iter().all(|s| s.contains("bind `ssx run"))
+    {
         p.push(Problem::new(
             Info,
             "this desktop cannot register global hotkeys for ssx by itself",
@@ -432,7 +452,11 @@ pub fn derive_problems(r: &Report) -> Vec<Problem> {
 /// Probes the machine.
 pub fn gather(app: &App) -> CliResult<Report> {
     let env = Environment::from_env();
-    let forced = app.global.backend.clone().or_else(|| std::env::var("SSX_BACKEND").ok().filter(|v| !v.is_empty()));
+    let forced = app
+        .global
+        .backend
+        .clone()
+        .or_else(|| std::env::var("SSX_BACKEND").ok().filter(|v| !v.is_empty()));
     let session = session_info(&env, forced);
 
     // Settings problems must not stop the diagnosis, so load them by hand.
@@ -441,11 +465,17 @@ pub fn gather(app: &App) -> CliResult<Report> {
         Ok(text) => match findings_for(&text, &app.paths.config_dir) {
             Ok(f) => {
                 let valid = !f.iter().any(|x| x.severity == "error");
-                let findings = f.iter().map(|x| format!("{}: {}: {}", x.severity, x.path, x.message)).collect();
+                let findings = f
+                    .iter()
+                    .map(|x| format!("{}: {}: {}", x.severity, x.path, x.message))
+                    .collect();
                 let s = Settings::from_toml_str(&text).map(|l| l.settings).unwrap_or_default();
                 (s, SettingsInfo { valid, findings, error: None })
             }
-            Err(e) => (Settings::default(), SettingsInfo { valid: false, findings: vec![], error: Some(e) }),
+            Err(e) => (
+                Settings::default(),
+                SettingsInfo { valid: false, findings: vec![], error: Some(e) },
+            ),
         },
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             (Settings::default(), SettingsInfo { valid: true, findings: vec![], error: None })
@@ -491,7 +521,13 @@ pub fn gather(app: &App) -> CliResult<Report> {
             (capture, mons, err)
         }
         Err(e) => (
-            CaptureInfo { ok: false, backend: None, attempts: vec![], capabilities: None, error: Some(e.to_string()) },
+            CaptureInfo {
+                ok: false,
+                backend: None,
+                attempts: vec![],
+                capabilities: None,
+                error: Some(e.to_string()),
+            },
             Vec::new(),
             None,
         ),
@@ -537,7 +573,10 @@ pub fn gather(app: &App) -> CliResult<Report> {
         .map(|UploaderInfo { name, kind, error, .. }| UploaderState { name, kind, error })
         .collect();
     let editor = ExternalEditor::discover();
-    let editor = EditorInfo { found: editor.helper().is_some(), path: editor.helper().map(std::path::Path::to_path_buf) };
+    let editor = EditorInfo {
+        found: editor.helper().is_some(),
+        path: editor.helper().map(std::path::Path::to_path_buf),
+    };
 
     let shell_integrations = crate::app::exe_path()
         .ok()
@@ -558,7 +597,10 @@ pub fn gather(app: &App) -> CliResult<Report> {
         os: OsInfo {
             name: std::env::consts::OS.to_owned(),
             arch: std::env::consts::ARCH.to_owned(),
-            distribution: std::fs::read_to_string("/etc/os-release").ok().as_deref().and_then(parse_os_release),
+            distribution: std::fs::read_to_string("/etc/os-release")
+                .ok()
+                .as_deref()
+                .and_then(parse_os_release),
         },
         session,
         capture,
@@ -609,51 +651,79 @@ pub fn render(r: &Report, style: Style) -> String {
         o.push_str(&style.bold(t));
         o.push('\n');
     };
-    o.push_str(&format!(
-        "ssx {} on {} {}{}\n",
+    let _ = writeln!(
+        o,
+        "ssx {} on {} {}{}",
         r.version,
         r.os.name,
         r.os.arch,
         r.os.distribution.as_ref().map_or_else(String::new, |d| format!(" ({d})"))
-    ));
+    );
 
     h(&mut o, "Session");
-    o.push_str(&format!(
-        "  type: {}   desktop: {}{}{}{}\n",
+    let _ = writeln!(
+        o,
+        "  type: {}   desktop: {}{}{}{}",
         r.session.session_type,
         r.session.desktop,
         r.session.display.as_ref().map_or_else(String::new, |d| format!("   DISPLAY={d}")),
-        r.session.wayland_display.as_ref().map_or_else(String::new, |d| format!("   WAYLAND_DISPLAY={d}")),
-        r.session.forced_backend.as_ref().map_or_else(String::new, |d| format!("   SSX_BACKEND={d}")),
-    ));
+        r.session
+            .wayland_display
+            .as_ref()
+            .map_or_else(String::new, |d| format!("   WAYLAND_DISPLAY={d}")),
+        r.session
+            .forced_backend
+            .as_ref()
+            .map_or_else(String::new, |d| format!("   SSX_BACKEND={d}")),
+    );
 
     h(&mut o, "Screen capture");
     match (&r.capture.backend, &r.capture.error) {
-        (Some(b), _) => o.push_str(&format!("  backend: {}\n", style.green(b))),
-        (None, e) => o.push_str(&format!("  backend: {}\n  {}\n", style.red("none"), e.clone().unwrap_or_default())),
+        (Some(b), _) => {
+            let _ = writeln!(o, "  backend: {}", style.green(b));
+        }
+        (None, e) => {
+            let _ = writeln!(
+                o,
+                "  backend: {}\n  {}",
+                style.red("none"),
+                e.clone().unwrap_or_default()
+            );
+        }
     }
     for a in &r.capture.attempts {
-        o.push_str(&format!(
-            "  tried {}: {}\n",
+        let _ = writeln!(
+            o,
+            "  tried {}: {}",
             a.backend,
             a.reason.as_deref().map_or_else(|| "ok".to_owned(), |x| format!("rejected: {x}"))
-        ));
+        );
     }
     if let Some(c) = &r.capture.capabilities {
         let on: Vec<&str> = c
             .as_object()
-            .map(|m| m.iter().filter(|(_, v)| v.as_bool() == Some(true)).map(|(k, _)| k.as_str()).collect())
+            .map(|m| {
+                m.iter()
+                    .filter(|(_, v)| v.as_bool() == Some(true))
+                    .map(|(k, _)| k.as_str())
+                    .collect()
+            })
             .unwrap_or_default();
-        o.push_str(&format!("  can: {}\n", if on.is_empty() { "nothing special".to_owned() } else { on.join(", ") }));
+        let _ = writeln!(
+            o,
+            "  can: {}",
+            if on.is_empty() { "nothing special".to_owned() } else { on.join(", ") }
+        );
     }
 
     h(&mut o, "Monitors");
     if r.monitors.is_empty() {
-        o.push_str(&format!("  {}\n", r.monitors_error.as_deref().unwrap_or("none reported")));
+        let _ = writeln!(o, "  {}", r.monitors_error.as_deref().unwrap_or("none reported"));
     } else {
         for m in &r.monitors {
-            o.push_str(&format!(
-                "  {} ({}): {}, scale {:.2}{}, HDR {}{}\n",
+            let _ = writeln!(
+                o,
+                "  {} ({}): {}, scale {:.2}{}, HDR {}{}",
                 m.name,
                 m.id,
                 m.rect,
@@ -661,58 +731,72 @@ pub fn render(r: &Report, style: Style) -> String {
                 if m.primary { ", primary" } else { "" },
                 m.hdr,
                 m.sdr_white_nits.map_or_else(String::new, |n| format!(" ({n:.0} nits SDR white)")),
-            ));
+            );
         }
     }
 
     h(&mut o, "Desktop integration");
-    o.push_str(&format!(
-        "  clipboard: {} (arboard {}, wl-copy {}, xclip {}; file lists as {})\n",
+    let _ = writeln!(
+        o,
+        "  clipboard: {} (arboard {}, wl-copy {}, xclip {}; file lists as {})",
         yes_no(r.clipboard.usable),
         yes_no(r.clipboard.arboard),
         yes_no(r.clipboard.wl_copy),
         yes_no(r.clipboard.xclip),
         r.clipboard.file_list_format
-    ));
-    o.push_str(&format!(
-        "  notifications: {}\n",
-        r.notifications.server.clone().or_else(|| r.notifications.error.clone().map(|e| format!("unavailable ({e})"))).unwrap_or_default()
-    ));
-    o.push_str(&format!(
-        "  secret store: {}\n",
-        r.keyring.backend.clone().unwrap_or_else(|| format!("none ({})", r.keyring.reason.clone().unwrap_or_default()))
-    ));
-    o.push_str(&format!(
-        "  editor helper: {}\n",
+    );
+    let _ = writeln!(
+        o,
+        "  notifications: {}",
+        r.notifications
+            .server
+            .clone()
+            .or_else(|| r.notifications.error.clone().map(|e| format!("unavailable ({e})")))
+            .unwrap_or_default()
+    );
+    let _ = writeln!(
+        o,
+        "  secret store: {}",
+        r.keyring
+            .backend
+            .clone()
+            .unwrap_or_else(|| format!("none ({})", r.keyring.reason.clone().unwrap_or_default()))
+    );
+    let _ = writeln!(
+        o,
+        "  editor helper: {}",
         r.editor.path.as_ref().map_or_else(|| "not found".to_owned(), |p| p.display().to_string())
-    ));
+    );
     for s in &r.shell_integrations {
-        o.push_str(&format!(
-            "  {}: {}, {}\n",
+        let _ = writeln!(
+            o,
+            "  {}: {}, {}",
             s.name,
             if s.detected { "found" } else { "not found" },
             if s.installed { "entries installed" } else { "no entries" }
-        ));
+        );
     }
 
     h(&mut o, "Hotkeys");
-    o.push_str(&format!(
-        "  {} workflow(s) with a hotkey; best mechanism: {}\n",
+    let _ = writeln!(
+        o,
+        "  {} workflow(s) with a hotkey; best mechanism: {}",
         r.hotkeys.bound_workflows, r.hotkeys.recommended
-    ));
+    );
 
     h(&mut o, "Files");
-    o.push_str(&format!(
-        "  config: {}{}\n  data:   {}\n  history: {}{}\n  uploaders: {} configured\n",
+    let _ = writeln!(
+        o,
+        "  config: {}{}\n  data:   {}\n  history: {}{}\n  uploaders: {} configured",
         r.paths.settings_file.display(),
         if r.paths.settings_exists { "" } else { " (not created yet, defaults in use)" },
         r.paths.data_dir.display(),
         r.paths.history_db.display(),
         if r.paths.history_ok { "" } else { " (cannot be opened)" },
         r.uploaders.len(),
-    ));
+    );
     for f in &r.settings.findings {
-        o.push_str(&format!("  settings: {f}\n"));
+        let _ = writeln!(o, "  settings: {f}");
     }
 
     h(&mut o, &format!("Problems ({})", r.problems.len()));
@@ -725,9 +809,9 @@ pub fn render(r: &Report, style: Style) -> String {
             Severity::Warning => style.yellow("warning"),
             Severity::Info => style.dim("info   "),
         };
-        o.push_str(&format!("  {tag} {}\n", p.message));
+        let _ = writeln!(o, "  {tag} {}", p.message);
         if let Some(hint) = &p.hint {
-            o.push_str(&format!("          hint: {hint}\n"));
+            let _ = writeln!(o, "          hint: {hint}");
         }
     }
     o
@@ -743,8 +827,11 @@ pub fn run(app: &App, args: &DoctorArgs) -> CliResult<()> {
     }
     let errors = report.problems.iter().filter(|p| p.severity == Severity::Error).count();
     if errors > 0 {
-        return Err(CliError::new(format!("doctor found {errors} error{}", if errors == 1 { "" } else { "s" }))
-            .hint("the problems are listed above"));
+        return Err(CliError::new(format!(
+            "doctor found {errors} error{}",
+            if errors == 1 { "" } else { "s" }
+        ))
+        .hint("the problems are listed above"));
     }
     Ok(())
 }
@@ -756,7 +843,11 @@ mod tests {
     fn healthy() -> Report {
         Report {
             version: "0.1.0".into(),
-            os: OsInfo { name: "linux".into(), arch: "x86_64".into(), distribution: Some("Test Linux".into()) },
+            os: OsInfo {
+                name: "linux".into(),
+                arch: "x86_64".into(),
+                distribution: Some("Test Linux".into()),
+            },
             session: SessionInfo {
                 session_type: "wayland".into(),
                 wayland_display: Some("wayland-1".into()),
@@ -769,7 +860,9 @@ mod tests {
                 ok: true,
                 backend: Some("wayland-wlr-screencopy".into()),
                 attempts: vec![Attempt { backend: "wayland".into(), ok: true, reason: None }],
-                capabilities: Some(serde_json::json!({"enumerate_monitors": true, "cursor": true, "hdr_float": false})),
+                capabilities: Some(
+                    serde_json::json!({"enumerate_monitors": true, "cursor": true, "hdr_float": false}),
+                ),
                 error: None,
             },
             monitors: vec![MonitorInfo {
@@ -791,8 +884,16 @@ mod tests {
                 xclip: false,
                 file_list_format: "x-special/gnome-copied-files".into(),
             },
-            notifications: NotificationInfo { ok: true, server: Some("mako 1.9".into()), error: None },
-            keyring: KeyringInfo { persistent: true, backend: Some("Secret Service".into()), reason: None },
+            notifications: NotificationInfo {
+                ok: true,
+                server: Some("mako 1.9".into()),
+                error: None,
+            },
+            keyring: KeyringInfo {
+                persistent: true,
+                backend: Some("Secret Service".into()),
+                reason: None,
+            },
             paths: PathsInfo {
                 config_dir: "/c".into(),
                 settings_file: "/c/settings.toml".into(),
@@ -803,7 +904,11 @@ mod tests {
                 uploaders_dir: "/c/uploaders".into(),
             },
             settings: SettingsInfo { valid: true, findings: vec![], error: None },
-            uploaders: vec![UploaderState { name: "local".into(), kind: "local".into(), error: None }],
+            uploaders: vec![UploaderState {
+                name: "local".into(),
+                kind: "local".into(),
+                error: None,
+            }],
             editor: EditorInfo { found: true, path: Some("/usr/bin/ssx-editor-ui".into()) },
             shell_integrations: vec![],
             hotkeys: HotkeyInfo {
@@ -851,13 +956,28 @@ mod tests {
     fn missing_services_are_warnings_with_a_fix() {
         let mut r = healthy();
         r.clipboard.usable = false;
-        r.notifications = NotificationInfo { ok: false, server: None, error: Some("no bus".into()) };
-        r.keyring = KeyringInfo { persistent: false, backend: None, reason: Some("no D-Bus session".into()) };
+        r.notifications =
+            NotificationInfo { ok: false, server: None, error: Some("no bus".into()) };
+        r.keyring = KeyringInfo {
+            persistent: false,
+            backend: None,
+            reason: Some("no D-Bus session".into()),
+        };
         r.editor = EditorInfo { found: false, path: None };
-        r.uploaders.push(UploaderState { name: "bad".into(), kind: "broken".into(), error: Some("missing bucket".into()) });
+        r.uploaders.push(UploaderState {
+            name: "bad".into(),
+            kind: "broken".into(),
+            error: Some("missing bucket".into()),
+        });
         let p = derive_problems(&r);
         let text = p.iter().map(|x| x.message.as_str()).collect::<Vec<_>>().join("\n");
-        for needle in ["clipboard cannot be used", "no desktop notification service (no bus)", "no OS credential store (no D-Bus session)", "ssx-editor-ui", "uploader \"bad\" does not load: missing bucket"] {
+        for needle in [
+            "clipboard cannot be used",
+            "no desktop notification service (no bus)",
+            "no OS credential store (no D-Bus session)",
+            "ssx-editor-ui",
+            "uploader \"bad\" does not load: missing bucket",
+        ] {
             assert!(text.contains(needle), "{needle} missing from:\n{text}");
         }
         assert!(p.iter().all(|x| x.hint.is_some()), "every problem says what to do");
@@ -871,7 +991,9 @@ mod tests {
         r.monitors_error = Some("the portal cannot enumerate monitors".into());
         let m = messages(&r);
         assert!(m.iter().any(|(s, t)| *s == Severity::Info && t.contains("HDR is on")));
-        assert!(m.iter().any(|(s, t)| *s == Severity::Info && t.contains("monitors cannot be listed")));
+        assert!(
+            m.iter().any(|(s, t)| *s == Severity::Info && t.contains("monitors cannot be listed"))
+        );
     }
 
     #[test]
@@ -879,13 +1001,17 @@ mod tests {
         let mut r = healthy();
         r.settings = SettingsInfo { valid: false, findings: vec!["error: x".into()], error: None };
         assert_eq!(derive_problems(&r)[0].severity, Severity::Error);
-        r.settings = SettingsInfo { valid: false, findings: vec![], error: Some("not TOML".into()) };
+        r.settings =
+            SettingsInfo { valid: false, findings: vec![], error: Some("not TOML".into()) };
         assert!(derive_problems(&r)[0].message.contains("cannot be read"));
     }
 
     #[test]
     fn os_release_parsing() {
-        assert_eq!(parse_os_release("NAME=\"X\"\nPRETTY_NAME=\"Ubuntu 24.04 LTS\"\n").as_deref(), Some("Ubuntu 24.04 LTS"));
+        assert_eq!(
+            parse_os_release("NAME=\"X\"\nPRETTY_NAME=\"Ubuntu 24.04 LTS\"\n").as_deref(),
+            Some("Ubuntu 24.04 LTS")
+        );
         assert_eq!(parse_os_release("PRETTY_NAME='Arch Linux'").as_deref(), Some("Arch Linux"));
         assert_eq!(parse_os_release("NAME=x"), None);
         assert_eq!(parse_os_release("PRETTY_NAME=\"\""), None);
@@ -912,7 +1038,23 @@ mod tests {
             assert!(text.contains(needle), "{needle} missing from:\n{text}");
         }
         let json = serde_json::to_value(&r).unwrap();
-        for key in ["version", "os", "session", "capture", "monitors", "clipboard", "notifications", "keyring", "paths", "settings", "uploaders", "editor", "shell_integrations", "hotkeys", "problems"] {
+        for key in [
+            "version",
+            "os",
+            "session",
+            "capture",
+            "monitors",
+            "clipboard",
+            "notifications",
+            "keyring",
+            "paths",
+            "settings",
+            "uploaders",
+            "editor",
+            "shell_integrations",
+            "hotkeys",
+            "problems",
+        ] {
             assert!(json.get(key).is_some(), "{key} missing from the JSON");
         }
         assert_eq!(json["problems"][0]["severity"], "info");
@@ -920,7 +1062,11 @@ mod tests {
 
     #[test]
     fn session_facts_come_from_the_environment_snapshot() {
-        let env = Environment::from_pairs([("XDG_CURRENT_DESKTOP", "GNOME"), ("WAYLAND_DISPLAY", "wayland-0"), ("XDG_SESSION_TYPE", "wayland")]);
+        let env = Environment::from_pairs([
+            ("XDG_CURRENT_DESKTOP", "GNOME"),
+            ("WAYLAND_DISPLAY", "wayland-0"),
+            ("XDG_SESSION_TYPE", "wayland"),
+        ]);
         let s = session_info(&env, Some("x11".into()));
         assert_eq!((s.session_type.as_str(), s.desktop.as_str()), ("wayland", "GNOME"));
         assert_eq!(s.forced_backend.as_deref(), Some("x11"));

@@ -42,7 +42,8 @@ pub struct Style {
 impl Style {
     /// Styling for stdout or stderr, per `choice` and the environment.
     pub fn for_stream(choice: ColorChoice, stderr: bool) -> Self {
-        let tty = if stderr { std::io::stderr().is_terminal() } else { std::io::stdout().is_terminal() };
+        let tty =
+            if stderr { std::io::stderr().is_terminal() } else { std::io::stdout().is_terminal() };
         let no_color = std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty());
         let dumb = std::env::var("TERM").is_ok_and(|t| t == "dumb");
         Self { on: use_color(choice, tty, no_color, dumb) }
@@ -243,7 +244,7 @@ mod tests {
         assert_eq!(human_bytes(999), "999 B");
         assert_eq!(human_bytes(1000), "1.0 kB");
         assert_eq!(human_bytes(1_234_567), "1.2 MB");
-        assert_eq!(human_bytes(u64::MAX).ends_with("TB"), true);
+        assert!(human_bytes(u64::MAX).ends_with("TB"));
     }
 
     #[test]

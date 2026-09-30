@@ -122,7 +122,11 @@ mod tests {
     fn monitor_table_shows_scale_and_hdr_state() {
         let out = render_monitors(
             &[
-                monitor("A", 0, Some(HdrInfo { active: true, sdr_white_nits: 203.0, max_luminance_nits: None })),
+                monitor(
+                    "A",
+                    0,
+                    Some(HdrInfo { active: true, sdr_white_nits: 203.0, max_luminance_nits: None }),
+                ),
                 monitor("B", -1920, Some(HdrInfo::SDR)),
                 monitor("C", 1920, None),
             ],
@@ -130,8 +134,18 @@ mod tests {
         );
         let lines: Vec<&str> = out.lines().collect();
         assert!(lines[0].starts_with("ID") && lines[0].contains("HDR"));
-        assert!(lines[1].contains("1.50") && lines[1].contains("yes") && lines[1].contains("on (203 nits SDR white)"), "{}", lines[1]);
-        assert!(lines[2].contains("-1920,0 1920x1080") && lines[2].ends_with("off"), "{}", lines[2]);
+        assert!(
+            lines[1].contains("1.50")
+                && lines[1].contains("yes")
+                && lines[1].contains("on (203 nits SDR white)"),
+            "{}",
+            lines[1]
+        );
+        assert!(
+            lines[2].contains("-1920,0 1920x1080") && lines[2].ends_with("off"),
+            "{}",
+            lines[2]
+        );
         assert!(lines[3].ends_with("unknown"));
         assert!(lines[1].contains(" 60 "), "refresh is rounded: {}", lines[1]);
     }
@@ -147,7 +161,11 @@ mod tests {
             focused,
         };
         let out = render_windows(
-            &[w("1", "short", true, false), w("2", &"x".repeat(200), false, true), w("3", "two\nlines", false, false)],
+            &[
+                w("1", "short", true, false),
+                w("2", &"x".repeat(200), false, true),
+                w("3", "two\nlines", false, false),
+            ],
             Style::plain(),
         );
         assert!(out.contains("focused") && out.contains("minimized"));

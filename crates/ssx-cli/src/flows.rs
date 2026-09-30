@@ -42,7 +42,13 @@ impl Wanted {
 }
 
 /// An ad-hoc workflow doing exactly what was asked, in a sensible order.
-pub fn adhoc_workflow(id: &str, name: &str, input: InputKind, wanted: Wanted, to: Option<&str>) -> Workflow {
+pub fn adhoc_workflow(
+    id: &str,
+    name: &str,
+    input: InputKind,
+    wanted: Wanted,
+    to: Option<&str>,
+) -> Workflow {
     let mut after_capture = Vec::new();
     if wanted.save {
         after_capture.push(AfterCapture::SaveToFile);
@@ -74,7 +80,12 @@ pub fn adhoc_workflow(id: &str, name: &str, input: InputKind, wanted: Wanted, to
 
 /// Sends every upload type to the uploader called `name`.
 pub fn route_everything_to(dest: &mut DestinationOverride, name: &str) {
-    for ty in [DestinationType::Image, DestinationType::Text, DestinationType::File, DestinationType::Video] {
+    for ty in [
+        DestinationType::Image,
+        DestinationType::Text,
+        DestinationType::File,
+        DestinationType::Video,
+    ] {
         set_destination(dest, ty, name);
     }
 }
@@ -150,7 +161,10 @@ pub fn choose_format(
 }
 
 /// `path` with the format's extension appended when it has none.
-pub fn with_default_extension(path: &std::path::Path, format: ImageFormatKind) -> std::path::PathBuf {
+pub fn with_default_extension(
+    path: &std::path::Path,
+    format: ImageFormatKind,
+) -> std::path::PathBuf {
     if path.extension().is_some() {
         path.to_path_buf()
     } else {
@@ -204,8 +218,16 @@ mod tests {
 
     #[test]
     fn to_routes_every_upload_type() {
-        let w = adhoc_workflow("c", "c", InputKind::Files, Wanted { upload: true, ..Wanted::default() }, Some("mine"));
-        for slot in [&w.destination.image, &w.destination.text, &w.destination.file, &w.destination.video] {
+        let w = adhoc_workflow(
+            "c",
+            "c",
+            InputKind::Files,
+            Wanted { upload: true, ..Wanted::default() },
+            Some("mine"),
+        );
+        for slot in
+            [&w.destination.image, &w.destination.text, &w.destination.file, &w.destination.video]
+        {
             assert_eq!(slot.as_deref(), Some("mine"));
         }
         assert!(w.destination.url_shortener.is_none());
@@ -216,14 +238,22 @@ mod tests {
         let mut settings = Settings::default();
         settings.destinations.image = Some("imgur".into());
         settings.destinations.file = Some("s3".into());
-        let mut wf = adhoc_workflow("c", "c", InputKind::Files, Wanted { upload: true, ..Wanted::default() }, None);
+        let mut wf = adhoc_workflow(
+            "c",
+            "c",
+            InputKind::Files,
+            Wanted { upload: true, ..Wanted::default() },
+            None,
+        );
         apply_destination_flags(&mut wf, &settings, None, Some(KindArg::Image)).unwrap();
         assert_eq!(wf.destination.file.as_deref(), Some("imgur"), "a .zip is now sent as an image");
         assert_eq!(wf.destination.video.as_deref(), Some("imgur"));
 
         let mut wf = adhoc_workflow("c", "c", InputKind::Files, Wanted::default(), None);
         let e = apply_destination_flags(&mut wf, &settings, None, Some(KindArg::Text)).unwrap_err();
-        assert!(e.message.contains("no text uploader") && e.hint.unwrap().contains("destinations.text"));
+        assert!(
+            e.message.contains("no text uploader") && e.hint.unwrap().contains("destinations.text")
+        );
 
         // --to beats --kind.
         let mut wf = adhoc_workflow("c", "c", InputKind::Files, Wanted::default(), None);
@@ -246,8 +276,17 @@ mod tests {
 
     #[test]
     fn missing_extensions_are_appended() {
-        assert_eq!(with_default_extension(Path::new("shot"), ImageFormatKind::Jpg), PathBuf::from("shot.jpg"));
-        assert_eq!(with_default_extension(Path::new("a/shot.png"), ImageFormatKind::Jpg), PathBuf::from("a/shot.png"));
-        assert_eq!(with_default_extension(Path::new("v1.2/shot"), ImageFormatKind::Png), PathBuf::from("v1.2/shot.png"));
+        assert_eq!(
+            with_default_extension(Path::new("shot"), ImageFormatKind::Jpg),
+            PathBuf::from("shot.jpg")
+        );
+        assert_eq!(
+            with_default_extension(Path::new("a/shot.png"), ImageFormatKind::Jpg),
+            PathBuf::from("a/shot.png")
+        );
+        assert_eq!(
+            with_default_extension(Path::new("v1.2/shot"), ImageFormatKind::Png),
+            PathBuf::from("v1.2/shot.png")
+        );
     }
 }

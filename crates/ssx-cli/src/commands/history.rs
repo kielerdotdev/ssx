@@ -86,10 +86,13 @@ pub fn render_entry(e: &Entry) -> String {
     opt("uploader:", e.uploader.clone());
     opt("window:", e.window_title.clone());
     opt("process:", e.process_name.clone());
-    opt("size:", match (e.width, e.height) {
-        (Some(w), Some(h)) => Some(format!("{w}x{h} px")),
-        _ => None,
-    });
+    opt(
+        "size:",
+        match (e.width, e.height) {
+            (Some(w), Some(h)) => Some(format!("{w}x{h} px")),
+            _ => None,
+        },
+    );
     opt("bytes:", e.size_bytes.map(human_bytes));
     opt("sha256:", e.sha256.clone());
     opt("workflow:", e.workflow_id.clone());
@@ -99,8 +102,10 @@ pub fn render_entry(e: &Entry) -> String {
 
 fn print_entries(app: &App, entries: &[Entry], json: bool) -> CliResult<()> {
     if json {
-        let items: Vec<EntryJson<'_>> =
-            entries.iter().map(|e| EntryJson { entry: e, created: rfc3339(e.created_at) }).collect();
+        let items: Vec<EntryJson<'_>> = entries
+            .iter()
+            .map(|e| EntryJson { entry: e, created: rfc3339(e.created_at) })
+            .collect();
         out_line(&serde_json::to_string_pretty(&items)?);
     } else if entries.is_empty() {
         err_line("nothing in the history");
@@ -159,10 +164,16 @@ pub fn run(app: &App, cmd: HistoryCmd) -> CliResult<()> {
                 max_age_days.or(Some(settings.history.max_age_days)),
             );
             let removed = history.prune(&policy, now_ms())?;
-            out_line(&format!("removed {removed} old entr{}", if removed == 1 { "y" } else { "ies" }));
+            out_line(&format!(
+                "removed {removed} old entr{}",
+                if removed == 1 { "y" } else { "ies" }
+            ));
             if orphans {
                 let n = history.remove_orphans()?;
-                out_line(&format!("removed {n} entr{} whose file is gone", if n == 1 { "y" } else { "ies" }));
+                out_line(&format!(
+                    "removed {n} entr{} whose file is gone",
+                    if n == 1 { "y" } else { "ies" }
+                ));
             }
             Ok(())
         }
@@ -191,14 +202,17 @@ pub fn run(app: &App, cmd: HistoryCmd) -> CliResult<()> {
 }
 
 fn no_such_entry(id: i64) -> CliError {
-    CliError::new(format!("there is no history entry {id}")).hint("`ssx history list` shows the ids")
+    CliError::new(format!("there is no history entry {id}"))
+        .hint("`ssx history list` shows the ids")
 }
 
 /// Retention policy from the two limits; 0 means "no limit".
 pub fn prune_policy(max_entries: Option<u32>, max_age_days: Option<u32>) -> PrunePolicy {
     PrunePolicy {
         max_entries: max_entries.filter(|n| *n > 0),
-        max_age: max_age_days.filter(|d| *d > 0).map(|d| Duration::from_secs(u64::from(d) * 86_400)),
+        max_age: max_age_days
+            .filter(|d| *d > 0)
+            .map(|d| Duration::from_secs(u64::from(d) * 86_400)),
     }
 }
 
@@ -232,7 +246,12 @@ mod tests {
 
     #[test]
     fn queries_reflect_the_filters() {
-        let f = HistoryFilter { limit: 5000, kind: Some(HistoryKindArg::Video), uploaded: true, json: false };
+        let f = HistoryFilter {
+            limit: 5000,
+            kind: Some(HistoryKindArg::Video),
+            uploaded: true,
+            json: false,
+        };
         let q = query_for(&f, Some("cat".into()));
         assert_eq!(q.kinds, [EntryKind::Video]);
         assert!(q.uploaded_only && !q.thumbnails);
@@ -248,7 +267,10 @@ mod tests {
     fn listing_and_detail_views() {
         let out = render_entries(&[entry(7)], Style::plain());
         assert!(out.lines().next().unwrap().starts_with("ID"));
-        assert!(out.contains("7 ") && out.contains("image") && out.contains("https://x.example/a.png"), "{out}");
+        assert!(
+            out.contains("7 ") && out.contains("image") && out.contains("https://x.example/a.png"),
+            "{out}"
+        );
         assert!(out.contains('\u{2026}'), "long paths are cut: {out}");
 
         let d = render_entry(&entry(7));
@@ -269,7 +291,8 @@ mod tests {
     #[test]
     fn entries_serialise_with_a_readable_timestamp() {
         let e = entry(1);
-        let v = serde_json::to_value(EntryJson { created: rfc3339(e.created_at), entry: &e }).unwrap();
+        let v =
+            serde_json::to_value(EntryJson { created: rfc3339(e.created_at), entry: &e }).unwrap();
         assert_eq!(v["id"], 1);
         assert_eq!(v["created"], "2023-11-14T22:13:20.000Z");
         assert_eq!(v["kind"], "image");

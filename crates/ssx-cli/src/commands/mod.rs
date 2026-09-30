@@ -43,10 +43,8 @@ pub fn dispatch(app: &App, command: Command) -> CliResult<()> {
             clap_complete::generate(shell, &mut cmd, "ssx", &mut std::io::stdout());
             Ok(())
         }
-        Command::Man => {
-            clap_mangen::Man::new(Cli::command())
-                .render(&mut std::io::stdout())
-                .map_err(|e| CliError::new(format!("cannot write the man page: {e}")))
-        }
+        Command::Man => clap_mangen::Man::new(Cli::command())
+            .render(&mut std::io::stdout())
+            .map_err(|e| CliError::new(format!("cannot write the man page: {e}"))),
     }
 }

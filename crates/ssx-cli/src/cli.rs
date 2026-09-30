@@ -63,10 +63,10 @@ pub struct GlobalArgs {
     /// Only print errors and the requested output
     #[arg(short, long, global = true, conflicts_with = "verbose")]
     pub quiet: bool,
-    /// Use this directory for settings and data instead of the default (like SSX_CONFIG_DIR)
+    /// Use this directory for settings and data instead of the default (like `SSX_CONFIG_DIR`)
     #[arg(long, value_name = "DIR", global = true)]
     pub config_dir: Option<PathBuf>,
-    /// Force a capture backend: windows, wayland, portal or x11 (like SSX_BACKEND)
+    /// Force a capture backend: windows, wayland, portal or x11 (like `SSX_BACKEND`)
     #[arg(long, value_name = "NAME", global = true)]
     pub backend: Option<String>,
     /// When to colour output
@@ -93,7 +93,7 @@ pub enum Command {
     Edit(EditArgs),
     /// Upload files and print their URLs (one per line), quietly, for scripts
     Upload(UploadArgs),
-    /// Manage upload destinations (Imgur, S3, HTTP, ShareX .sxcu files)
+    /// Manage upload destinations (`Imgur`, S3, HTTP, `ShareX` .sxcu files)
     Uploaders {
         /// What to do.
         #[command(subcommand)]
@@ -236,7 +236,9 @@ pub struct CaptureOpts {
 pub fn parse_rect(s: &str) -> Result<Rect, String> {
     let parts: Vec<&str> = s.split(',').map(str::trim).collect();
     let [x, y, w, h] = parts.as_slice() else {
-        return Err(format!("expected X,Y,WIDTH,HEIGHT (four numbers separated by commas), got {s:?}"));
+        return Err(format!(
+            "expected X,Y,WIDTH,HEIGHT (four numbers separated by commas), got {s:?}"
+        ));
     };
     let int = |name: &str, v: &str| {
         v.parse::<i32>().map_err(|_| format!("{name} must be a whole number, got {v:?}"))
@@ -364,7 +366,7 @@ pub struct UploadArgs {
 pub enum UploadersCmd {
     /// List destinations and whether they load
     List(ListArgs),
-    /// Import a ShareX custom uploader (.sxcu)
+    /// Import a `ShareX` custom uploader (.sxcu)
     Import {
         /// The .sxcu file.
         file: PathBuf,
@@ -550,7 +552,7 @@ pub enum ConfigCmd {
     Edit,
     /// Set one value, e.g. `ssx config set general.image_quality 80`
     Set {
-        /// Dotted key: general.image_format, capture.hdr.exposure, workflows[0].name, ...
+        /// Dotted key: `general.image_format`, `capture.hdr.exposure`, `workflows[0].name`, ...
         key: String,
         /// New value: a TOML value (`true`, `80`, `[1,2]`) or plain text
         value: String,
@@ -683,7 +685,16 @@ mod tests {
     fn rect_parsing() {
         assert_eq!(parse_rect("1,2,3,4"), Ok(Rect::new(1, 2, 3, 4)));
         assert_eq!(parse_rect(" -1920 , 0,1920,1080"), Ok(Rect::new(-1920, 0, 1920, 1080)));
-        for bad in ["", "1,2,3", "1,2,3,4,5", "a,2,3,4", "1,2,0,4", "1,2,3,-4", "1,2,3.5,4", "1,2,3,99999999999"] {
+        for bad in [
+            "",
+            "1,2,3",
+            "1,2,3,4,5",
+            "a,2,3,4",
+            "1,2,0,4",
+            "1,2,3,-4",
+            "1,2,3.5,4",
+            "1,2,3,99999999999",
+        ] {
             assert!(parse_rect(bad).is_err(), "{bad:?}");
         }
         assert!(parse_rect("1,2,3").unwrap_err().contains("four numbers"));
@@ -695,7 +706,17 @@ mod tests {
 
     #[test]
     fn capture_options_may_follow_the_target() {
-        let cli = parse(&["capture", "fullscreen", "-o", "x.png", "--cursor", "--delay", "500", "--json"]).unwrap();
+        let cli = parse(&[
+            "capture",
+            "fullscreen",
+            "-o",
+            "x.png",
+            "--cursor",
+            "--delay",
+            "500",
+            "--json",
+        ])
+        .unwrap();
         let Command::Capture(c) = cli.command else { panic!("not capture") };
         assert!(matches!(c.target, CaptureTarget::Fullscreen));
         assert_eq!(c.opts.output.as_deref(), Some(std::path::Path::new("x.png")));
@@ -704,7 +725,9 @@ mod tests {
 
         let cli = parse(&["capture", "-o", "y.png", "region", "--rect", "-10,5,20,30"]).unwrap();
         let Command::Capture(c) = cli.command else { panic!() };
-        assert!(matches!(c.target, CaptureTarget::Region { rect: Some(r) } if r == Rect::new(-10, 5, 20, 30)));
+        assert!(
+            matches!(c.target, CaptureTarget::Region { rect: Some(r) } if r == Rect::new(-10, 5, 20, 30))
+        );
         assert_eq!(c.opts.output.as_deref(), Some(std::path::Path::new("y.png")));
     }
 
@@ -719,7 +742,8 @@ mod tests {
 
     #[test]
     fn paths_after_double_dash_may_look_like_flags() {
-        let cli = parse(&["post-file", "--coalesce", "--", "-rf", "--weird name", "a b.png"]).unwrap();
+        let cli =
+            parse(&["post-file", "--coalesce", "--", "-rf", "--weird name", "a b.png"]).unwrap();
         let Command::PostFile(a) = cli.command else { panic!() };
         assert!(a.coalesce);
         assert_eq!(a.paths.len(), 3);

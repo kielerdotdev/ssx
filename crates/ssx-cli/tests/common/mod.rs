@@ -29,7 +29,8 @@ pub fn ssx_bin() -> &'static str {
 
 /// `true` if `prog` is an executable in `PATH`.
 pub fn have(prog: &str) -> bool {
-    std::env::var_os("PATH").is_some_and(|p| std::env::split_paths(&p).any(|d| d.join(prog).is_file()))
+    std::env::var_os("PATH")
+        .is_some_and(|p| std::env::split_paths(&p).any(|d| d.join(prog).is_file()))
 }
 
 /// A finished command.
@@ -55,7 +56,11 @@ impl Out {
     /// Panics with both streams unless the command exited with 0.
     #[track_caller]
     pub fn ok(self) -> Self {
-        assert_eq!(self.code, 0, "expected success\n--- stdout ---\n{}\n--- stderr ---\n{}", self.stdout, self.stderr);
+        assert_eq!(
+            self.code, 0,
+            "expected success\n--- stdout ---\n{}\n--- stderr ---\n{}",
+            self.stdout, self.stderr
+        );
         self
     }
 
@@ -78,8 +83,9 @@ impl Out {
     /// stdout parsed as JSON.
     #[track_caller]
     pub fn json(&self) -> serde_json::Value {
-        serde_json::from_str(&self.stdout)
-            .unwrap_or_else(|e| panic!("stdout is not JSON ({e}):\n{}\n--- stderr ---\n{}", self.stdout, self.stderr))
+        serde_json::from_str(&self.stdout).unwrap_or_else(|e| {
+            panic!("stdout is not JSON ({e}):\n{}\n--- stderr ---\n{}", self.stdout, self.stderr)
+        })
     }
 }
 
@@ -163,7 +169,11 @@ impl TestEnv {
     /// text sets one).
     pub fn write_settings(&self, text: &str) {
         std::fs::create_dir_all(&self.cfg).expect("cfg dir");
-        let body = if text.contains("version =") { text.to_owned() } else { format!("version = 1\n{text}") };
+        let body = if text.contains("version =") {
+            text.to_owned()
+        } else {
+            format!("version = 1\n{text}")
+        };
         std::fs::write(self.cfg.join("settings.toml"), body).expect("write settings");
     }
 
@@ -176,7 +186,8 @@ impl TestEnv {
 /// Decodes a PNG/JPEG file.
 #[track_caller]
 pub fn read_image(path: &Path) -> Frame {
-    let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+    let bytes =
+        std::fs::read(path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
     Frame::decode(&bytes).unwrap_or_else(|e| panic!("{} is not an image: {e}", path.display()))
 }
 
@@ -189,7 +200,13 @@ pub fn rgb(f: &Frame, x: u32, y: u32) -> [u8; 3] {
 
 /// The first pixel where `f` differs from `expected` (RGB triples in row-major order).
 pub fn first_diff(f: &Frame, expected: &[[u8; 3]]) -> Option<String> {
-    assert_eq!(expected.len(), (f.width() * f.height()) as usize, "size mismatch: {}x{}", f.width(), f.height());
+    assert_eq!(
+        expected.len(),
+        (f.width() * f.height()) as usize,
+        "size mismatch: {}x{}",
+        f.width(),
+        f.height()
+    );
     for y in 0..f.height() {
         for x in 0..f.width() {
             let got = rgb(f, x, y);

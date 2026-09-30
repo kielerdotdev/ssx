@@ -155,8 +155,12 @@ impl LayeredSecretStore {
     /// store or logging anything (for diagnostics such as `ssx doctor`).
     pub fn probe_status() -> SecretStatus {
         match OsKeyring::probe() {
-            Ok(k) => SecretStatus { backend: Some(k.name()), persistent: true, unavailable_reason: None },
-            Err(reason) => SecretStatus { backend: None, persistent: false, unavailable_reason: Some(reason) },
+            Ok(k) => {
+                SecretStatus { backend: Some(k.name()), persistent: true, unavailable_reason: None }
+            }
+            Err(reason) => {
+                SecretStatus { backend: None, persistent: false, unavailable_reason: Some(reason) }
+            }
         }
     }
 

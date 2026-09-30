@@ -6,7 +6,7 @@
 //! line to add; GNOME and KDE store their shortcuts in desktop settings, so those only change
 //! with `--apply`.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt::Write as _};
 
 use serde::Serialize;
 use ssx_core::settings::Settings;
@@ -29,7 +29,10 @@ use crate::{
 };
 
 /// The bindings for the workflows that have hotkeys, plus what had to be skipped and why.
-pub fn bindings_from_settings(settings: &Settings, exe: &str) -> (Vec<(Chord, Command)>, Vec<String>) {
+pub fn bindings_from_settings(
+    settings: &Settings,
+    exe: &str,
+) -> (Vec<(Chord, Command)>, Vec<String>) {
     let mut out = Vec::new();
     let mut skipped = Vec::new();
     let mut seen = HashSet::new();
@@ -114,7 +117,11 @@ pub fn render(target: Target, bindings: &[(Chord, Command)]) -> CliResult<String
             let entries = kde::entries(bindings).map_err(e)?;
             let mut out = String::new();
             for entry in &entries {
-                out.push_str(&format!("# {} ({})\n{}\n", entry.desktop_id, entry.shortcut, entry.desktop_file));
+                let _ = writeln!(
+                    out,
+                    "# {} ({})\n{}",
+                    entry.desktop_id, entry.shortcut, entry.desktop_file
+                );
             }
             for c in kde::kwriteconfig_commands("kwriteconfig6", &entries) {
                 out.push_str(&c.join(" "));
@@ -168,7 +175,8 @@ pub fn strategy_text(s: Strategy) -> &'static str {
 }
 
 fn dirs() -> CliResult<Dirs> {
-    Dirs::from_env().ok_or_else(|| CliError::new("cannot find your home directory (HOME is not set)"))
+    Dirs::from_env()
+        .ok_or_else(|| CliError::new("cannot find your home directory (HOME is not set)"))
 }
 
 fn binding_error(e: &ssx_hotkeys::bindings::BindingError) -> CliError {
@@ -204,18 +212,27 @@ pub fn run(app: &App, cmd: HotkeysCmd) -> CliResult<()> {
                 err_line(&format!("{} {s}", app.err.yellow("warning:")));
             }
             if bindings.is_empty() {
-                return Err(CliError::new("no workflow has a hotkey")
-                    .hint("give one a hotkey: ssx config set 'workflows[0].trigger.hotkey' Ctrl+Shift+S"));
+                return Err(CliError::new("no workflow has a hotkey").hint(
+                    "give one a hotkey: ssx config set 'workflows[0].trigger.hotkey' Ctrl+Shift+S",
+                ));
             }
             out_text(&render(target, &bindings)?);
             Ok(())
         }
-        HotkeysCmd::Install { target, apply, reload, exe } => install(app, target, apply, reload, exe),
+        HotkeysCmd::Install { target, apply, reload, exe } => {
+            install(app, target, apply, reload, exe)
+        }
         HotkeysCmd::Uninstall { target } => uninstall(app, target),
     }
 }
 
-fn install(app: &App, target: Option<HotkeyTarget>, apply: bool, reload: bool, exe: Option<String>) -> CliResult<()> {
+fn install(
+    app: &App,
+    target: Option<HotkeyTarget>,
+    apply: bool,
+    reload: bool,
+    exe: Option<String>,
+) -> CliResult<()> {
     let settings = app.load_settings()?;
     let target = choose_target(target)?;
     let exe = match exe {
@@ -243,7 +260,8 @@ fn install(app: &App, target: Option<HotkeyTarget>, apply: bool, reload: bool, e
                     c.line
                 ));
             }
-            let report = files::write_include_file(&dirs, target, &bindings).map_err(|e| binding_error(&e))?;
+            let report = files::write_include_file(&dirs, target, &bindings)
+                .map_err(|e| binding_error(&e))?;
             out_line(&format!(
                 "{} {}",
                 if report.changed { "wrote" } else { "already up to date:" },
@@ -251,8 +269,12 @@ fn install(app: &App, target: Option<HotkeyTarget>, apply: bool, reload: bool, e
             ));
             if apply {
                 match files::install_main_include(&dirs, target).map_err(|e| binding_error(&e))? {
-                    MainConfigChange::Changed => out_line("added a removable ssx block to your config"),
-                    MainConfigChange::Unchanged => out_line("your config already has the ssx block"),
+                    MainConfigChange::Changed => {
+                        out_line("added a removable ssx block to your config");
+                    }
+                    MainConfigChange::Unchanged => {
+                        out_line("your config already has the ssx block");
+                    }
                     MainConfigChange::AlreadyIncludedManually => {
                         out_line("your config already includes the file by hand");
                     }
@@ -284,7 +306,8 @@ fn install(app: &App, target: Option<HotkeyTarget>, apply: bool, reload: bool, e
                     format!("registered {} GNOME setting(s)", r.values_written)
                 });
             } else {
-                let r = kde::apply(&dirs()?, &SystemRunner, &bindings).map_err(|e| binding_error(&e))?;
+                let r = kde::apply(&dirs()?, &SystemRunner, &bindings)
+                    .map_err(|e| binding_error(&e))?;
                 out_line(&format!(
                     "wrote {} launcher(s), registered {} shortcut(s)",
                     r.desktop_files_written, r.shortcuts_registered
@@ -293,7 +316,9 @@ fn install(app: &App, target: Option<HotkeyTarget>, apply: bool, reload: bool, e
                     kde::reload(&SystemRunner).map_err(|e| binding_error(&e))?;
                     out_line("reloaded the shortcut daemon");
                 } else {
-                    err_line("shortcuts become active after the next login (or run again with --reload)");
+                    err_line(
+                        "shortcuts become active after the next login (or run again with --reload)",
+                    );
                 }
             }
         }
@@ -331,17 +356,20 @@ mod tests {
     use super::*;
 
     fn settings_with(hotkeys: &[(&str, &str, Option<&str>)]) -> Settings {
-        let mut s = Settings::default();
-        s.workflows = hotkeys
+        let workflows = hotkeys
             .iter()
             .map(|(id, key, cli)| {
-                let mut w = Workflow { id: (*id).into(), name: format!("Name of {id}"), ..Workflow::default() };
+                let mut w = Workflow {
+                    id: (*id).into(),
+                    name: format!("Name of {id}"),
+                    ..Workflow::default()
+                };
                 w.trigger.hotkey = Some((*key).to_owned());
                 w.trigger.cli_name = cli.map(str::to_owned);
                 w
             })
             .collect();
-        s
+        Settings { workflows, ..Settings::default() }
     }
 
     #[test]
@@ -369,7 +397,10 @@ mod tests {
         assert_eq!(b[0].1.arguments(), ["run", "a"], "falls back to the id");
         assert_eq!(b[1].1.program(), "/opt/ssx");
         assert_eq!(skipped.len(), 2);
-        assert!(skipped[0].contains("already uses it") && skipped[0].contains("\"b\""), "{skipped:?}");
+        assert!(
+            skipped[0].contains("already uses it") && skipped[0].contains("\"b\""),
+            "{skipped:?}"
+        );
         assert!(skipped[1].contains("NotAKey"));
     }
 
@@ -384,7 +415,9 @@ mod tests {
     #[test]
     fn rendering_works_for_every_target() {
         let (b, _) = bindings_from_settings(&Settings::default(), "ssx");
-        assert!(render(Target::Sway, &b).unwrap().contains("bindsym Ctrl+Print exec ssx run region"));
+        assert!(
+            render(Target::Sway, &b).unwrap().contains("bindsym Ctrl+Print exec ssx run region")
+        );
         assert!(render(Target::Hyprland, &b).unwrap().contains("ssx run region"));
         assert!(render(Target::Gnome, &b).unwrap().contains("gsettings"));
         let kde = render(Target::Kde, &b).unwrap();

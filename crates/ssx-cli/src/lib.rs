@@ -113,7 +113,8 @@ pub fn report_error(e: &CliError, style: Style) {
     }
     let mut line = format!("{} {}", style.red("error:"), e.message);
     if let Some(h) = &e.hint {
-        line.push_str(&format!(" {}", style.dim(&format!("(hint: {h})"))));
+        line.push(' ');
+        line.push_str(&style.dim(&format!("(hint: {h})")));
     }
     err_line(&line);
 }

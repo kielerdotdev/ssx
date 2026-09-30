@@ -35,7 +35,8 @@ pub fn wire_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
     paths
         .iter()
         .map(|p| {
-            let abs = std::path::absolute(p).map_err(|e| format!("cannot resolve {}: {e}", p.display()))?;
+            let abs = std::path::absolute(p)
+                .map_err(|e| format!("cannot resolve {}: {e}", p.display()))?;
             if abs.to_str().is_none() {
                 return Err(format!(
                     "{} is not valid UTF-8, which the instance protocol needs",
@@ -53,7 +54,9 @@ pub fn request_line(paths: &[PathBuf], action: PostAction) -> Result<String, Str
     let env = RequestEnvelope::new(1, Request::PostFiles { paths, action, wait: false });
     // `encode_line` ends the line with `\n`; the transport adds its own terminator and refuses
     // a line that already contains one.
-    encode_line(&env).map(|l| l.trim_end_matches(['\r', '\n']).to_owned()).map_err(|e| e.to_string())
+    encode_line(&env)
+        .map(|l| l.trim_end_matches(['\r', '\n']).to_owned())
+        .map_err(|e| e.to_string())
 }
 
 /// Interprets the instance's reply line.
@@ -61,10 +64,12 @@ pub fn interpret_reply(line: &str) -> Forward {
     match decode_line::<ResponseEnvelope>(line) {
         Ok(env) => match env.response {
             Response::Accepted { .. } | Response::Ok | Response::Finished(_) => Forward::Sent,
-            Response::Error { code, message } => {
-                Forward::Failed(format!("the running instance refused the request ({code:?}): {message}"))
+            Response::Error { code, message } => Forward::Failed(format!(
+                "the running instance refused the request ({code:?}): {message}"
+            )),
+            other => {
+                Forward::Failed(format!("unexpected reply from the running instance: {other:?}"))
             }
-            other => Forward::Failed(format!("unexpected reply from the running instance: {other:?}")),
         },
         Err(e) => Forward::Failed(format!("unreadable reply from the running instance: {e}")),
     }
@@ -101,10 +106,14 @@ mod tests {
     #[test]
     fn request_lines_carry_absolute_paths_verbatim() {
         let hostile = PathBuf::from("rel/a b \"quoted\" $(x) \n newline.png");
-        let line = request_line(&[hostile.clone(), PathBuf::from("/abs/é.png")], PostAction::Upload).unwrap();
+        let line =
+            request_line(&[hostile.clone(), PathBuf::from("/abs/é.png")], PostAction::Upload)
+                .unwrap();
         assert!(!line.contains('\n'), "no terminator: the transport adds it: {line:?}");
         let env: RequestEnvelope = decode_line(&line).unwrap();
-        let Request::PostFiles { paths, action, wait } = env.request else { panic!("wrong request") };
+        let Request::PostFiles { paths, action, wait } = env.request else {
+            panic!("wrong request")
+        };
         assert_eq!(action, PostAction::Upload);
         assert!(!wait);
         assert!(paths[0].is_absolute() && paths[0].ends_with(&hostile), "{paths:?}");
@@ -113,8 +122,11 @@ mod tests {
 
     #[test]
     fn workflow_actions_are_forwarded() {
-        let line =
-            request_line(&[PathBuf::from("/a")], PostAction::Workflow { workflow: "upload".into() }).unwrap();
+        let line = request_line(
+            &[PathBuf::from("/a")],
+            PostAction::Workflow { workflow: "upload".into() },
+        )
+        .unwrap();
         assert!(line.contains("\"workflow\":\"upload\""), "{line}");
     }
 
@@ -129,16 +141,24 @@ mod tests {
 
     #[test]
     fn replies_are_interpreted() {
-        let ok = encode_line(&ssx_core::ipc::ResponseEnvelope::new(1, Response::Accepted { run_id: 3 })).unwrap();
+        let ok =
+            encode_line(&ssx_core::ipc::ResponseEnvelope::new(1, Response::Accepted { run_id: 3 }))
+                .unwrap();
         assert_eq!(interpret_reply(&ok), Forward::Sent);
         let busy = encode_line(&ssx_core::ipc::ResponseEnvelope::new(
             1,
             Response::error(ErrorCode::Busy, "another run is active"),
         ))
         .unwrap();
-        assert!(matches!(interpret_reply(&busy), Forward::Failed(m) if m.contains("another run is active")));
+        assert!(
+            matches!(interpret_reply(&busy), Forward::Failed(m) if m.contains("another run is active"))
+        );
         assert!(matches!(interpret_reply("not json"), Forward::Failed(_)));
-        let pong = encode_line(&ssx_core::ipc::ResponseEnvelope::new(1, Response::Pong { app_version: "1".into() })).unwrap();
+        let pong = encode_line(&ssx_core::ipc::ResponseEnvelope::new(
+            1,
+            Response::Pong { app_version: "1".into() },
+        ))
+        .unwrap();
         assert!(matches!(interpret_reply(&pong), Forward::Failed(m) if m.contains("unexpected")));
     }
 }

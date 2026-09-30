@@ -79,7 +79,9 @@ pub fn post_file(app: &App, args: PostFileArgs) -> CliResult<()> {
                 tracing::info!("handed {} file(s) to the running ssx instance", args.paths.len());
                 return Ok(());
             }
-            Forward::NotRunning => tracing::debug!("no running ssx instance, uploading from this process"),
+            Forward::NotRunning => {
+                tracing::debug!("no running ssx instance, uploading from this process");
+            }
             Forward::Failed(why) => tracing::warn!("{why}; uploading from this process instead"),
         }
     }
@@ -97,7 +99,9 @@ pub fn post_video(app: &App, args: PostVideoArgs) -> CliResult<()> {
     // Uses `post_file` rather than the engine's recording input: that input treats the file
     // as one ssx just recorded, and such files are eligible for `delete_local_file`. A video
     // the user picked must never be deleted.
-    if let Err(e) = apply_destination_flags(&mut wf, &settings, args.to.as_deref(), Some(KindArg::Video)) {
+    if let Err(e) =
+        apply_destination_flags(&mut wf, &settings, args.to.as_deref(), Some(KindArg::Video))
+    {
         // No video and no file destination configured: the engine explains the same thing per
         // file, with better context, so this is not worth failing early for.
         tracing::debug!("{e}");
@@ -110,7 +114,8 @@ pub fn post_video(app: &App, args: PostVideoArgs) -> CliResult<()> {
 pub fn upload(app: &App, args: UploadArgs) -> CliResult<()> {
     let settings = app.load_settings()?;
     let wanted = Wanted { upload: true, copy_url: args.copy, ..Wanted::default() };
-    let mut wf = adhoc_workflow("cli-upload", "ssx upload", InputKind::Files, wanted, args.to.as_deref());
+    let mut wf =
+        adhoc_workflow("cli-upload", "ssx upload", InputKind::Files, wanted, args.to.as_deref());
     wf.after_capture = vec![AfterCapture::Upload];
     let session = Session::new(app, settings)?;
     run_files(app, &session, &wf, args.paths, &wanted.explicit_steps(), args.json)
@@ -118,7 +123,9 @@ pub fn upload(app: &App, args: UploadArgs) -> CliResult<()> {
 
 /// The default output of `ssx edit`: `<stem>-edited.<ext>` next to the original.
 pub fn edited_path(original: &Path) -> PathBuf {
-    let stem = original.file_stem().map_or_else(|| "image".to_owned(), |s| s.to_string_lossy().into_owned());
+    let stem = original
+        .file_stem()
+        .map_or_else(|| "image".to_owned(), |s| s.to_string_lossy().into_owned());
     let ext = original
         .extension()
         .and_then(|e| e.to_str())
@@ -170,7 +177,11 @@ mod tests {
     fn edited_names_sit_next_to_the_original() {
         assert_eq!(edited_path(Path::new("/a/b/shot.png")), PathBuf::from("/a/b/shot-edited.png"));
         assert_eq!(edited_path(Path::new("x.JPG")), PathBuf::from("x-edited.jpg"));
-        assert_eq!(edited_path(Path::new("x.bmp")), PathBuf::from("x-edited.png"), "unknown formats become PNG");
+        assert_eq!(
+            edited_path(Path::new("x.bmp")),
+            PathBuf::from("x-edited.png"),
+            "unknown formats become PNG"
+        );
         assert_eq!(edited_path(Path::new("noext")), PathBuf::from("noext-edited.png"));
     }
 

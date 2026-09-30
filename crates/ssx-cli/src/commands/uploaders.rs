@@ -129,9 +129,9 @@ fn remove(app: &App, name: &str) -> CliResult<()> {
     let settings_path = app.paths.settings_file();
     let mut removed_table = false;
     if let Ok(text) = std::fs::read_to_string(&settings_path) {
-        let mut doc: DocumentMut = text
-            .parse()
-            .map_err(|e| CliError::new(format!("{} is not valid TOML: {e}", settings_path.display())))?;
+        let mut doc: DocumentMut = text.parse().map_err(|e| {
+            CliError::new(format!("{} is not valid TOML: {e}", settings_path.display()))
+        })?;
         let key = format!("uploaders.\"{name}\"");
         if settings_edit::remove_key(&mut doc, &key).map_err(CliError::new)? {
             removed_table = true;
@@ -141,8 +141,10 @@ fn remove(app: &App, name: &str) -> CliResult<()> {
         }
     }
     if !removed_file && !removed_table {
-        return Err(CliError::new(format!("there is no imported or configured uploader called {name:?}"))
-            .hint("`ssx uploaders list` shows what exists; built-in destinations cannot be removed"));
+        return Err(CliError::new(format!(
+            "there is no imported or configured uploader called {name:?}"
+        ))
+        .hint("`ssx uploaders list` shows what exists; built-in destinations cannot be removed"));
     }
     if removed_file {
         out_line(&format!("removed the imported file for {name}"));
@@ -151,7 +153,8 @@ fn remove(app: &App, name: &str) -> CliResult<()> {
         out_line(&format!("removed [uploaders.{name}] from settings.toml"));
     }
     let settings = app.load_settings()?;
-    let dangling: Vec<&str> = settings.destinations.referenced_names().filter(|n| *n == name).collect();
+    let dangling: Vec<&str> =
+        settings.destinations.referenced_names().filter(|n| *n == name).collect();
     if !dangling.is_empty() {
         err_line(&format!(
             "{} destinations in settings.toml still point at {name:?}; change them with `ssx config set destinations.image NAME`",
@@ -222,7 +225,10 @@ fn secret(app: &App, cmd: SecretCmd) -> CliResult<()> {
             secrets.set(&name, &value).map_err(|e| CliError::new(e.to_string()))?;
             let st = secrets.status();
             if st.persistent {
-                out_line(&format!("stored {name:?} in the {}", st.backend.unwrap_or("credential store")));
+                out_line(&format!(
+                    "stored {name:?} in the {}",
+                    st.backend.unwrap_or("credential store")
+                ));
             } else {
                 err_line(&format!(
                     "{} there is no OS credential store here ({}), so {name:?} was NOT saved. \
@@ -251,7 +257,8 @@ fn secret(app: &App, cmd: SecretCmd) -> CliResult<()> {
             }
             for name in names {
                 check_secret_name(&name)?;
-                let env = std::env::var_os(ssx_services::secrets::env_var_name(&name)).is_some_and(|v| !v.is_empty());
+                let env = std::env::var_os(ssx_services::secrets::env_var_name(&name))
+                    .is_some_and(|v| !v.is_empty());
                 let present = secrets.get(&name).ok().flatten().is_some();
                 let text = match (env, present) {
                     (true, _) => "set (from environment)",
@@ -269,7 +276,13 @@ fn secret(app: &App, cmd: SecretCmd) -> CliResult<()> {
 mod tests {
     use super::*;
 
-    fn info(name: &str, kind: &str, uploads: &[&'static str], shortens: bool, error: Option<&str>) -> UploaderInfo {
+    fn info(
+        name: &str,
+        kind: &str,
+        uploads: &[&'static str],
+        shortens: bool,
+        error: Option<&str>,
+    ) -> UploaderInfo {
         UploaderInfo {
             name: name.into(),
             kind: kind.into(),
@@ -299,7 +312,11 @@ mod tests {
     fn secret_names_are_validated() {
         assert!(check_secret_name("imgur-token").is_ok());
         for bad in ["", "a b", "a/b", "$(x)", &"x".repeat(65)] {
-            assert_eq!(check_secret_name(bad).unwrap_err().code, crate::error::ExitCode::Usage, "{bad:?}");
+            assert_eq!(
+                check_secret_name(bad).unwrap_err().code,
+                crate::error::ExitCode::Usage,
+                "{bad:?}"
+            );
         }
     }
 }

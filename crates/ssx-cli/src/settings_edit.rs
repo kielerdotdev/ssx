@@ -69,7 +69,9 @@ pub fn parse_key(key: &str) -> Result<Vec<Seg>, String> {
                         _ => return Err(bad("expected a number between [ and ]")),
                     }
                 }
-                segs.push(Seg::Index(digits.parse().map_err(|_| bad("index is too large or empty"))?));
+                segs.push(Seg::Index(
+                    digits.parse().map_err(|_| bad("index is too large or empty"))?,
+                ));
                 just_closed_index = true;
             }
             c => {
@@ -98,9 +100,8 @@ enum Expect {
 }
 
 fn expectation(doc: &DocumentMut, defaults: &DocumentMut, segs: &[Seg]) -> Expect {
-    let is_string = |d: &DocumentMut| {
-        find_value(d.as_item(), segs).is_some_and(|v| v.is_str())
-    };
+    let is_string =
+        |d: &DocumentMut| find_value(d.as_item(), segs).is_some_and(toml_edit::Value::is_str);
     if is_string(doc) || is_string(defaults) { Expect::String } else { Expect::Other }
 }
 
@@ -116,13 +117,15 @@ pub fn find_value<'a>(root: &'a Item, segs: &[Seg]) -> Option<&'a Value> {
     for s in segs {
         cur = match (s, cur) {
             (Seg::Key(k), Cur::Item(Item::Table(t)) | Cur::Tab(t)) => Cur::Item(t.get(k)?),
-            (Seg::Key(k), Cur::Item(Item::Value(Value::InlineTable(t))) | Cur::Val(Value::InlineTable(t))) => {
-                Cur::Val(t.get(k)?)
-            }
+            (
+                Seg::Key(k),
+                Cur::Item(Item::Value(Value::InlineTable(t))) | Cur::Val(Value::InlineTable(t)),
+            ) => Cur::Val(t.get(k)?),
             (Seg::Index(i), Cur::Item(Item::ArrayOfTables(a))) => Cur::Tab(a.get(*i)?),
-            (Seg::Index(i), Cur::Item(Item::Value(Value::Array(a))) | Cur::Val(Value::Array(a))) => {
-                Cur::Val(a.get(*i)?)
-            }
+            (
+                Seg::Index(i),
+                Cur::Item(Item::Value(Value::Array(a))) | Cur::Val(Value::Array(a)),
+            ) => Cur::Val(a.get(*i)?),
             _ => return None,
         };
     }
@@ -167,7 +170,11 @@ fn set_value(doc: &mut DocumentMut, segs: &[Seg], value: Value, key: &str) -> Re
             Seg::Key(k) => {
                 let next_is_index = matches!(parents.get(i + 1), Some(Seg::Index(_)));
                 let entry = table.entry(k).or_insert_with(|| {
-                    if next_is_index { Item::ArrayOfTables(toml_edit::ArrayOfTables::new()) } else { Item::Table(Table::new()) }
+                    if next_is_index {
+                        Item::ArrayOfTables(toml_edit::ArrayOfTables::new())
+                    } else {
+                        Item::Table(Table::new())
+                    }
                 });
                 if next_is_index {
                     let Seg::Index(idx) = parents[i + 1] else { unreachable!("checked above") };
@@ -175,13 +182,15 @@ fn set_value(doc: &mut DocumentMut, segs: &[Seg], value: Value, key: &str) -> Re
                         return Err(format!("{key:?}: {k} is not a list of tables"));
                     };
                     let len = arr.len();
-                    table = arr
-                        .get_mut(idx)
-                        .ok_or_else(|| format!("{key:?}: {k} has no entry number {idx} (it has {len})"))?;
+                    table = arr.get_mut(idx).ok_or_else(|| {
+                        format!("{key:?}: {k} has no entry number {idx} (it has {len})")
+                    })?;
                     i += 2;
                 } else {
                     let Item::Table(t) = entry else {
-                        return Err(format!("{key:?}: {k} is not a table, so nothing can be set inside it"));
+                        return Err(format!(
+                            "{key:?}: {k} is not a table, so nothing can be set inside it"
+                        ));
                     };
                     t.set_implicit(true);
                     table = t;
@@ -204,7 +213,9 @@ fn set_value(doc: &mut DocumentMut, segs: &[Seg], value: Value, key: &str) -> Re
             }
             Ok(())
         }
-        Seg::Index(_) => Err(format!("invalid key {key:?}: a key cannot end with an index; set the fields of that entry")),
+        Seg::Index(_) => Err(format!(
+            "invalid key {key:?}: a key cannot end with an index; set the fields of that entry"
+        )),
     }
 }
 
@@ -212,7 +223,9 @@ fn set_value(doc: &mut DocumentMut, segs: &[Seg], value: Value, key: &str) -> Re
 pub fn remove_key(doc: &mut DocumentMut, key: &str) -> Result<bool, String> {
     let segs = parse_key(key)?;
     let (last, parents) = segs.split_last().ok_or_else(|| format!("invalid key {key:?}"))?;
-    let Seg::Key(last) = last else { return Err(format!("invalid key {key:?}: cannot remove a list entry")) };
+    let Seg::Key(last) = last else {
+        return Err(format!("invalid key {key:?}: cannot remove a list entry"));
+    };
     let mut table: &mut Table = doc.as_table_mut();
     let mut i = 0;
     while i < parents.len() {
@@ -263,8 +276,11 @@ pub fn check_text(text: &str) -> CliResult<(Loaded, Vec<String>)> {
         .map(|i| format!("{}: {}", i.path, i.message))
         .collect();
     if !errors.is_empty() {
-        return Err(CliError::new(format!("the result would be invalid:\n  {}", errors.join("\n  ")))
-            .hint("nothing was written; correct the value and try again"));
+        return Err(CliError::new(format!(
+            "the result would be invalid:\n  {}",
+            errors.join("\n  ")
+        ))
+        .hint("nothing was written; correct the value and try again"));
     }
     let warnings = issues
         .iter()
@@ -279,7 +295,9 @@ pub fn check_text(text: &str) -> CliResult<(Loaded, Vec<String>)> {
 pub fn read_text_or_default(path: &Path) -> CliResult<String> {
     match std::fs::read_to_string(path) {
         Ok(t) => Ok(t),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Settings::default().to_toml_string()?),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Ok(Settings::default().to_toml_string()?)
+        }
         Err(e) => Err(CliError::new(format!("cannot read {}: {e}", path.display()))),
     }
 }
@@ -317,11 +335,16 @@ pub fn set_in_file(path: &Path, key: &str, value: &str) -> CliResult<Vec<String>
     let known_before: std::collections::HashSet<String> = Settings::from_toml_str(&text)
         .map(|l| l.warnings.into_iter().collect())
         .unwrap_or_default();
-    let mut doc: DocumentMut = text
+    let mut doc: DocumentMut = text.parse().map_err(|e| {
+        CliError::new(format!("{} is not valid TOML: {e}", path.display()))
+            .hint("fix it with `ssx config edit`")
+    })?;
+    let defaults: DocumentMut = Settings::default()
+        .to_toml_string()?
         .parse()
-        .map_err(|e| CliError::new(format!("{} is not valid TOML: {e}", path.display())).hint("fix it with `ssx config edit`"))?;
-    let defaults: DocumentMut = Settings::default().to_toml_string()?.parse().map_err(|e| CliError::new(format!("internal error: {e}")))?;
-    set_key(&mut doc, &defaults, key, value).map_err(|e| CliError::new(e).hint("`ssx config show` lists all keys"))?;
+        .map_err(|e| CliError::new(format!("internal error: {e}")))?;
+    set_key(&mut doc, &defaults, key, value)
+        .map_err(|e| CliError::new(e).hint("`ssx config show` lists all keys"))?;
     let new_text = doc.to_string();
     let (_, warnings) = check_text(&new_text)?;
     if warnings.iter().any(|w| w.starts_with("unknown setting") && !known_before.contains(w)) {
@@ -331,7 +354,9 @@ pub fn set_in_file(path: &Path, key: &str, value: &str) -> CliResult<Vec<String>
         } else {
             format!("valid keys next to it: {}", siblings.join(", "))
         };
-        return Err(CliError::new(format!("{key:?} is not a setting ssx knows (a typo?)")).hint(hint));
+        return Err(
+            CliError::new(format!("{key:?} is not a setting ssx knows (a typo?)")).hint(hint)
+        );
     }
     write_checked(path, &new_text)
 }
@@ -356,7 +381,10 @@ mod tests {
         let k = |s: &str| Key(s.to_owned());
         assert_eq!(parse_key("a.b.c").unwrap(), [k("a"), k("b"), k("c")]);
         assert_eq!(parse_key("workflows[2].name").unwrap(), [k("workflows"), Index(2), k("name")]);
-        assert_eq!(parse_key("uploaders.\"is.gd\".type").unwrap(), [k("uploaders"), k("is.gd"), k("type")]);
+        assert_eq!(
+            parse_key("uploaders.\"is.gd\".type").unwrap(),
+            [k("uploaders"), k("is.gd"), k("type")]
+        );
         assert!(parse_key("a.list[0][1]").unwrap_err().contains("nested"));
         for bad in ["", ".a", "a.", "a..b", "[0]", "a[x]", "a[", "a\"b", "a[1]b"] {
             assert!(parse_key(bad).is_err(), "{bad:?}");
@@ -392,7 +420,12 @@ mod tests {
         let text = "# my settings\nfuture_key = 1\n\n[general]\n# quality\nimage_quality = 90 # inline\nimage_format = \"png\"\n";
         let doc = set(text, "general.image_quality", "70").unwrap();
         let out = doc.to_string();
-        assert!(out.contains("# my settings") && out.contains("# quality") && out.contains("future_key = 1"), "{out}");
+        assert!(
+            out.contains("# my settings")
+                && out.contains("# quality")
+                && out.contains("future_key = 1"),
+            "{out}"
+        );
         assert!(out.contains("image_quality = 70"), "{out}");
         assert!(out.contains("image_format = \"png\""));
     }
@@ -417,13 +450,21 @@ mod tests {
         set_key(&mut doc, &defaults(), "general.image_quality", "0").unwrap();
         set_key(&mut doc, &defaults(), "capture.delay_ms", "999999").unwrap();
         let e = check_text(&doc.to_string()).unwrap_err();
-        assert!(e.message.contains("general.image_quality") && e.message.contains("1 to 100"), "{}", e.message);
+        assert!(
+            e.message.contains("general.image_quality") && e.message.contains("1 to 100"),
+            "{}",
+            e.message
+        );
         assert!(e.message.contains("capture.delay_ms"), "all problems at once: {}", e.message);
         // A number that does not even fit the type is a parse-level error.
         let mut doc: DocumentMut = "".parse().unwrap();
         set_key(&mut doc, &defaults(), "general.image_quality", "500").unwrap();
         let e = check_text(&doc.to_string()).unwrap_err();
-        assert!(e.message.contains("general.image_quality") && e.message.contains("would not be valid"), "{}", e.message);
+        assert!(
+            e.message.contains("general.image_quality") && e.message.contains("would not be valid"),
+            "{}",
+            e.message
+        );
         assert!(e.hint.unwrap().contains("nothing was written"));
         // Wrong type for the field: parse error from the settings loader.
         let mut doc: DocumentMut = "".parse().unwrap();
@@ -447,10 +488,17 @@ mod tests {
         std::fs::create_dir_all(p.parent().unwrap()).unwrap();
         set_in_file(&p, "general.image_quality", "75").unwrap();
         let text = std::fs::read_to_string(&p).unwrap();
-        assert!(text.contains("image_quality = 75") && text.contains("[[workflows]]"), "created from the defaults");
+        assert!(
+            text.contains("image_quality = 75") && text.contains("[[workflows]]"),
+            "created from the defaults"
+        );
         let before = std::fs::read_to_string(&p).unwrap();
         assert!(set_in_file(&p, "general.image_quality", "0").is_err());
-        assert_eq!(std::fs::read_to_string(&p).unwrap(), before, "a refused change leaves the file alone");
+        assert_eq!(
+            std::fs::read_to_string(&p).unwrap(),
+            before,
+            "a refused change leaves the file alone"
+        );
         std::fs::write(&p, "not [valid").unwrap();
         let e = set_in_file(&p, "general.image_quality", "5").unwrap_err();
         assert!(e.message.contains("not valid TOML") && e.hint.unwrap().contains("config edit"));
@@ -461,7 +509,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("settings.toml");
         let e = set_in_file(&p, "general.imag_quality", "5").unwrap_err();
-        assert!(e.message.contains("general.imag_quality") && e.message.contains("typo"), "{}", e.message);
+        assert!(
+            e.message.contains("general.imag_quality") && e.message.contains("typo"),
+            "{}",
+            e.message
+        );
         let hint = e.hint.unwrap();
         assert!(hint.contains("image_quality") && hint.contains("image_format"), "{hint}");
         assert!(!p.exists(), "nothing was written");

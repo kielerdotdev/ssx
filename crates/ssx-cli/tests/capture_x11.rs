@@ -54,7 +54,11 @@ fn last_region_without_history_and_interactive_region_explain_themselves() {
     let Some((x, _painter)) = scene_server() else { return };
     let env = TestEnv::new().with_x11(&x.display);
     let r = env.ssx(&["capture", "last-region", "-o", env.path("x.png").to_str().unwrap()]).code(1);
-    assert!(r.stderr.contains("error:") && r.stderr.contains("no region has been captured yet"), "{}", r.stderr);
+    assert!(
+        r.stderr.contains("error:") && r.stderr.contains("no region has been captured yet"),
+        "{}",
+        r.stderr
+    );
 
     let r = env.ssx(&["capture", "region", "-o", env.path("y.png").to_str().unwrap()]).code(1);
     assert!(r.stderr.contains("--rect") && r.stderr.contains("overlay"), "{}", r.stderr);
@@ -72,7 +76,11 @@ fn format_flag_and_extension_choose_the_encoding() {
     assert!(bytes.starts_with(&[0xff, 0xd8, 0xff]), "JPEG magic");
     let img = read_image(&jpg);
     let near = |got: [u8; 3], want: [u8; 3]| got.iter().zip(want).all(|(a, b)| a.abs_diff(b) <= 8);
-    assert!(near(rgb(&img, 20, 15), rgb_of(0xff0000)), "red survives JPEG: {:?}", rgb(&img, 20, 15));
+    assert!(
+        near(rgb(&img, 20, 15), rgb_of(0x00ff_0000)),
+        "red survives JPEG: {:?}",
+        rgb(&img, 20, 15)
+    );
     assert!(near(rgb(&img, 700, 500), rgb_of(ROOT_BG)));
 
     // --format wins over a missing extension, which is appended.
@@ -82,10 +90,19 @@ fn format_flag_and_extension_choose_the_encoding() {
     let webp = env.path("shot.webp");
     env.ssx(&["capture", "fullscreen", "-o", webp.to_str().unwrap()]).ok();
     assert!(std::fs::read(&webp).unwrap().starts_with(b"RIFF"));
-    assert_eq!(first_diff(&read_image(&webp), &expected_scene(800, 600, 0, 0)), None, "WebP is lossless here");
+    assert_eq!(
+        first_diff(&read_image(&webp), &expected_scene(800, 600, 0, 0)),
+        None,
+        "WebP is lossless here"
+    );
 
-    let r = env.ssx(&["capture", "fullscreen", "-o", env.path("bad.xyz").to_str().unwrap()]).code(2);
-    assert!(r.stderr.contains("cannot tell the image format") && r.stderr.contains("--format"), "{}", r.stderr);
+    let r =
+        env.ssx(&["capture", "fullscreen", "-o", env.path("bad.xyz").to_str().unwrap()]).code(2);
+    assert!(
+        r.stderr.contains("cannot tell the image format") && r.stderr.contains("--format"),
+        "{}",
+        r.stderr
+    );
 }
 
 #[test]
@@ -94,13 +111,18 @@ fn without_output_the_image_lands_in_the_configured_folder_and_history() {
     let env = TestEnv::new().with_x11(&x.display);
     let save = env.path("shots");
     env.write_settings(&format!(
-        "[general]\nsave_dir = {:?}\nuse_type_subfolders = false\nfolder_pattern = \"\"\nfile_name_pattern = \"shot_%i\"\n",
-        save
+        "[general]\nsave_dir = {save:?}\nuse_type_subfolders = false\nfolder_pattern = \"\"\nfile_name_pattern = \"shot_%i\"\n"
     ));
     let r = env.ssx(&["capture", "fullscreen"]).ok();
     let printed = r.lines()[0].to_owned();
-    assert!(printed.ends_with("shot_1.png") && printed.starts_with(save.to_str().unwrap()), "{printed}");
-    assert_eq!(first_diff(&read_image(std::path::Path::new(&printed)), &expected_scene(800, 600, 0, 0)), None);
+    assert!(
+        printed.ends_with("shot_1.png") && printed.starts_with(save.to_str().unwrap()),
+        "{printed}"
+    );
+    assert_eq!(
+        first_diff(&read_image(std::path::Path::new(&printed)), &expected_scene(800, 600, 0, 0)),
+        None
+    );
 
     let h = env.ssx(&["history", "list", "--json"]).ok().json();
     assert_eq!(h.as_array().unwrap().len(), 1);
@@ -133,10 +155,17 @@ fn monitors_json_schema() {
     assert_eq!(m["rect"], serde_json::json!({"x": 0, "y": 0, "width": 800, "height": 600}));
     assert!((m["scale_factor"].as_f64().unwrap() - 1.0).abs() < 1e-9);
     assert_eq!(m["primary"], true);
-    assert!(m.get("refresh_hz").is_some() && m.get("hdr").is_some(), "keys are present even when null: {m}");
+    assert!(
+        m.get("refresh_hz").is_some() && m.get("hdr").is_some(),
+        "keys are present even when null: {m}"
+    );
 
     let table = env.ssx(&["monitors"]).ok();
-    assert!(table.stdout.starts_with("ID") && table.stdout.contains("0,0 800x600"), "{}", table.stdout);
+    assert!(
+        table.stdout.starts_with("ID") && table.stdout.contains("0,0 800x600"),
+        "{}",
+        table.stdout
+    );
 }
 
 #[test]
@@ -150,7 +179,14 @@ fn windows_lists_something_or_explains() {
     } else {
         assert!(r.stderr.starts_with("error:"), "{}", r.stderr);
     }
-    let r = env.ssx(&["capture", "window", "--id", "0xdeadbeef", "-o", env.path("w.png").to_str().unwrap()]);
+    let r = env.ssx(&[
+        "capture",
+        "window",
+        "--id",
+        "0xdeadbeef",
+        "-o",
+        env.path("w.png").to_str().unwrap(),
+    ]);
     assert_eq!(r.code, 1, "an unknown window id fails cleanly");
     assert!(r.stderr.contains("error:"), "{}", r.stderr);
 }
@@ -159,7 +195,10 @@ fn windows_lists_something_or_explains() {
 fn capture_and_upload_prints_the_url_and_records_history() {
     let Some((x, _painter)) = scene_server() else { return };
     let mock = HttpMock::start();
-    mock.respond_to_all(200, r#"{"link":"https://cdn.example/i/abc.png","delete":"https://cdn.example/del/abc"}"#);
+    mock.respond_to_all(
+        200,
+        r#"{"link":"https://cdn.example/i/abc.png","delete":"https://cdn.example/del/abc"}"#,
+    );
     let env = TestEnv::new().with_x11(&x.display);
 
     // Import the ShareX uploader through the CLI (this exercises `uploaders import` too).
@@ -169,24 +208,36 @@ fn capture_and_upload_prints_the_url_and_records_history() {
     assert!(imp.stdout.contains("imported") && imp.stdout.contains("mock"), "{}", imp.stdout);
     assert!(env.cfg.join("uploaders/mock.sxcu").exists());
     let list = env.ssx(&["uploaders", "list", "--json"]).ok().json();
-    assert!(list.as_array().unwrap().iter().any(|u| u["name"] == "mock" && u["kind"] == "sxcu"), "{list}");
+    assert!(
+        list.as_array().unwrap().iter().any(|u| u["name"] == "mock" && u["kind"] == "sxcu"),
+        "{list}"
+    );
 
     let save = env.path("shots");
     env.write_settings(&format!(
-        "[general]\nsave_dir = {:?}\nuse_type_subfolders = false\nfolder_pattern = \"\"\n\n[destinations]\nimage = \"mock\"\n",
-        save
+        "[general]\nsave_dir = {save:?}\nuse_type_subfolders = false\nfolder_pattern = \"\"\n\n[destinations]\nimage = \"mock\"\n"
     ));
     let r = env.ssx(&["capture", "fullscreen", "--upload"]).ok();
-    assert_eq!(r.lines(), ["https://cdn.example/i/abc.png"], "stdout carries only the URL: {}", r.stdout);
+    assert_eq!(
+        r.lines(),
+        ["https://cdn.example/i/abc.png"],
+        "stdout carries only the URL: {}",
+        r.stdout
+    );
     assert!(r.stderr.contains("saved:"), "the saved path goes to stderr: {}", r.stderr);
 
     // The server received the real screenshot.
     let reqs = mock.requests();
     assert_eq!(reqs.len(), 1);
     let body = &reqs[0].body;
-    let start = body.windows(4).position(|w| w == b"\x89PNG").expect("a PNG part in the multipart body");
+    let start =
+        body.windows(4).position(|w| w == b"\x89PNG").expect("a PNG part in the multipart body");
     let uploaded = Frame::decode(&body[start..]).expect("valid PNG");
-    assert_eq!(first_diff(&uploaded, &expected_scene(800, 600, 0, 0)), None, "the uploaded pixels are the screenshot");
+    assert_eq!(
+        first_diff(&uploaded, &expected_scene(800, 600, 0, 0)),
+        None,
+        "the uploaded pixels are the screenshot"
+    );
 
     // History has the file and the URLs.
     let h = env.ssx(&["history", "list", "--json"]).ok().json();
@@ -199,7 +250,11 @@ fn capture_and_upload_prints_the_url_and_records_history() {
     let id = h[0]["id"].as_i64().unwrap().to_string();
     let shown = env.ssx(&["history", "show", &id]).ok();
     assert!(shown.stdout.contains("https://cdn.example/i/abc.png"), "{}", shown.stdout);
-    assert_eq!(env.ssx(&["history", "search", "abc"]).ok().stdout.lines().count(), 2, "header + the entry");
+    assert_eq!(
+        env.ssx(&["history", "search", "abc"]).ok().stdout.lines().count(),
+        2,
+        "header + the entry"
+    );
 }
 
 #[test]
@@ -213,7 +268,18 @@ fn upload_with_output_path_and_explicit_destination() {
     env.ssx(&["uploaders", "import", sxcu.to_str().unwrap(), "--name", "mock"]).ok();
 
     let out = env.path("kept.png");
-    let r = env.ssx(&["capture", "region", "--rect", "0,0,300,200", "-o", out.to_str().unwrap(), "--to", "mock"]).ok();
+    let r = env
+        .ssx(&[
+            "capture",
+            "region",
+            "--rect",
+            "0,0,300,200",
+            "-o",
+            out.to_str().unwrap(),
+            "--to",
+            "mock",
+        ])
+        .ok();
     assert_eq!(r.lines(), ["https://cdn.example/o.png"]);
     assert!(out.exists(), "the explicit output file is kept");
     let h = env.ssx(&["history", "list", "--json"]).ok().json();
@@ -230,7 +296,8 @@ fn a_failing_upload_keeps_the_file_and_exits_1() {
     std::fs::write(&sxcu, sxcu_json(&mock.url())).unwrap();
     env.ssx(&["uploaders", "import", sxcu.to_str().unwrap(), "--name", "mock"]).ok();
     let out = env.path("kept.png");
-    let r = env.ssx(&["capture", "fullscreen", "-o", out.to_str().unwrap(), "--to", "mock"]).code(1);
+    let r =
+        env.ssx(&["capture", "fullscreen", "-o", out.to_str().unwrap(), "--to", "mock"]).code(1);
     assert!(r.stdout.trim().is_empty(), "no URL on stdout: {}", r.stdout);
     assert!(r.stderr.contains("error:") && r.stderr.contains("404"), "{}", r.stderr);
     assert!(out.exists(), "a failed upload keeps the local file");
@@ -263,12 +330,24 @@ fn verbose_flags_and_rust_log_control_logging() {
     let mut env = TestEnv::new().with_x11(&x.display);
     let out = env.path("v.png");
     let quiet = env.ssx(&["capture", "fullscreen", "-o", out.to_str().unwrap()]).ok();
-    assert!(!quiet.stderr.contains("capture backend selected"), "quiet by default: {}", quiet.stderr);
+    assert!(
+        !quiet.stderr.contains("capture backend selected"),
+        "quiet by default: {}",
+        quiet.stderr
+    );
     let v = env.ssx(&["-v", "capture", "fullscreen", "-o", out.to_str().unwrap()]).ok();
-    assert!(v.stderr.contains("capture backend selected") && v.stderr.contains("INFO"), "-v shows info logs: {}", v.stderr);
+    assert!(
+        v.stderr.contains("capture backend selected") && v.stderr.contains("INFO"),
+        "-v shows info logs: {}",
+        v.stderr
+    );
     env.set("RUST_LOG", "ssx_platform=debug");
     let d = env.ssx(&["capture", "fullscreen", "-o", out.to_str().unwrap()]).ok();
-    assert!(d.stderr.contains("capture backend selected"), "RUST_LOG overrides the flags: {}", d.stderr);
+    assert!(
+        d.stderr.contains("capture backend selected"),
+        "RUST_LOG overrides the flags: {}",
+        d.stderr
+    );
     let q = env.ssx(&["-q", "capture", "fullscreen", "-o", out.to_str().unwrap()]).ok();
     assert!(q.stderr.contains("capture backend selected"), "RUST_LOG wins over -q too");
 }
@@ -279,13 +358,23 @@ fn ctrl_c_during_the_delay_cancels_with_exit_code_3() {
     let env = TestEnv::new().with_x11(&x.display);
     let child = env
         .command()
-        .args(["capture", "fullscreen", "--delay", "30000", "-o", env.path("never.png").to_str().unwrap()])
+        .args([
+            "capture",
+            "fullscreen",
+            "--delay",
+            "30000",
+            "-o",
+            env.path("never.png").to_str().unwrap(),
+        ])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
         .expect("spawn");
     std::thread::sleep(std::time::Duration::from_millis(600));
-    let kill = std::process::Command::new("kill").args(["-INT", &child.id().to_string()]).status().expect("kill");
+    let kill = std::process::Command::new("kill")
+        .args(["-INT", &child.id().to_string()])
+        .status()
+        .expect("kill");
     assert!(kill.success());
     let started = std::time::Instant::now();
     let out = child.wait_with_output().expect("wait");

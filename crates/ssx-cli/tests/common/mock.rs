@@ -28,7 +28,8 @@ impl HttpMock {
     /// Answers every request with `status` and `body`.
     pub fn respond_to_all(&self, status: u16, body: &str) {
         let mock = |m: &str| {
-            Mock::given(method(m)).respond_with(ResponseTemplate::new(status).set_body_string(body.to_owned()))
+            Mock::given(method(m))
+                .respond_with(ResponseTemplate::new(status).set_body_string(body.to_owned()))
         };
         for m in ["GET", "POST", "PUT"] {
             self.rt.block_on(mock(m).mount(&self.server));

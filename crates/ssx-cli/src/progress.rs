@@ -86,12 +86,11 @@ pub fn finished_line(
         StepStatus::Succeeded if is_slow(step) || verbosity == Verbosity::Verbose => {
             Some(format!("  {} {what} ({secs:.2}s)", style.green("ok")))
         }
-        StepStatus::Succeeded => None,
-        StepStatus::Failed(f) => Some(format!("  {} {what}: {}", style.red("failed"), f.message)),
         StepStatus::Skipped(reason) if verbosity == Verbosity::Verbose => {
             Some(format!("  {} {what}: {reason}", style.dim("skipped")))
         }
-        StepStatus::Skipped(_) => None,
+        StepStatus::Succeeded | StepStatus::Skipped(_) => None,
+        StepStatus::Failed(f) => Some(format!("  {} {what}: {}", style.red("failed"), f.message)),
         StepStatus::Cancelled => Some(format!("  {} {what}", style.yellow("cancelled"))),
     }
 }
@@ -132,9 +131,15 @@ impl EventSink for ProgressLines {
                 }
             }
             Event::StepFinished { item, step, status, duration } => {
-                if let Some(line) =
-                    finished_line(item, step, &status, duration, self.verbosity, self.style, self.multi)
-                {
+                if let Some(line) = finished_line(
+                    item,
+                    step,
+                    &status,
+                    duration,
+                    self.verbosity,
+                    self.style,
+                    self.multi,
+                ) {
                     err_line(&line);
                 }
             }
@@ -177,8 +182,12 @@ mod tests {
             "  ok upload (0.31s)",
             "a single item needs no number"
         );
-        assert!(finished_line(None, StepKind::CopyImage, &ok, D, Verbosity::Normal, S, true).is_none());
-        assert!(finished_line(None, StepKind::CopyImage, &ok, D, Verbosity::Verbose, S, true).is_some());
+        assert!(
+            finished_line(None, StepKind::CopyImage, &ok, D, Verbosity::Normal, S, true).is_none()
+        );
+        assert!(
+            finished_line(None, StepKind::CopyImage, &ok, D, Verbosity::Verbose, S, true).is_some()
+        );
 
         let failed = StepStatus::Failed(StepFailure {
             kind: FailureKind::Service,
@@ -186,7 +195,8 @@ mod tests {
             retryable: true,
         });
         assert_eq!(
-            finished_line(None, StepKind::CopyImage, &failed, D, Verbosity::Normal, S, true).unwrap(),
+            finished_line(None, StepKind::CopyImage, &failed, D, Verbosity::Normal, S, true)
+                .unwrap(),
             "  failed copy_image_to_clipboard: HTTP 500",
             "failures are always shown"
         );
@@ -195,8 +205,12 @@ mod tests {
     #[test]
     fn skipped_steps_only_in_verbose() {
         let skipped = StepStatus::Skipped(SkipReason::NoUrl);
-        assert!(finished_line(None, StepKind::CopyUrl, &skipped, D, Verbosity::Normal, S, true).is_none());
-        let l = finished_line(None, StepKind::CopyUrl, &skipped, D, Verbosity::Verbose, S, true).unwrap();
+        assert!(
+            finished_line(None, StepKind::CopyUrl, &skipped, D, Verbosity::Normal, S, true)
+                .is_none()
+        );
+        let l = finished_line(None, StepKind::CopyUrl, &skipped, D, Verbosity::Verbose, S, true)
+            .unwrap();
         assert!(l.contains("skipped") && l.contains("copy_url"), "{l}");
     }
 

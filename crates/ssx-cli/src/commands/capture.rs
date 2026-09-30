@@ -25,7 +25,9 @@ use crate::{
     app::{App, Session},
     cli::{CaptureArgs, CaptureOpts, CaptureTarget},
     error::{CliError, CliResult},
-    flows::{Wanted, adhoc_workflow, apply_destination_flags, choose_format, with_default_extension},
+    flows::{
+        Wanted, adhoc_workflow, apply_destination_flags, choose_format, with_default_extension,
+    },
     progress::{ProgressLines, Verbosity},
     report::{RunResult, print_result},
 };
@@ -132,7 +134,8 @@ pub fn finish_image(
         opts.output.as_deref().and_then(Path::extension).and_then(|e| e.to_str()),
         settings.general.image_format,
     )?;
-    let sink = ProgressLines::new(Verbosity::from_flags(app.global.quiet, app.global.verbose), app.err, 1);
+    let sink =
+        ProgressLines::new(Verbosity::from_flags(app.global.quiet, app.global.verbose), app.err, 1);
     let wanted = Wanted {
         save: opts.output.is_none(),
         copy_image: opts.copy,
@@ -153,14 +156,23 @@ pub fn finish_image(
         write_image(&captured.frame, &path, format, settings)?;
         // The engine has nothing to copy for a file we wrote ourselves, so copy here.
         let copy_error = if opts.copy {
-            session.services.clipboard.set_image(&captured.frame).err().map(|e| format!("copy_image_to_clipboard: {e}"))
+            session
+                .services
+                .clipboard
+                .set_image(&captured.frame)
+                .err()
+                .map(|e| format!("copy_image_to_clipboard: {e}"))
         } else {
             None
         };
         let mut result = if opts.upload {
             wf.after_capture.retain(|s| *s == AfterCapture::Upload);
-            let report = session.engine.post_file(&wf, vec![path], &session.bundle(), &sink, &app.cancel);
-            RunResult::from_report(&report, &Wanted { copy_image: false, ..wanted }.explicit_steps())
+            let report =
+                session.engine.post_file(&wf, vec![path], &session.bundle(), &sink, &app.cancel);
+            RunResult::from_report(
+                &report,
+                &Wanted { copy_image: false, ..wanted }.explicit_steps(),
+            )
         } else {
             RunResult::saved(opts.workflow_id, path)
         };

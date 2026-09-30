@@ -43,10 +43,10 @@ pub fn resolve_paths(
     env: impl Fn(&str) -> Option<OsString>,
 ) -> CliResult<Paths> {
     let over = config_dir.map(|d| d.as_os_str().to_owned());
-    Paths::discover_with(|k| if k == CONFIG_DIR_ENV { over.clone().or_else(|| env(k)) } else { env(k) })
-        .map_err(|e| {
-            CliError::new(e.to_string()).hint("pass --config-dir DIR or set SSX_CONFIG_DIR")
-        })
+    Paths::discover_with(
+        |k| if k == CONFIG_DIR_ENV { over.clone().or_else(|| env(k)) } else { env(k) },
+    )
+    .map_err(|e| CliError::new(e.to_string()).hint("pass --config-dir DIR or set SSX_CONFIG_DIR"))
 }
 
 impl App {

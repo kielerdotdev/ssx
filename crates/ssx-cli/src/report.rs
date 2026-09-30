@@ -98,7 +98,8 @@ impl RunResult {
                 let mut error: Option<String> = None;
                 for step in &i.steps {
                     let Some(text) = describe(step) else { continue };
-                    let optional = step.kind.importance() == ssx_core::workflow::Importance::Optional;
+                    let optional =
+                        step.kind.importance() == ssx_core::workflow::Importance::Optional;
                     if optional && !explicit.contains(&step.kind) {
                         warnings.push(text);
                     } else {
@@ -214,7 +215,12 @@ fn outcome_downgraded(outcome: Outcome, items: &[ItemResult], errors: &[String])
 
 /// Prints the result (`json` → JSON on stdout; otherwise URLs or paths on stdout and the
 /// details on stderr) and returns the process result.
-pub fn print_result(result: &RunResult, json: bool, quiet: bool, err_style: Style) -> CliResult<()> {
+pub fn print_result(
+    result: &RunResult,
+    json: bool,
+    quiet: bool,
+    err_style: Style,
+) -> CliResult<()> {
     if json {
         out_line(&serde_json::to_string_pretty(result)?);
     } else {
@@ -263,9 +269,7 @@ mod tests {
 
     use ssx_core::{
         history::EntryKind,
-        workflow::{
-            FailureKind, ItemReport, SkipReason, StepFailure, StepReport, StepStatus,
-        },
+        workflow::{FailureKind, ItemReport, SkipReason, StepFailure, StepReport, StepStatus},
     };
 
     use super::*;
@@ -311,7 +315,11 @@ mod tests {
     fn a_successful_upload_prints_urls_and_exits_zero() {
         let r = report(
             Outcome::Success,
-            vec![item(Some("https://x/1"), vec![step(StepKind::Upload, StepStatus::Succeeded)], Outcome::Success)],
+            vec![item(
+                Some("https://x/1"),
+                vec![step(StepKind::Upload, StepStatus::Succeeded)],
+                Outcome::Success,
+            )],
             vec![],
         );
         let res = RunResult::from_report(&r, &[]);
@@ -337,13 +345,20 @@ mod tests {
         let strict = RunResult::from_report(&r, &[StepKind::CopyImage]);
         assert!(strict.warnings.is_empty());
         assert_eq!(strict.items[0].error.as_deref(), Some("copy_image_to_clipboard: no clipboard"));
-        assert_eq!(strict.outcome, Outcome::PartialSuccess, "an explicit --copy that failed is not a success");
+        assert_eq!(
+            strict.outcome,
+            Outcome::PartialSuccess,
+            "an explicit --copy that failed is not a success"
+        );
         assert_eq!(strict.exit_code(), ExitCode::Error);
     }
 
     #[test]
     fn failed_uploads_and_run_level_errors_fail_the_run() {
-        let steps = vec![failed(StepKind::Upload, "HTTP 500"), step(StepKind::CopyUrl, StepStatus::Skipped(SkipReason::NoUrl))];
+        let steps = vec![
+            failed(StepKind::Upload, "HTTP 500"),
+            step(StepKind::CopyUrl, StepStatus::Skipped(SkipReason::NoUrl)),
+        ];
         let r = report(
             Outcome::PartialSuccess,
             vec![item(None, steps, Outcome::PartialSuccess)],

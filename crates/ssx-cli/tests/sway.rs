@@ -10,7 +10,7 @@ mod common;
 
 use std::{
     fs::File,
-    path::PathBuf,
+    path::Path,
     process::{Child, Command, Stdio},
     time::{Duration, Instant},
 };
@@ -63,15 +63,14 @@ impl Sway {
             if let Ok(Some(status)) = child.try_wait() {
                 let log = std::fs::read_to_string(dir.path().join("sway.log")).unwrap_or_default();
                 let tail: Vec<&str> = log.lines().rev().take(5).collect();
-                if std::env::var_os("CI").is_some() {
-                    panic!("sway exited early ({status}): {tail:?}");
-                }
+                assert!(std::env::var_os("CI").is_none(), "sway exited early ({status}): {tail:?}");
                 eprintln!("SKIP: sway cannot run headless here ({status}): {tail:?}");
                 return None;
             }
             let socket = std::fs::read_dir(dir.path()).ok()?.flatten().find_map(|e| {
                 let n = e.file_name().to_string_lossy().into_owned();
-                (n.starts_with("wayland-") && !n.ends_with(".lock")).then_some(n)
+                (n.starts_with("wayland-") && !n.to_ascii_lowercase().ends_with(".lock"))
+                    .then_some(n)
             });
             if let Some(socket) = socket {
                 return Some(Sway { child, dir, socket });
@@ -103,7 +102,7 @@ impl Drop for Sway {
 }
 
 /// Retries until sway has rendered its background (the first frames can be black).
-fn capture_until_background(env: &TestEnv, args: &[&str], out: &PathBuf) -> ssx_types::Frame {
+fn capture_until_background(env: &TestEnv, args: &[&str], out: &Path) -> ssx_types::Frame {
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
         let r = env.ssx(args);
@@ -113,7 +112,12 @@ fn capture_until_background(env: &TestEnv, args: &[&str], out: &PathBuf) -> ssx_
                 return img;
             }
         }
-        assert!(Instant::now() < deadline, "sway never showed the background; last run: {}\n{}", r.stdout, r.stderr);
+        assert!(
+            Instant::now() < deadline,
+            "sway never showed the background; last run: {}\n{}",
+            r.stdout,
+            r.stderr
+        );
         std::thread::sleep(Duration::from_millis(300));
     }
 }
@@ -134,11 +138,18 @@ fn wayland_backend_captures_a_headless_sway_end_to_end() {
         std::thread::sleep(Duration::from_millis(200));
     };
     assert_eq!(monitors[0]["id"], "HEADLESS-1");
-    assert_eq!(monitors[0]["rect"], serde_json::json!({"x": 0, "y": 0, "width": 800, "height": 600}));
+    assert_eq!(
+        monitors[0]["rect"],
+        serde_json::json!({"x": 0, "y": 0, "width": 800, "height": 600})
+    );
 
     // fullscreen: every pixel is the background colour.
     let full = env.path("full.png");
-    let img = capture_until_background(&env, &["capture", "fullscreen", "-o", full.to_str().unwrap()], &full);
+    let img = capture_until_background(
+        &env,
+        &["capture", "fullscreen", "-o", full.to_str().unwrap()],
+        &full,
+    );
     assert_eq!((img.width(), img.height()), (800, 600));
     for y in (0..600).step_by(7) {
         for x in (0..800).step_by(11) {
