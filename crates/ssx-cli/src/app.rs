@@ -158,10 +158,22 @@ impl Session {
     }
 }
 
-/// Directory of the running executable's settings, for messages.
+/// Removes the verbatim prefix (`\\?\`) that Windows' `canonicalize` adds to drive paths:
+/// registry entries and shortcuts should carry the ordinary `C:\...` spelling. UNC and
+/// non-Windows paths are returned unchanged.
+pub fn strip_verbatim(path: PathBuf) -> PathBuf {
+    let text = path.to_string_lossy();
+    match text.strip_prefix(r"\\?\") {
+        Some(rest) if rest.len() > 2 && rest.as_bytes()[1] == b':' => PathBuf::from(rest),
+        _ => path,
+    }
+}
+
+/// The absolute path of the running executable (what menu entries and hotkeys should run).
 pub fn exe_path() -> CliResult<PathBuf> {
     std::env::current_exe()
         .and_then(std::fs::canonicalize)
+        .map(strip_verbatim)
         .map_err(|e| CliError::new(format!("cannot determine the path of this executable: {e}")))
 }
 
@@ -179,6 +191,21 @@ mod tests {
         assert_eq!(p.config_dir, PathBuf::from("/from/env"));
         let e = resolve_paths(None, |_| Some(OsString::from("  "))).unwrap_err();
         assert!(e.hint.unwrap().contains("--config-dir"));
+    }
+
+    #[test]
+    fn windows_verbatim_prefixes_are_removed_from_drive_paths_only() {
+        let strip = |s: &str| strip_verbatim(PathBuf::from(s));
+        assert_eq!(
+            strip(r"\\?\C:\Program Files\ssx\ssx.exe"),
+            PathBuf::from(r"C:\Program Files\ssx\ssx.exe")
+        );
+        assert_eq!(
+            strip(r"\\?\UNC\server\share\ssx.exe"),
+            PathBuf::from(r"\\?\UNC\server\share\ssx.exe")
+        );
+        assert_eq!(strip("/usr/bin/ssx"), PathBuf::from("/usr/bin/ssx"));
+        assert_eq!(strip(r"C:\ssx.exe"), PathBuf::from(r"C:\ssx.exe"));
     }
 
     #[test]

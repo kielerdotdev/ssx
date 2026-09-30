@@ -12,10 +12,11 @@ use std::{
 use x11rb::{
     connection::Connection,
     protocol::xproto::{
-        ChangeWindowAttributesAux, ConnectionExt as _, CreateWindowAux, EventMask, Window,
-        WindowClass,
+        AtomEnum, ChangeWindowAttributesAux, ConnectionExt as _, CreateWindowAux, EventMask,
+        PropMode, Window, WindowClass,
     },
     rust_connection::RustConnection,
+    wrapper::ConnectionExt as _,
 };
 
 /// A running Xvfb, killed on drop.
@@ -106,8 +107,52 @@ impl Painter {
         self.conn.get_input_focus().expect("sync").reply().expect("sync reply");
     }
 
+    fn atom(&self, name: &str) -> u32 {
+        self.conn
+            .intern_atom(false, name.as_bytes())
+            .expect("intern")
+            .reply()
+            .expect("atom reply")
+            .atom
+    }
+
+    /// Sets `_NET_WM_NAME` (the title) and `WM_CLASS` (the application name) of `win`.
+    pub fn describe(&self, win: Window, title: &str, class: &str) {
+        let (name, utf8) = (self.atom("_NET_WM_NAME"), self.atom("UTF8_STRING"));
+        self.conn
+            .change_property8(PropMode::REPLACE, win, name, utf8, title.as_bytes())
+            .expect("title");
+        let mut wm_class = class.as_bytes().to_vec();
+        wm_class.push(0);
+        wm_class.extend_from_slice(class.as_bytes());
+        wm_class.push(0);
+        self.conn
+            .change_property8(
+                PropMode::REPLACE,
+                win,
+                AtomEnum::WM_CLASS,
+                AtomEnum::STRING,
+                &wm_class,
+            )
+            .expect("class");
+        self.sync();
+    }
+
+    /// Plays window manager: publishes the stacking order and the active window on the root.
+    pub fn publish_windows(&self, stacking: &[Window], active: Window) {
+        for (name, ids) in
+            [("_NET_CLIENT_LIST_STACKING", stacking), ("_NET_ACTIVE_WINDOW", &[active][..])]
+        {
+            let a = self.atom(name);
+            self.conn
+                .change_property32(PropMode::REPLACE, self.root, a, AtomEnum::WINDOW, ids)
+                .expect("root prop");
+        }
+        self.sync();
+    }
+
     /// Creates and maps a window filled with `rgb` (`0xRRGGBB`).
-    pub fn window(&self, x: i16, y: i16, w: u16, h: u16, rgb: u32) {
+    pub fn window(&self, x: i16, y: i16, w: u16, h: u16, rgb: u32) -> Window {
         let id = self.conn.generate_id().expect("id");
         self.conn
             .create_window(
@@ -126,6 +171,7 @@ impl Painter {
             .expect("create window");
         self.conn.map_window(id).expect("map");
         self.sync();
+        id
     }
 }
 
@@ -138,18 +184,26 @@ pub const SCENE: [(i32, i32, u32, u32, u32); 3] = [
 
 /// Paints [`SCENE`] on a fresh 800x600 server.
 pub fn scene_server() -> Option<(Xvfb, Painter)> {
+    scene_server_with_ids().map(|(x, p, _)| (x, p))
+}
+
+/// Like [`scene_server`], also returning the window ids in stacking order.
+pub fn scene_server_with_ids() -> Option<(Xvfb, Painter, Vec<Window>)> {
     let x = Xvfb::start("800x600x24")?;
     let p = Painter::new(&x.display);
-    for (sx, sy, w, h, c) in SCENE {
-        p.window(
-            i16::try_from(sx).expect("x"),
-            i16::try_from(sy).expect("y"),
-            u16::try_from(w).expect("w"),
-            u16::try_from(h).expect("h"),
-            c,
-        );
-    }
-    Some((x, p))
+    let ids = SCENE
+        .iter()
+        .map(|&(sx, sy, w, h, c)| {
+            p.window(
+                i16::try_from(sx).expect("x"),
+                i16::try_from(sy).expect("y"),
+                u16::try_from(w).expect("w"),
+                u16::try_from(h).expect("h"),
+                c,
+            )
+        })
+        .collect();
+    Some((x, p, ids))
 }
 
 /// Expected RGB of every pixel of an `w`x`h` capture whose top-left is desktop `(ox, oy)`.

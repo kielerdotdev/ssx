@@ -17,12 +17,12 @@ EXIT CODES:
   3  cancelled (Ctrl-C, closed the editor, dismissed the region overlay)
 
 ENVIRONMENT:
-  SSX_CONFIG_DIR   relocate settings and data (config in DIR, data in DIR/data)
-  SSX_BACKEND      force the capture backend: windows, wayland, portal or x11
-  SSX_EDITOR_UI    path of the ssx-editor-ui helper used by `edit` and --edit
-  SSX_SECRET_<NAME> supply an uploader secret without a keyring (NAME upper-cased)
-  RUST_LOG         log filter (overrides -v), e.g. RUST_LOG=ssx_services=debug
-  NO_COLOR         disable coloured output
+  SSX_CONFIG_DIR     relocate settings and data (config in DIR, data in DIR/data)
+  SSX_BACKEND        force the capture backend: windows, wayland, portal or x11
+  SSX_EDITOR_UI      path of the ssx-editor-ui helper used by `edit` and --edit
+  SSX_SECRET_<NAME>  supply an uploader secret without a keyring (NAME upper-cased)
+  RUST_LOG           log filter (overrides -v), e.g. RUST_LOG=ssx_services=debug
+  NO_COLOR           disable coloured output
 
 Run `ssx <command> --help` for the details of one command. `ssx doctor` explains what works
 on this machine and why.";

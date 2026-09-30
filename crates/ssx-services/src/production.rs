@@ -143,6 +143,16 @@ impl ProductionServices {
         }
     }
 
+    /// The production services with default options and an optional interactive region
+    /// selector (the overlay). Shorthand for [`ProductionServices::new`].
+    pub fn production(
+        settings: &Settings,
+        paths: &Paths,
+        selector: Option<Arc<dyn RegionSelector>>,
+    ) -> Self {
+        Self::new(settings, paths, ProductionOptions { selector, ..ProductionOptions::default() })
+    }
+
     /// The bundle the workflow engine takes. `history` enables recording of finished runs.
     pub fn services<'a>(&'a self, history: Option<&'a History>) -> Services<'a> {
         Services {

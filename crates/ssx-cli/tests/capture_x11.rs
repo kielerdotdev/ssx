@@ -7,7 +7,7 @@ use common::{
     TestEnv, first_diff, have,
     mock::HttpMock,
     read_image, rgb, sxcu_json,
-    x11::{ROOT_BG, expected_scene, scene_server},
+    x11::{ROOT_BG, expected_scene, scene_server, scene_server_with_ids},
 };
 use ssx_types::Frame;
 
@@ -189,6 +189,99 @@ fn windows_lists_something_or_explains() {
     ]);
     assert_eq!(r.code, 1, "an unknown window id fails cleanly");
     assert!(r.stderr.contains("error:"), "{}", r.stderr);
+}
+
+#[test]
+fn window_capture_uses_the_active_window_and_fills_title_and_process_into_the_name() {
+    let Some((x, painter, ids)) = scene_server_with_ids() else { return };
+    // Play window manager: the green window (second in the scene) is active.
+    painter.describe(ids[0], "Red Window", "red-app");
+    painter.describe(ids[1], "Green Window", "green-app");
+    painter.describe(ids[2], "Blue Window", "blue-app");
+    painter.publish_windows(&ids, ids[1]);
+
+    let env = TestEnv::new().with_x11(&x.display);
+    let save = env.path("shots");
+    env.write_settings(&format!(
+        "[general]\nsave_dir = {save:?}\nuse_type_subfolders = false\nfolder_pattern = \"\"\nfile_name_pattern = \"%t__%pn\"\n"
+    ));
+    let r = env.ssx(&["capture", "window", "--active"]).ok();
+    let path = std::path::PathBuf::from(r.lines()[0]);
+    assert_eq!(
+        path.file_name().unwrap(),
+        "Green_Window__green-app.png",
+        "%t and %pn come from the window"
+    );
+    let img = read_image(&path);
+    assert_eq!((img.width(), img.height()), (50, 50));
+    assert_eq!(
+        first_diff(&img, &vec![rgb_of(0x00_ff_00); 2500]),
+        None,
+        "exactly the window's pixels"
+    );
+    let h = env.ssx(&["history", "list", "--json"]).ok().json();
+    assert_eq!(h[0]["window_title"], "Green Window");
+    assert_eq!(h[0]["process_name"], "green-app");
+
+    // Windows are listed with title, app and the focused flag; capture by id works too.
+    let list = env.ssx(&["windows", "--json"]).ok().json();
+    let green = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|w| w["title"] == "Green Window")
+        .expect("green window listed");
+    assert_eq!(green["focused"], true);
+    assert_eq!(green["app_name"], "green-app");
+    assert_eq!(green["rect"], serde_json::json!({"x": 200, "y": 100, "width": 50, "height": 50}));
+    let red_id =
+        list.as_array().unwrap().iter().find(|w| w["title"] == "Red Window").unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+    let by_id = env.path("red.png");
+    env.ssx(&["capture", "window", "--id", &red_id, "-o", by_id.to_str().unwrap()]).ok();
+    let red = read_image(&by_id);
+    assert_eq!((red.width(), red.height()), (100, 50));
+    let table = env.ssx(&["windows"]).ok().stdout;
+    assert!(table.contains("focused") && table.contains("Blue Window"), "{table}");
+}
+
+#[test]
+fn doctor_under_x11_reports_the_backend_monitors_and_whats_missing() {
+    let Some((x, _painter)) = scene_server() else { return };
+    let env = TestEnv::new().with_x11(&x.display);
+    // No notification daemon, keyring or editor helper here: warnings, but no errors, so exit 0.
+    let j = env.ssx(&["doctor", "--json"]).ok().json();
+    assert_eq!(j["capture"]["ok"], true);
+    assert_eq!(j["capture"]["backend"], "x11");
+    assert_eq!(j["capture"]["attempts"][0], serde_json::json!({"backend": "x11", "ok": true}));
+    assert_eq!(j["session"]["session_type"], "x11");
+    assert_eq!(j["session"]["forced_backend"], "x11");
+    let m = &j["monitors"][0];
+    assert_eq!(
+        (m["rect"].as_str().unwrap(), m["primary"].as_bool().unwrap()),
+        ("0,0 800x600", true)
+    );
+    assert!((m["scale_factor"].as_f64().unwrap() - 1.0).abs() < 1e-9);
+    assert_eq!(m["hdr"], "unknown", "X11 cannot report HDR");
+    assert_eq!(j["clipboard"]["usable"], true);
+    let problems: Vec<String> = j["problems"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["message"].as_str().unwrap().to_owned())
+        .collect();
+    assert!(problems.iter().any(|p| p.contains("no OS credential store")), "{problems:?}");
+    assert!(problems.iter().any(|p| p.contains("ssx-editor-ui")), "{problems:?}");
+    assert!(!problems.iter().any(|p| p.contains("screen-capture backend")), "{problems:?}");
+    let text = env.ssx(&["doctor"]).ok().stdout;
+    assert!(
+        text.contains("backend: x11")
+            && text.contains("tried x11: ok")
+            && text.contains("0,0 800x600"),
+        "{text}"
+    );
 }
 
 #[test]
