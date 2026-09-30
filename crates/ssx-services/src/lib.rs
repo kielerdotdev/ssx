@@ -39,6 +39,8 @@ pub mod hdr;
 pub mod helpers;
 pub mod overlay;
 pub mod production;
+#[cfg(feature = "record")]
+pub mod record;
 pub mod runtime;
 pub mod secrets;
 pub mod stubs;
