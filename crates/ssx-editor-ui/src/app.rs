@@ -373,16 +373,15 @@ impl EditorApp {
             }
         }
         if let Some(mut b) = self.bench.take() {
-            let done = b.step(self, ctx);
-            if done {
+            if b.step(self, ctx) {
                 b.report(self);
                 if self.finished.is_none() {
                     self.finished = Some(EditorOutcome::cancelled());
                 }
             } else {
                 ctx.request_repaint();
+                self.bench = Some(b);
             }
-            self.bench = Some(b);
         }
     }
 

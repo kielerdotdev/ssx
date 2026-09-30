@@ -841,7 +841,8 @@ impl Canvas {
             let stamp = (c.caret.x.to_bits(), c.caret.y.to_bits(), c.selection.len());
             let key = egui::Id::new("ssx-caret-epoch");
             let epoch = ui.data_mut(|d| {
-                let e: &mut (f64, (u32, u32, usize)) = d.get_temp_mut_or_insert_with(key, || (now, stamp));
+                let e: &mut (f64, (u32, u32, usize)) =
+                    d.get_temp_mut_or_insert_with(key, || (now, stamp));
                 if e.1 != stamp {
                     *e = (now, stamp);
                 }

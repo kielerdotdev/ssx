@@ -28,8 +28,10 @@ fn skip_reason() -> Option<String> {
         }
     }
     let icd_dirs = ["/usr/share/vulkan/icd.d", "/etc/vulkan/icd.d"];
-    let has_lvp = icd_dirs.iter().any(|d| Path::new(d).join("lvp_icd.json").exists()
-        || Path::new(d).join("lvp_icd.x86_64.json").exists());
+    let has_lvp = icd_dirs.iter().any(|d| {
+        Path::new(d).join("lvp_icd.json").exists()
+            || Path::new(d).join("lvp_icd.x86_64.json").exists()
+    });
     if !has_lvp {
         return Some("no lavapipe Vulkan driver (lvp_icd.json)".into());
     }
@@ -71,7 +73,12 @@ fn canvas_diff(a: &image::RgbaImage, b: &image::RgbaImage) -> usize {
 fn accent(img: &image::RgbaImage) -> usize {
     img.enumerate_pixels()
         .filter(|(x, y, p)| {
-            *y > 120 && *y < 760 && *x < 1280 && (60..95).contains(&p[0]) && (130..160).contains(&p[1]) && p[2] > 200
+            *y > 120
+                && *y < 760
+                && *x < 1280
+                && (60..95).contains(&p[0])
+                && (130..160).contains(&p[1])
+                && p[2] > 200
         })
         .count()
 }
@@ -153,7 +160,11 @@ if kill -0 $PID 2>/dev/null; then echo "still-running" > status.txt; kill $PID; 
         .env("SSX_CONFIG_DIR", d.join("cfg"))
         .status()
         .expect("xvfb-run starts");
-    assert!(status.success(), "driver script failed; stderr: {}", std::fs::read_to_string(d.join("stderr.txt")).unwrap_or_default());
+    assert!(
+        status.success(),
+        "driver script failed; stderr: {}",
+        std::fs::read_to_string(d.join("stderr.txt")).unwrap_or_default()
+    );
 
     if let Some(keep) = common::dump_dir() {
         let _ = std::fs::create_dir_all(&keep);
@@ -162,15 +173,30 @@ if kill -0 $PID 2>/dev/null; then echo "still-running" > status.txt; kill $PID; 
         }
     }
     let stderr = std::fs::read_to_string(d.join("stderr.txt")).unwrap_or_default();
-    let (s1, s2, s3, s4) = (load(&d.join("shot1.png")), load(&d.join("shot2.png")), load(&d.join("shot3.png")), load(&d.join("shot4.png")));
+    let (s1, s2, s3, s4) = (
+        load(&d.join("shot1.png")),
+        load(&d.join("shot2.png")),
+        load(&d.join("shot3.png")),
+        load(&d.join("shot4.png")),
+    );
     // 1. It painted the image: the dashboard's dark navy header is on screen.
-    let navy = s1.enumerate_pixels().filter(|(_, y, p)| *y > 120 && p[0] < 40 && p[1] < 50 && (55..90).contains(&p[2])).count();
-    assert!(navy > 20_000, "the loaded image is not visible ({navy} header pixels); stderr:\n{stderr}");
+    let navy = s1
+        .enumerate_pixels()
+        .filter(|(_, y, p)| *y > 120 && p[0] < 40 && p[1] < 50 && (55..90).contains(&p[2]))
+        .count();
+    assert!(
+        navy > 20_000,
+        "the loaded image is not visible ({navy} header pixels); stderr:\n{stderr}"
+    );
     // 2. Dragging with the rectangle tool drew a rectangle and selected it.
     assert!(canvas_diff(&s1, &s2) > 300, "drag changed nothing; stderr:\n{stderr}");
     assert!(accent(&s2) > accent(&s1) + 40, "the new rectangle is not selected (no handles drawn)");
     // 3. Undo removed it again (apart from status-bar style noise, which is outside the canvas).
-    assert!(canvas_diff(&s1, &s3) < 400, "undo did not restore the picture: {}", canvas_diff(&s1, &s3));
+    assert!(
+        canvas_diff(&s1, &s3) < 400,
+        "undo did not restore the picture: {}",
+        canvas_diff(&s1, &s3)
+    );
     // 4. Typing produced text (red glyph pixels appear near the click).
     assert!(canvas_diff(&s3, &s4) > 200, "typed text is not visible");
     // 5. Ctrl+S wrote the output; Ctrl+Enter finished with the documented outcome.
@@ -178,7 +204,11 @@ if kill -0 $PID 2>/dev/null; then echo "still-running" > status.txt; kill $PID; 
     let saved = image::open(&out).unwrap();
     assert_eq!((saved.width(), saved.height()), (1280, 760));
     let status = std::fs::read_to_string(d.join("status.txt")).unwrap_or_default();
-    assert_eq!(status.trim(), "exit=0", "the editor did not exit cleanly: {status}\nstderr:\n{stderr}");
+    assert_eq!(
+        status.trim(),
+        "exit=0",
+        "the editor did not exit cleanly: {status}\nstderr:\n{stderr}"
+    );
     let json = std::fs::read_to_string(d.join("result.json")).unwrap();
     let v: serde_json::Value = serde_json::from_str(json.trim()).unwrap();
     assert_eq!(v["action"], "save");
