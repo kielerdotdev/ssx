@@ -21,6 +21,11 @@ fn dump_states() {
     common::annotate::annotate(&mut h);
     settle(&mut h);
     dump(&mut h, "annotated");
+    if let Some(dir) = dump_dir() {
+        // The annotated document as an editable project, for the real-window screenshot.
+        ssx_editor::project::save(h.state().doc.doc(), dir.join("annotated.ssxe"))
+            .expect("save the project");
+    }
 
     // Select the rectangle: handles and the properties bar.
     h.key_press(Key::V);

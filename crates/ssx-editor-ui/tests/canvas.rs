@@ -32,6 +32,7 @@ fn a_4k_image_only_renders_what_is_visible_and_dirty_rects_are_partial() {
     settle(&mut h);
     let s = h.state().canvas.stats;
     let full = 3840u64 * 2160;
+    eprintln!("first paint of a 4K image at 100%: {} of {full} pixels rendered", s.pixels_rendered);
     assert!(
         s.pixels_rendered < full / 2,
         "rendered {} of {full} pixels for a 1280x680 view",

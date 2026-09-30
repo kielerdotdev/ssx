@@ -81,6 +81,7 @@ fn file_menu(ui: &mut Ui, state: &mut AppState, doc: &EditorDoc) {
     let _ = doc;
     item(ui, state, "New from clipboard", Action::NewFromClipboard, true);
     item(ui, state, "Open...", Action::Open, true);
+    item(ui, state, "Open by path...", Action::OpenDialog(DialogKind::Open), true);
     ui.separator();
     item(ui, state, "Save", Action::Save, true);
     item(ui, state, "Save as...", Action::SaveAs, true);
