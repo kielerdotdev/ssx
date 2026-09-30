@@ -337,8 +337,11 @@ fn connecting_to_nothing_is_a_clean_error() {
 
 #[test]
 fn survives_server_restart() {
-    let Some(mut x) = xvfb() else { return };
-    let display = x.display.clone();
+    // Use an explicit display number from a private range. Every other test lets Xvfb pick
+    // the lowest free number (`-displayfd`), so between `kill()` and the restart below a
+    // parallel test could otherwise grab the number we are about to reuse.
+    let display = format!(":{}", 700 + std::process::id() % 200);
+    let Some(mut x) = Xvfb::start_on(Some(&display), "640x480x24", &[]) else { return };
     let cap = capture(&x, |_| {});
     assert!(cap.capture_desktop(&NO_CURSOR).is_ok());
 
