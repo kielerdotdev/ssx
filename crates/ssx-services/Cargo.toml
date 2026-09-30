@@ -1,0 +1,46 @@
+[package]
+name = "ssx-services"
+description = "Real implementations of the ssx-core service traits: capture, uploads, clipboard, notifications, commands, zipping and more."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+default = []
+# Native "save as" dialog (`rfd`, through the XDG portal on Linux). Off by default so headless
+# builds stay small; the CLI never needs it.
+save-dialog = ["dep:rfd"]
+
+[dependencies]
+ssx-types.workspace = true
+ssx-core.workspace = true
+ssx-capture.workspace = true
+ssx-hdr.workspace = true
+ssx-platform.workspace = true
+ssx-upload.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+toml = "0.9"
+tempfile = "3"
+url = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros", "net"] }
+tokio-util = "0.7"
+arboard = { version = "3", default-features = false, features = ["image-data", "wayland-data-control"] }
+keyring = "4"
+notify-rust = "4"
+opener = "0.8"
+zip = { version = "8", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+rfd = { version = "0.17", optional = true, default-features = false, features = ["xdg-portal"] }
+
+[dev-dependencies]
+ssx-core = { workspace = true, features = ["testing"] }
+half.workspace = true
+wiremock = "0.6"
+
+[lints]
+workspace = true
