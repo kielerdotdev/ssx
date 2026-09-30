@@ -211,7 +211,10 @@ mod tests {
         assert_eq!(install_files(std::slice::from_ref(&f2)).expect("i3"), InstallOutcome::Updated);
         assert!(files_current(std::slice::from_ref(&f2)).expect("cur"));
         assert!(!files_current(std::slice::from_ref(&f)).expect("cur"));
-        assert_eq!(uninstall_files(&[f2.clone()], &c).expect("u"), UninstallOutcome::Removed);
+        assert_eq!(
+            uninstall_files(std::slice::from_ref(&f2), &c).expect("u"),
+            UninstallOutcome::Removed
+        );
         assert_eq!(uninstall_files(&[f2], &c).expect("u2"), UninstallOutcome::NotPresent);
         assert_eq!(fs::read_dir(&c.home).expect("ls").count(), 0, "empty dirs must be pruned");
     }
@@ -227,7 +230,10 @@ mod tests {
         let err = install_files(&[other.clone(), f.clone()]).expect_err("conflict");
         assert!(matches!(err, ShellError::NotManaged { .. }), "{err}");
         assert!(!other.path.exists(), "all-or-nothing: nothing may be written");
-        assert_eq!(uninstall_files(&[f.clone()], &c).expect("u"), UninstallOutcome::NotPresent);
+        assert_eq!(
+            uninstall_files(std::slice::from_ref(&f), &c).expect("u"),
+            UninstallOutcome::NotPresent
+        );
         assert_eq!(fs::read_to_string(&f.path).expect("read"), "user data");
     }
 

@@ -13,7 +13,7 @@ use ssx_shell::{Integration, Platform};
 
 const STUB_GI_INIT: &str = "def require_version(name, version):\n    if version == '4.0' and STUB_ONLY_3:\n        raise ValueError('no 4.0')\nSTUB_ONLY_3 = False\n";
 
-const STUB_REPO: &str = r#"
+const STUB_REPO: &str = r"
 class GObject:
     class GObject:
         pass
@@ -33,7 +33,7 @@ class Nautilus:
         def activate(self):
             for signal, callback, args in self.handlers:
                 callback(self, *args)
-"#;
+";
 
 const DRIVER: &str = r#"
 import importlib.util, json, sys

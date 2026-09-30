@@ -9,6 +9,25 @@
 
 use crate::error::{Result, ShellError};
 
+/// Appends formatted text to a `String` (writing to a `String` cannot fail).
+macro_rules! push_fmt {
+    ($dst:expr, $($arg:tt)*) => {{
+        use std::fmt::Write as _;
+        let _ = write!($dst, $($arg)*);
+    }};
+}
+pub(crate) use push_fmt;
+
+/// `a;b;c;` - the list syntax of Desktop Entry / Nemo keys (every item terminated).
+pub fn semicolon_list<'a>(items: impl IntoIterator<Item = &'a str>) -> String {
+    let mut s = String::new();
+    for i in items {
+        s.push_str(i);
+        s.push(';');
+    }
+    s
+}
+
 /// POSIX shell single-quoting: `'` becomes `'\''`. Safe for any string without NUL.
 pub fn sh_single_quote(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
@@ -117,8 +136,8 @@ pub fn py_str(s: &str) -> String {
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
             c if (' '..='~').contains(&c) => out.push(c),
-            c if u32::from(c) <= 0xffff => out.push_str(&format!("\\u{:04x}", u32::from(c))),
-            c => out.push_str(&format!("\\U{:08x}", u32::from(c))),
+            c if u32::from(c) <= 0xffff => push_fmt!(out, "\\u{:04x}", u32::from(c)),
+            c => push_fmt!(out, "\\U{:08x}", u32::from(c)),
         }
     }
     out.push('"');

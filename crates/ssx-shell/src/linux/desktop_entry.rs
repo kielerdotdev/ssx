@@ -18,7 +18,7 @@ use crate::context::{Context, Platform};
 use crate::error::Result;
 use crate::fsutil::{MARKER, ManagedFile, files_current, install_files, uninstall_files};
 use crate::integration::{Description, Detection, InstallOutcome, Integration, UninstallOutcome};
-use crate::quote::{desktop_exec_arg, keyfile_value};
+use crate::quote::{desktop_exec_arg, keyfile_value, semicolon_list};
 
 /// MIME types offered for "any file" actions (desktop entries cannot use wildcards).
 pub const COMMON_MIME_TYPES: &[&str] = &[
@@ -69,7 +69,7 @@ impl DesktopEntries {
         ctx.data_home.join("applications")
     }
 
-    fn files(&self, ctx: &Context) -> Result<Vec<ManagedFile>> {
+    fn files(self, ctx: &Context) -> Result<Vec<ManagedFile>> {
         // GLib checks that the program in `Exec=` exists *before* decoding `%%`, so a literal
         // '%' in the path (correctly written `%%`) makes the whole entry unloadable. Fail
         // loudly instead of installing an entry that silently never appears.
@@ -91,7 +91,7 @@ impl DesktopEntries {
             .collect()
     }
 
-    pub(crate) fn source(&self, ctx: &Context, action: &Action) -> Result<String> {
+    pub(crate) fn source(self, ctx: &Context, action: &Action) -> Result<String> {
         let exe = desktop_exec_arg(ctx.exe_str()?);
         let args: Vec<String> = action.exec_args.iter().map(|a| desktop_exec_arg(a)).collect();
         let code = if action.multi_select { "%F" } else { "%f" };
@@ -134,7 +134,7 @@ fn mime_list(action: &Action) -> String {
             v
         }
     };
-    list.iter().map(|m| format!("{m};")).collect()
+    semicolon_list(list)
 }
 
 impl Integration for DesktopEntries {

@@ -10,7 +10,7 @@
 
 use crate::action::{Action, FilterKind};
 use crate::error::{Result, ShellError};
-use crate::quote::xml_escape;
+use crate::quote::{push_fmt, xml_escape};
 
 /// Inputs for [`sparse_package_manifest`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -163,23 +163,25 @@ pub fn sparse_package_manifest(p: &SparsePackageParams) -> Result<String> {
         }
     }
     for (t, actions) in &groups {
-        verbs.push_str(&format!("            <desktop5:ItemType Type=\"{}\">\n", e(t)));
+        push_fmt!(verbs, "            <desktop5:ItemType Type=\"{}\">\n", e(t));
         for a in actions {
-            verbs.push_str(&format!(
+            push_fmt!(
+                verbs,
                 "              <desktop5:Verb Id=\"{}\" Clsid=\"{}\" />\n",
                 e(&verb_id(a)),
                 clsid_for(a)
-            ));
+            );
         }
         verbs.push_str("            </desktop5:ItemType>\n");
     }
     let mut classes = String::new();
     for a in &p.actions {
-        classes.push_str(&format!(
+        push_fmt!(
+            classes,
             "                <com:Class Id=\"{}\" Path=\"{}\" ThreadingModel=\"STA\" />\n",
             clsid_for(a).trim_matches(['{', '}']),
             e(&p.dll_file)
-        ));
+        );
     }
     Ok(format!(
         r#"<?xml version="1.0" encoding="utf-8"?>

@@ -101,7 +101,7 @@ fn hostile_exe_paths_survive_nautilus_script_and_extension() {
         for a in Action::defaults() {
             let script = crate::linux::nautilus::script_source(&c, &a).expect("script");
             let words = parse_shell_words(line_value(&script, "SSX="));
-            assert_eq!(words, [exe.clone()], "nautilus script {exe:?}");
+            assert_eq!(words, std::slice::from_ref(&exe), "nautilus script {exe:?}");
             assert!(script.contains(" -- \""), "the -- terminator must precede the file arguments");
         }
         let ext = crate::linux::nautilus::extension_source(&c).expect("extension");

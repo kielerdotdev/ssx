@@ -6,7 +6,7 @@
 //! and newline-only `IFS`) after a `--`.
 
 use crate::action::Action;
-use crate::quote::sh_word;
+use crate::quote::{push_fmt, sh_word};
 
 fn key_for(action: &Action) -> &'static str {
     match action.id.as_str() {
@@ -37,11 +37,12 @@ pub fn yazi(ssx_exe: &str, actions: &[Action]) -> String {
         }
         let run = format!("shell -- {exe} {} -- \"$@\"", args_for(a));
         // Single-quoted TOML literal strings cannot contain `'`; use a basic string then.
-        s.push_str(&format!(
+        push_fmt!(
+            s,
             "\n[[mgr.prepend_keymap]]\non   = [ \"<C-s>\", \"{key}\" ]\nrun  = {}\ndesc = {}\n",
             toml_basic(&run),
             toml_basic(&a.label),
-        ));
+        );
     }
     s
 }
@@ -55,12 +56,13 @@ pub fn ranger(ssx_exe: &str, actions: &[Action]) -> String {
         if key.is_empty() {
             continue;
         }
-        s.push_str(&format!(
+        push_fmt!(
+            s,
             "map <C-s>{} shell -f {exe} {} -- %s   # {}\n",
             key.to_ascii_lowercase(),
             args_for(a),
             a.label
-        ));
+        );
     }
     s
 }
@@ -76,12 +78,13 @@ pub fn lf(ssx_exe: &str, actions: &[Action]) -> String {
             continue;
         }
         let cmd = format!("ssx-{}", a.id);
-        s.push_str(&format!(
+        push_fmt!(
+            s,
             "cmd {cmd} %{{{{\n    set -f\n    IFS=\"$(printf '\\n\\t')\"\n    {exe} {} -- $fx\n}}}}\nmap <c-s>{} {cmd}   # {}\n",
             args_for(a),
             key.to_ascii_lowercase(),
             a.label,
-        ));
+        );
     }
     s
 }

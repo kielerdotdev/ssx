@@ -6,6 +6,7 @@
 mod common;
 
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -63,7 +64,6 @@ fn fake_ssx(root: &Path) -> PathBuf {
         "#!/bin/sh\nprintf 'CALL\\0' >> \"$SSX_OUT\"\nfor a in \"$@\"; do printf '%s\\0' \"$a\" >> \"$SSX_OUT\"; done\n",
     )
     .expect("write fake");
-    use std::os::unix::fs::PermissionsExt;
     fs::set_permissions(&exe, fs::Permissions::from_mode(0o755)).expect("chmod");
     exe
 }

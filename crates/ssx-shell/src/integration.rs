@@ -190,6 +190,14 @@ impl fmt::Display for Report {
     }
 }
 
+fn detect_one(i: &dyn Integration, ctx: &Context) -> Detection {
+    if i.platform() == ctx.platform {
+        i.detect(ctx)
+    } else {
+        Detection::missing(format!("{} integration only applies on {}", i.name(), i.platform()))
+    }
+}
+
 /// A set of integrations processed together. Failures never abort the batch.
 #[derive(Debug, Clone)]
 pub struct Integrations {
@@ -214,15 +222,7 @@ impl Integrations {
 
     /// Detection result for each integration (never modifies anything).
     pub fn detect_all(&self, ctx: &Context) -> Vec<(&'static str, Detection)> {
-        self.items.iter().map(|i| (i.id(), self.detect_one(i.as_ref(), ctx))).collect()
-    }
-
-    fn detect_one(&self, i: &dyn Integration, ctx: &Context) -> Detection {
-        if i.platform() == ctx.platform {
-            i.detect(ctx)
-        } else {
-            Detection::missing(format!("{} integration only applies on {}", i.name(), i.platform()))
-        }
+        self.items.iter().map(|i| (i.id(), detect_one(i.as_ref(), ctx))).collect()
     }
 
     /// Installs every integration whose target was detected.
@@ -238,10 +238,8 @@ impl Integrations {
             let status = if let Err(e) = ctx.validate() {
                 Status::Failed(e.to_string())
             } else {
-                let det = self.detect_one(i.as_ref(), ctx);
-                if !det.available && !(force && i.platform() == ctx.platform) {
-                    Status::Skipped(det.reason)
-                } else {
+                let det = detect_one(i.as_ref(), ctx);
+                if det.available || (force && i.platform() == ctx.platform) {
                     match i.install(ctx) {
                         Ok(InstallOutcome::Installed) => Status::Installed,
                         Ok(InstallOutcome::Updated) => Status::Updated,
@@ -251,6 +249,8 @@ impl Integrations {
                             Status::Failed(e.to_string())
                         }
                     }
+                } else {
+                    Status::Skipped(det.reason)
                 }
             };
             report.entries.push(ReportEntry { id: i.id(), name: i.name(), status });
@@ -263,13 +263,7 @@ impl Integrations {
     pub fn uninstall_all(&self, ctx: &Context) -> Report {
         let mut report = Report::default();
         for i in &self.items {
-            let status = if i.platform() != ctx.platform {
-                Status::Skipped(format!(
-                    "{} integration only applies on {}",
-                    i.name(),
-                    i.platform()
-                ))
-            } else {
+            let status = if i.platform() == ctx.platform {
                 match i.uninstall(ctx) {
                     Ok(UninstallOutcome::Removed) => Status::Removed,
                     Ok(UninstallOutcome::NotPresent) => Status::NotPresent,
@@ -278,6 +272,12 @@ impl Integrations {
                         Status::Failed(e.to_string())
                     }
                 }
+            } else {
+                Status::Skipped(format!(
+                    "{} integration only applies on {}",
+                    i.name(),
+                    i.platform()
+                ))
             };
             report.entries.push(ReportEntry { id: i.id(), name: i.name(), status });
         }

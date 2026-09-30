@@ -18,7 +18,7 @@ use crate::context::{Context, Platform};
 use crate::error::Result;
 use crate::fsutil::{MARKER, ManagedFile, files_current, install_files, uninstall_files};
 use crate::integration::{Description, Detection, InstallOutcome, Integration, UninstallOutcome};
-use crate::quote::{desktop_exec_arg, keyfile_value};
+use crate::quote::{desktop_exec_arg, keyfile_value, semicolon_list};
 
 /// Dolphin / KDE integration.
 #[derive(Debug, Clone, Copy, Default)]
@@ -59,7 +59,7 @@ impl Dolphin {
             .collect()
     }
 
-    fn wanted(&self, ctx: &Context) -> Result<Vec<ManagedFile>> {
+    fn wanted(self, ctx: &Context) -> Result<Vec<ManagedFile>> {
         let mut files = Self::files_in(&Self::dir(ctx), ctx)?;
         if self.legacy_kservices5 {
             files.extend(Self::files_in(&Self::legacy_dir(ctx), ctx)?);
@@ -132,7 +132,7 @@ fn mime_for(action: &Action) -> String {
         FilterKind::Images => "image/*;".to_owned(),
         FilterKind::Videos => "video/*;".to_owned(),
         FilterKind::Custom => {
-            let mut s: String = action.filter.mime_types.iter().map(|m| format!("{m};")).collect();
+            let mut s = semicolon_list(action.filter.mime_types.iter().map(String::as_str));
             if action.filter.directories {
                 s.push_str("inode/directory;");
             }

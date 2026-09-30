@@ -1,7 +1,7 @@
 //! Nemo (Cinnamon) actions: `~/.local/share/nemo/actions/ssx-<id>.nemo_action`.
 //!
 //! Nemo expands `%F` itself and then runs the line through `g_spawn_command_line_async`
-//! (GLib shell-style word splitting, *no* shell). With `Quote=single` it wraps every path in
+//! (`GLib` shell-style word splitting, *no* shell). With `Quote=single` it wraps every path in
 //! single quotes and rewrites embedded `'` as `'\''` (checked in `nemo-action.c`), which is an
 //! exact encoding for that parser, so any file name round-trips. Without `Quote=` paths are
 //! inserted unquoted and names with spaces would split.
@@ -16,7 +16,7 @@ use crate::context::{Context, Platform};
 use crate::error::Result;
 use crate::fsutil::{MARKER, ManagedFile, files_current, install_files, uninstall_files};
 use crate::integration::{Description, Detection, InstallOutcome, Integration, UninstallOutcome};
-use crate::quote::{keyfile_value, shell_word_with_field_codes};
+use crate::quote::{keyfile_value, semicolon_list, shell_word_with_field_codes};
 
 /// Nemo integration.
 #[derive(Debug, Clone, Copy, Default)]
@@ -89,7 +89,9 @@ fn extensions_for(action: &Action) -> String {
     if action.filter.is_any() || action.filter.extensions.is_empty() {
         "any;".to_owned()
     } else {
-        action.filter.extensions.iter().map(|e| format!(".{e};")).collect()
+        let dotted: Vec<String> =
+            action.filter.extensions.iter().map(|e| format!(".{e}")).collect();
+        semicolon_list(dotted.iter().map(String::as_str))
     }
 }
 
