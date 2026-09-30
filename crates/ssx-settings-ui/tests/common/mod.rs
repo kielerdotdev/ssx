@@ -14,21 +14,37 @@ use egui_kittest::{Harness, kittest::Queryable};
 use ssx_core::settings::{Paths, Settings};
 use ssx_settings_ui::{SettingsApp, host::Host, model::SettingsModel, nav::Page, task::no_wake};
 
-/// A window in a temp folder, with the temp folder kept alive.
+/// A window in a folder (a temp folder, kept alive, unless a fixed one was asked for).
 pub struct Fixture {
-    /// Owns the folder.
-    pub dir: tempfile::TempDir,
+    root: PathBuf,
+    _guard: Option<tempfile::TempDir>,
+}
+
+impl Fixture {
+    /// A fresh temp folder.
+    pub fn temp() -> Self {
+        let dir = tempfile::tempdir().unwrap();
+        Self { root: dir.path().to_path_buf(), _guard: Some(dir) }
+    }
+
+    /// A fixed, emptied folder: for golden images, which show paths.
+    pub fn fixed(name: &str) -> Self {
+        let root = std::env::temp_dir().join("ssx-settings-ui-golden").join(name);
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        Self { root, _guard: None }
+    }
 }
 
 impl Fixture {
     /// The settings file.
     pub fn settings_file(&self) -> PathBuf {
-        self.dir.path().join("config").join("settings.toml")
+        self.root.join("config").join("settings.toml")
     }
 
     /// The paths of the host.
     pub fn paths(&self) -> Paths {
-        Paths::rooted_at(self.dir.path().join("config"))
+        Paths::rooted_at(self.root.join("config"))
     }
 
     /// Reloads the file with the core.
@@ -38,7 +54,7 @@ impl Fixture {
 
     /// The root of the sandbox.
     pub fn root(&self) -> &Path {
-        self.dir.path()
+        &self.root
     }
 }
 
@@ -58,7 +74,7 @@ pub fn app_custom(
     settings: Settings,
     customise: impl FnOnce(&mut Host, &Path),
 ) -> (SettingsApp, Fixture) {
-    let fx = Fixture { dir: tempfile::tempdir().unwrap() };
+    let fx = Fixture::temp();
     let mut host = Host::sandboxed(fx.root());
     customise(&mut host, fx.root());
     std::fs::create_dir_all(&host.paths.config_dir).unwrap();
@@ -81,7 +97,16 @@ pub fn demo_app_custom(
     edit_settings: impl FnOnce(&mut Settings),
     edit_host: impl FnOnce(&mut Host),
 ) -> (SettingsApp, Fixture) {
-    let fx = Fixture { dir: tempfile::tempdir().unwrap() };
+    demo_app_in(Fixture::temp(), page, edit_settings, edit_host)
+}
+
+/// Like [`demo_app_custom`] in the given fixture.
+pub fn demo_app_in(
+    fx: Fixture,
+    page: Page,
+    edit_settings: impl FnOnce(&mut Settings),
+    edit_host: impl FnOnce(&mut Host),
+) -> (SettingsApp, Fixture) {
     let mut host = demo::demo_host(fx.root());
     let vault = ssx_settings_ui::secrets::MemoryVault::keyring();
     for n in ["my-s3-access-key-id", "my-s3-secret-access-key", "work-dropbox-auth-secret"] {
