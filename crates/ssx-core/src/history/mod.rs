@@ -454,6 +454,10 @@ impl History {
         if q.uploaded_only {
             clauses.push("upload_url IS NOT NULL AND upload_url != ''".into());
         }
+        if let Some(name) = q.uploader.as_deref().filter(|n| !n.is_empty()) {
+            clauses.push("uploader = ?".into());
+            args.push(Value::Text(name.to_owned()));
+        }
         let sql = if clauses.is_empty() {
             String::new()
         } else {

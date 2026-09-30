@@ -182,6 +182,27 @@ fn kind_date_and_upload_filters() {
 }
 
 #[test]
+fn uploader_filter_matches_the_exact_name_only() {
+    let h = History::open_in_memory().unwrap();
+    let mk = |name: &str, at| NewEntry {
+        upload_url: Some(format!("https://x/{name}")),
+        uploader: Some(name.to_owned()),
+        ..entry(EntryKind::Image, at)
+    };
+    let imgur = h.insert(&mk("imgur", T0)).unwrap();
+    let s3 = h.insert(&mk("s3", T0 + 1)).unwrap();
+    let local = h.insert(&entry(EntryKind::Image, T0 + 2)).unwrap();
+    let by = |name: Option<&str>| {
+        ids(&h.list(&Query { uploader: name.map(str::to_owned), ..Query::default() }).unwrap())
+    };
+    assert_eq!(by(Some("imgur")), vec![imgur]);
+    assert_eq!(by(Some("s3")), vec![s3]);
+    assert_eq!(by(Some("im")), Vec::<i64>::new(), "exact match, not a prefix");
+    assert_eq!(by(Some("")), vec![local, s3, imgur], "an empty name means no filter");
+    assert_eq!(by(None), vec![local, s3, imgur]);
+}
+
+#[test]
 fn thumbnails_are_optional_in_listings() {
     let h = mem();
     let id =

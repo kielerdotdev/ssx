@@ -185,6 +185,8 @@ pub struct Query {
     pub until: Option<i64>,
     /// Only entries that have an upload URL.
     pub uploaded_only: bool,
+    /// Only entries uploaded through this uploader (exact name match); `None` = any.
+    pub uploader: Option<String>,
     /// Page size (clamped to 1..=1000).
     pub limit: usize,
     /// Rows to skip.
@@ -201,6 +203,7 @@ impl Default for Query {
             since: None,
             until: None,
             uploaded_only: false,
+            uploader: None,
             limit: 50,
             offset: 0,
             thumbnails: true,

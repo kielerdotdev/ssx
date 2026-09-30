@@ -273,6 +273,10 @@ impl HistoryFilter {
             since,
             until,
             uploaded_only: self.uploaded_only,
+            // Deliberately not `self.uploader`: the uploader menu learns every name seen while
+            // scanning, which a server-side filter would hide. (`Query::uploader` exists now
+            // and would make the filtered case a single query; see the crate README.)
+            uploader: None,
             limit: self.page_size.clamp(1, 1000),
             offset: self.page * self.page_size,
             thumbnails: false,

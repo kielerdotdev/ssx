@@ -8,6 +8,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
+  # Shrink build artefacts: debug info is the bulk of a workspace this size.
+  CARGO_PROFILE_DEV_DEBUG: "line-tables-only"
 
 jobs:
   fmt:
@@ -18,24 +20,39 @@ jobs:
         with: { components: rustfmt }
       - run: cargo fmt --all -- --check
 
+  # The full workspace, with every live test: X11 (Xvfb), wlroots (headless sway), GPU shaders
+  # (lavapipe), PipeWire audio, D-Bus mocks, ffmpeg encoding through the distro libav*.
   linux:
     runs-on: ubuntu-latest
+    env:
+      # A missing GPU adapter must fail CI instead of silently skipping the shader tests.
+      SSX_GPU_REQUIRE: "1"
+      WGPU_BACKEND: vulkan
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with: { components: clippy }
       - uses: Swatinem/rust-cache@v2
-      - name: System libraries
+      - name: System libraries and test tooling
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libwayland-dev libdbus-1-dev libxkbcommon-dev libx11-dev libxcb1-dev \
-            libxcb-shm0-dev libxcb-randr0-dev libxcb-xfixes0-dev libxi-dev \
-            xvfb sway grim mesa-vulkan-drivers libvulkan1
+            build-essential pkg-config clang libclang-dev nasm \
+            libwayland-dev libdbus-1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libx11-dev libxcb1-dev libxcb-shm0-dev libxcb-randr0-dev libxcb-xfixes0-dev \
+            libxcb-shape0-dev libxi-dev libxrandr-dev libxcursor-dev libgl-dev libegl-dev \
+            libpulse-dev libasound2-dev libpipewire-0.3-dev libxdo-dev \
+            libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev \
+            libavfilter-dev libavdevice-dev ffmpeg \
+            xvfb xdotool xclip wl-clipboard imagemagick dbus-x11 \
+            sway grim wtype pipewire wireplumber \
+            mesa-vulkan-drivers libvulkan1 vulkan-tools
       - run: cargo clippy --workspace --all-targets
-      - name: Tests (X11 tests run under Xvfb; Wayland tests run under headless sway)
-        run: xvfb-run -a cargo test --workspace
+      - name: Tests
+        run: xvfb-run -a cargo test --workspace --no-fail-fast
 
+  # Crates that build without FFmpeg. `ssx-record` (and through it the CLI and daemon's default
+  # features) needs an FFmpeg SDK on Windows; see `windows-full` below.
   windows:
     runs-on: windows-latest
     steps:
@@ -43,5 +60,44 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with: { components: clippy }
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --workspace --all-targets
-      - run: cargo test --workspace
+      - name: Clippy
+        run: >
+          cargo clippy --all-targets
+          -p ssx-types -p ssx-hdr -p ssx-capture -p ssx-capture-win -p ssx-platform
+          -p ssx-gpu -p ssx-editor -p ssx-imgfx -p ssx-upload -p ssx-core -p ssx-ipc
+          -p ssx-shell -p ssx-hotkeys -p ssx-overlay -p ssx-editor-ui -p ssx-settings-ui
+      - name: Tests (live Windows capture tests are #[ignore]d: they need an interactive session)
+        run: >
+          cargo test --no-fail-fast
+          -p ssx-types -p ssx-hdr -p ssx-capture -p ssx-capture-win -p ssx-platform
+          -p ssx-gpu -p ssx-editor -p ssx-imgfx -p ssx-upload -p ssx-core -p ssx-ipc
+          -p ssx-shell -p ssx-hotkeys -p ssx-overlay -p ssx-editor-ui -p ssx-settings-ui
+
+  # EXPERIMENTAL / UNVERIFIED: builds the CLI and daemon with a vcpkg FFmpeg, which is the
+  # path the release build needs. Nobody has run this job yet, so it may need tweaks; it does
+  # not gate merges until it has gone green once. See crates/ssx-record/build/README.md.
+  windows-full:
+    runs-on: windows-latest
+    continue-on-error: true
+    env:
+      VCPKG_ROOT: C:\vcpkg
+      VCPKGRS_TRIPLET: x64-windows-static-md
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: FFmpeg from vcpkg
+        run: vcpkg install "ffmpeg[x264,x265,vpx,opus,nvcodec,amf]:x64-windows-static-md"
+      - run: cargo build --release -p ssx-cli -p ssx-app -p ssx-overlay -p ssx-editor-ui -p ssx-settings-ui
+        env:
+          RUSTFLAGS: ""
+
+  # EXPERIMENTAL: macOS has no capture backend yet; this only proves the portable crates build.
+  macos:
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check -p ssx-types -p ssx-hdr -p ssx-capture -p ssx-platform -p ssx-core -p ssx-editor -p ssx-imgfx -p ssx-upload

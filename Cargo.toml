@@ -5,7 +5,7 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.92"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/kielerdotdev/ssx"
 authors = ["ssx contributors"]
@@ -72,4 +72,5 @@ debug = "line-tables-only"
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
-panic = "abort"
+# NOTE: no `panic = "abort"`. The daemon contains a panicking workflow run and logs it instead
+# of dying; aborting would defeat that (and the panic hook).

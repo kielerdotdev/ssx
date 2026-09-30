@@ -12,7 +12,7 @@
 //! testable on Linux as well. Only entries carrying ssx's marker are ever removed: a file that
 //! merely has the same name is reported, not deleted.
 //!
-//! The command that gets started is [`AutostartCommand`]: the `ssx-tray` program next to this
+//! The command that gets started is [`AutostartCommand`]: the `ssx-app` program next to this
 //! executable with `--background` (the tray app does not exist in every build yet; the UI says
 //! so when the file is missing instead of pretending).
 
@@ -36,7 +36,7 @@ pub const LAUNCH_AGENT_LABEL: &str = "io.ssx.tray";
 /// The line that marks a file as written by ssx (desktop entries and plists).
 pub const MARKER: &str = "X-SSX-Managed";
 /// The background program.
-pub const TRAY_PROGRAM: &str = "ssx-tray";
+pub const TRAY_PROGRAM: &str = "ssx-app";
 /// Its arguments when started at login.
 pub const TRAY_ARGS: [&str; 1] = ["--background"];
 
@@ -50,7 +50,7 @@ pub struct AutostartCommand {
 }
 
 impl AutostartCommand {
-    /// `ssx-tray --background` next to the running executable (or bare `ssx-tray`, found on
+    /// `ssx-app --background` next to the running executable (or bare `ssx-app`, found on
     /// `PATH`, when the executable's folder is unknown).
     pub fn discover() -> Self {
         let exe = std::env::current_exe().ok().and_then(|p| std::fs::canonicalize(p).ok());
@@ -425,7 +425,7 @@ impl<S: RunKeyStore> RegistryAutostart<S> {
 
     fn ours(&self, data: &str) -> bool {
         // An older ssx may have been installed elsewhere: any value that launches a program
-        // called `ssx-tray[.exe]` counts as ours.
+        // called `ssx-app[.exe]` counts as ours.
         data.starts_with(&self.program_prefix)
             || data.to_ascii_lowercase().contains(&format!("{TRAY_PROGRAM}."))
             || data.to_ascii_lowercase().contains(&format!("{TRAY_PROGRAM}\""))
@@ -605,7 +605,7 @@ mod tests {
 
     fn cmd() -> AutostartCommand {
         AutostartCommand {
-            program: PathBuf::from("/opt/ssx/ssx-tray"),
+            program: PathBuf::from("/opt/ssx/ssx-app"),
             args: vec!["--background".into()],
         }
     }
@@ -616,7 +616,7 @@ mod tests {
         assert!(t.starts_with("[Desktop Entry]\n"));
         for line in [
             "Type=Application",
-            "Exec=/opt/ssx/ssx-tray --background",
+            "Exec=/opt/ssx/ssx-app --background",
             "Terminal=false",
             "X-GNOME-Autostart-enabled=true",
             "X-SSX-Managed=true",
@@ -642,12 +642,12 @@ mod tests {
     #[test]
     fn exec_line_with_spaces_and_metacharacters() {
         let c = AutostartCommand {
-            program: PathBuf::from("/opt/My Apps/ssx-tray"),
+            program: PathBuf::from("/opt/My Apps/ssx-app"),
             args: vec!["--name=a b".into(), "$(rm -rf ~)".into()],
         };
         let t = desktop_entry(&c);
         assert!(
-            t.contains("Exec=\"/opt/My Apps/ssx-tray\" \"--name=a b\" \"\\$(rm -rf ~)\"\n"),
+            t.contains("Exec=\"/opt/My Apps/ssx-app\" \"--name=a b\" \"\\$(rm -rf ~)\"\n"),
             "{t}"
         );
     }
@@ -686,10 +686,10 @@ mod tests {
     #[test]
     fn run_key_value_quotes_the_program_always() {
         let c = AutostartCommand {
-            program: PathBuf::from(r"C:\Program Files\ssx\ssx-tray.exe"),
+            program: PathBuf::from(r"C:\Program Files\ssx\ssx-app.exe"),
             args: vec!["--background".into()],
         };
-        assert_eq!(run_key_value(&c), r#""C:\Program Files\ssx\ssx-tray.exe" --background"#);
+        assert_eq!(run_key_value(&c), r#""C:\Program Files\ssx\ssx-app.exe" --background"#);
     }
 
     #[test]
@@ -726,11 +726,11 @@ mod tests {
     #[test]
     fn xdg_updates_a_stale_entry() {
         let dir = tempfile::tempdir().unwrap();
-        let old = AutostartCommand { program: PathBuf::from("/old/ssx-tray"), args: vec![] };
+        let old = AutostartCommand { program: PathBuf::from("/old/ssx-app"), args: vec![] };
         XdgAutostart::new(dir.path(), &old).set_enabled(true).unwrap();
         XdgAutostart::new(dir.path(), &cmd()).set_enabled(true).unwrap();
         let t = std::fs::read_to_string(dir.path().join("autostart/ssx.desktop")).unwrap();
-        assert!(t.contains("/opt/ssx/ssx-tray --background") && !t.contains("/old/"));
+        assert!(t.contains("/opt/ssx/ssx-app --background") && !t.contains("/old/"));
     }
 
     #[test]
@@ -747,13 +747,13 @@ mod tests {
     #[test]
     fn registry_autostart_on_the_memory_store() {
         let c = AutostartCommand {
-            program: PathBuf::from(r"C:\ssx\ssx-tray.exe"),
+            program: PathBuf::from(r"C:\ssx\ssx-app.exe"),
             args: vec!["--background".into()],
         };
         let a = RegistryAutostart::new(MemoryRunKey::default(), &c);
         assert!(!a.is_enabled().unwrap());
         a.set_enabled(true).unwrap();
-        assert_eq!(a.store().value().as_deref(), Some(r#""C:\ssx\ssx-tray.exe" --background"#));
+        assert_eq!(a.store().value().as_deref(), Some(r#""C:\ssx\ssx-app.exe" --background"#));
         assert!(a.is_enabled().unwrap());
         a.set_enabled(false).unwrap();
         assert_eq!(a.store().value(), None);
@@ -772,7 +772,7 @@ mod tests {
     #[test]
     fn registry_autostart_recognises_an_older_install_path() {
         let a = RegistryAutostart::new(MemoryRunKey::default(), &cmd());
-        a.store().seed(r#""D:\old\ssx-tray.exe" --background"#);
+        a.store().seed(r#""D:\old\ssx-app.exe" --background"#);
         assert!(a.is_enabled().unwrap());
         a.set_enabled(true).unwrap();
         assert_eq!(a.store().value().as_deref(), Some(run_key_value(&cmd()).as_str()));
@@ -793,7 +793,7 @@ mod tests {
     #[test]
     fn discover_points_next_to_this_executable() {
         let c = AutostartCommand::discover();
-        assert!(c.program.file_name().unwrap().to_string_lossy().starts_with("ssx-tray"));
+        assert!(c.program.file_name().unwrap().to_string_lossy().starts_with("ssx-app"));
         assert_eq!(c.args, ["--background"]);
     }
 }
