@@ -159,37 +159,25 @@ pub fn status(dirs: &Dirs, target: Target) -> Result<Status> {
 /// Byte range of the managed block *including* the blank line ssx put before it and the
 /// newline after the end marker, so removing it restores the original text.
 fn find_block(text: &str) -> Option<(usize, usize)> {
-    let begin = text.lines().scan(0usize, |pos, l| {
-        let start = *pos;
-        *pos += l.len() + 1;
-        Some((start, l))
-    });
+    let mut pos = 0;
     let mut start = None;
     let mut end = None;
-    let mut offset_end = 0;
-    for (pos, line) in begin {
-        if start.is_none() && line.trim_end() == BLOCK_BEGIN {
+    for raw in text.split_inclusive('\n') {
+        let line = raw.trim_end_matches(['\r', '\n']).trim_end();
+        if start.is_none() && line == BLOCK_BEGIN {
             start = Some(pos);
-        } else if start.is_some() && line.trim_end() == BLOCK_END {
-            end = Some(pos);
-            offset_end = pos + line.len();
+        } else if start.is_some() && line == BLOCK_END {
+            end = Some(pos + raw.len());
             break;
         }
+        pos += raw.len();
     }
-    let (s, _) = (start?, end?);
-    let mut e = offset_end;
-    if text.as_bytes().get(e) == Some(&b'\r') {
-        e += 1;
-    }
-    if text.as_bytes().get(e) == Some(&b'\n') {
-        e += 1;
-    }
+    let (mut s, e) = (start?, end?);
     // Also swallow the single blank separator line we inserted before the block.
-    let mut s = s;
     if text[..s].ends_with("\n\n") {
         s -= 1;
     }
-    Some((s, e.min(text.len())))
+    Some((s, e))
 }
 
 /// What an install/uninstall did to the main config.

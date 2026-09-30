@@ -11,13 +11,13 @@ use std::path::Path;
 
 use crate::{
     chord::{Chord, Modifiers},
-    command::{Command, sway_exec_arg},
+    command::{Command, sway_bindsym_exec_arg, sway_exec_arg},
 };
 
 use super::{Result, comment_text, validate};
 
-/// The text after `exec` for `command`; see [`crate::command::sway_exec_arg`] for why it
-/// looks the way it does.
+/// The text after `exec` for a *one-shot* sway command (`exec_always`, `swaymsg exec`);
+/// see [`crate::command::sway_exec_arg`] for why it looks the way it does.
 pub fn exec_arg(command: &Command) -> String {
     sway_exec_arg(command)
 }
@@ -41,7 +41,7 @@ pub fn chord_syntax(chord: &Chord) -> String {
 
 /// One `bindsym` line (no trailing newline).
 pub fn bindsym_line(chord: &Chord, command: &Command) -> String {
-    format!("bindsym {} exec {}", chord_syntax(chord), exec_arg(command))
+    format!("bindsym {} exec {}", chord_syntax(chord), sway_bindsym_exec_arg(command))
 }
 
 /// The complete contents of `ssx.conf`.
@@ -86,13 +86,25 @@ mod tests {
     }
 
     #[test]
-    fn bindsym_wraps_the_command_in_one_double_quoted_string() {
+    fn bindsym_lines_double_quote_only_what_needs_it() {
         let c = Command::new("ssx").args(["capture", "region"]);
-        assert_eq!(bindsym_line(&"Print".parse().unwrap(), &c), "bindsym Print exec \"ssx capture region\"");
-        let hostile = Command::new("ssx").arg("a;b,c $x \"q\" 'r'");
+        assert_eq!(bindsym_line(&"Print".parse().unwrap(), &c), "bindsym Print exec ssx capture region");
+        assert_eq!(exec_arg(&c), "ssx capture region");
+        let spaced = Command::new("ssx").args(["a b", "c,d", "e;f", ""]);
+        assert_eq!(exec_arg(&spaced), "ssx \"a b\" \"c,d\" \"e;f\" \"\"");
+    }
+
+    #[test]
+    fn bindsym_escapes_one_level_deeper_than_one_shot_commands() {
+        // Word: a"b$c\d`e   (quote, dollar, backslash, backtick)
+        let c = Command::new("x").arg("a\"b$c\\d`e");
+        // One-shot: shell-level escapes only.
+        assert_eq!(exec_arg(&c), "x \"a\\\"b\\$c\\\\d\\`e\"");
+        // bindsym: `\\` and `\"` are escaped once more (sway unescapes them when storing the
+        // command); `\$` and `` \` `` are not.
         assert_eq!(
-            bindsym_line(&"Print".parse().unwrap(), &hostile),
-            "bindsym Print exec \"ssx 'a;b,c '\\$'x '\\\"'q'\\\"' '\\''r'\\'''\""
+            bindsym_line(&"Print".parse().unwrap(), &c),
+            "bindsym Print exec x \"a\\\\\\\"b\\$c\\\\\\\\d\\`e\""
         );
     }
 

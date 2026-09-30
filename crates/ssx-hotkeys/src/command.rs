@@ -5,14 +5,14 @@
 //!
 //! | target | who parses the text | quoting used |
 //! |---|---|---|
-//! | sway | sway's command parser, then `sh -c` | one double-quoted string holding a POSIX line; see [`sway_exec_arg`] |
+//! | sway | sway's command parser (with an extra unescape for a `bindsym`), then `sh -c` | POSIX line with double-quoted words; see [`sway_exec_arg`], [`sway_bindsym_exec_arg`] |
 //! | Hyprland | config parser (`$var`, `#`), then `sh -c` | POSIX line, `$` and `#` neutralised; see [`hyprland_exec_arg`] |
 //! | GNOME | GLib `g_shell_parse_argv` (no shell) | POSIX single quotes inside a GVariant string |
 //! | KDE | Desktop Entry `Exec=` parser (no shell) | `Exec` double-quote rules + string escapes |
 //!
-//! The sway rules were found empirically against a real sway (its parser splits at `;` and
-//! `,` even inside single quotes, expands `$name`, and only honours `"`); the test-suite
-//! replays a corpus of hostile arguments through it.
+//! The sway rules were found empirically against a real sway (it splits commands at `;` and
+//! `,`, expands `$name`, and protects only double-quoted text); the test-suite replays a
+//! corpus of hostile arguments through it, including real key presses.
 
 /// Why a [`Command`] cannot be rendered.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -137,28 +137,60 @@ fn quote_with(word: &str, replace: impl Fn(char) -> Option<&'static str>) -> Str
     out
 }
 
-/// The text after `exec` in a sway config line (or `swaymsg exec`).
+/// The text after `exec` for a sway command that is parsed once by sway (`exec_always`,
+/// `swaymsg exec`, a runtime `exec`): a POSIX shell line whose words are double-quoted
+/// wherever needed.
 ///
-/// Sway splits the line at `;` and `,` unless they are inside a *double-quoted* string,
-/// strips the outer quotes, expands `$variable`s, and hands the rest to `sh -c`. So the
-/// whole POSIX line goes inside one double-quoted string, with the three characters that
-/// are special at the sway level written outside the shell's single quotes:
-/// `"` as `\"` (sway keeps the backslash, which is exactly what the shell wants) and
-/// `$` as `\$` (which also stops sway expanding it).
+/// Why double quotes: sway splits a command at `;` and `,` and expands `$variables`, and it
+/// only protects `;`/`,` inside *double*-quoted strings (its single-quote handling is
+/// parity-based and breaks on the `'\''` idiom). Inside `"..."` sway leaves the text alone
+/// and hands it to `sh -c`, where POSIX double quotes are equally valid, so a word is
+/// written as `"..."` with `\`, `"`, `$` and `` ` `` backslash-escaped (also stopping sway
+/// expanding `$name`), and only words made purely of harmless characters stay bare.
 pub fn sway_exec_arg(cmd: &Command) -> String {
-    let line = cmd
-        .words()
-        .map(|w| {
-            quote_with(w, |c| match c {
-                '\'' => Some("'\\''"),
-                '"' => Some("'\\\"'"),
-                '$' => Some("'\\$'"),
-                _ => None,
-            })
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
-    format!("\"{line}\"")
+    cmd.words().map(|w| quote_sway_word(w, false)).collect::<Vec<_>>().join(" ")
+}
+
+/// The text after `exec` in a sway **`bindsym`** line.
+///
+/// A `bindsym` line goes through one extra unescaping step compared with
+/// [`sway_exec_arg`]: inside a double-quoted string sway turns `\\` into `\` and `\"` into
+/// `"` before storing the command (found by injecting real key presses into a headless
+/// sway and reading the `sh -c` argument with `strace`; the single-pass form works for
+/// `exec_always` but loses the backslash of any escaped `"` or `\`). So the escapes for
+/// `\` and `"` are escaped once more. `\$` and `` \` `` are left alone by that unescaping,
+/// and the backslash in front of `$` is what stops sway expanding `$name` at load time.
+pub fn sway_bindsym_exec_arg(cmd: &Command) -> String {
+    cmd.words().map(|w| quote_sway_word(w, true)).collect::<Vec<_>>().join(" ")
+}
+
+fn quote_sway_word(word: &str, bindsym: bool) -> String {
+    if !word.is_empty() && word.chars().all(|c| is_posix_safe(c) && !matches!(c, ',' | ';')) {
+        return word.to_owned();
+    }
+    let mut out = String::with_capacity(word.len() + 2);
+    out.push('"');
+    for c in word.chars() {
+        match c {
+            // The shell needs `\\` and `\"` inside double quotes. For a `bindsym`, sway's
+            // extra unescaping then eats one level of both characters, so that two-character
+            // sequence is escaped again (`\\` -> `\\\\`, `\"` -> `\\\"`).
+            '\\' | '"' => {
+                if bindsym {
+                    out.push_str("\\\\");
+                }
+                out.push('\\');
+                out.push(c);
+            }
+            '$' | '`' => {
+                out.push('\\');
+                out.push(c);
+            }
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
 
 /// The `params` field of a Hyprland `bind = MODS, key, exec, <params>` line.

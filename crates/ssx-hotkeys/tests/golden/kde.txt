@@ -1,0 +1,66 @@
+=== net.local.ssx-capture-region.desktop (Ctrl+Shift+S)
+[Desktop Entry]
+Type=Application
+Name=Capture region
+Exec=ssx capture region
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
+=== net.local.ssx-capture-screen.desktop (Print)
+[Desktop Entry]
+Type=Application
+Name=ssx capture screen
+Exec=ssx capture screen
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
+=== net.local.ssx-record-title-my-clip.desktop (Alt+Meta+R)
+[Desktop Entry]
+Type=Application
+Name=/usr/local/bin/ssx record --title 'My clip'
+Exec=/usr/local/bin/ssx record --title "My clip"
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
+=== net.local.ssx-sh-c-notify-send-ssx-done-home-a776b4d2.desktop (Ctrl+Alt+Shift+Meta+F12)
+[Desktop Entry]
+Type=Application
+Name=Hostile: quotes, $, ; and #
+Exec=sh -c "notify-send 'ssx' \\"done: \\$HOME\\"; echo 100%% # ok, really" "arg with spaces"
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
+=== net.local.ssx-capture-window-delay-2.desktop (Meta+`)
+[Desktop Entry]
+Type=Application
+Name=ssx capture window '--delay=2'
+Exec=ssx capture window --delay=2
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
+=== net.local.ssx-n-c-d.desktop (Volume Mute)
+[Desktop Entry]
+Type=Application
+Name=ssx 'ünïcödé 日本語'
+Exec=ssx "ünïcödé 日本語"
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+X-KDE-GlobalAccel-CommandShortcut=true
+
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-capture-region.desktop --key _launch Ctrl+Shift+S
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-capture-screen.desktop --key _launch Print
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-record-title-my-clip.desktop --key _launch Alt+Meta+R
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-sh-c-notify-send-ssx-done-home-a776b4d2.desktop --key _launch Ctrl+Alt+Shift+Meta+F12
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-capture-window-delay-2.desktop --key _launch Meta+`
+kwriteconfig6 --file kglobalshortcutsrc --group services --group net.local.ssx-n-c-d.desktop --key _launch Volume Mute

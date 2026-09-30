@@ -315,10 +315,7 @@ fn pressing_a_generated_binding_runs_its_command() {
     }
     let dir = scratch("press");
     let script = recorder(&dir);
-    // A representative subset (each exercises a different quoting path).
-    let words: Vec<String> = ["plain", "with space", "it's", "semi;colon", "com,ma", "$x $mod", "\"double\"", "back\\slash", "ünïcödé 日本語 🙂", "hash # not comment"]
-        .map(str::to_owned)
-        .to_vec();
+    let words = corpus();
     let mut bindings = bindings_for(&script, &words);
     // And a bare key and a Super+Alt chord in the everyday style.
     bindings.push((chord("Print"), Command::new(script.display().to_string()).args(["100", "print"])));
