@@ -188,6 +188,11 @@ impl SettingsModel {
         &self.issues
     }
 
+    /// A fresh validation of the working copy (no cache; for callers that only have `&self`).
+    pub fn current_issues(&self) -> Issues {
+        Issues::of(&self.working)
+    }
+
     /// Whether anything differs from what is on disk.
     pub fn is_dirty(&self) -> bool {
         self.working != self.saved

@@ -19,8 +19,8 @@ use crate::{
     workflow_edit::{
         CAPTURE_STEPS, DESTINATION_ROWS, INPUT_KINDS, RUN_COMMAND_PLACEHOLDERS, addable_capture_steps,
         addable_upload_steps, capture_step_blurb, capture_step_label, delete, duplicate, input_blurb,
-        input_label, instantiate, set_destination, set_input, templates, upload_step_blurb,
-        upload_step_label,
+        input_label, instantiate, others_with_cli, others_with_id, set_destination, set_input, templates,
+        upload_step_blurb, upload_step_label,
     },
 };
 
@@ -191,6 +191,9 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         let w = &cx.settings.workflows[i];
         others_using(cx.settings, &Owner::Workflow { index: i, name: w.name.clone() })
     };
+    let names_of = |ix: Vec<usize>| -> Vec<String> { ix.into_iter().map(|k| cx.settings.workflows[k].name.clone()).collect() };
+    let cli_clash = names_of(others_with_cli(&cx.settings.workflows, i));
+    let id_clash = names_of(others_with_id(&cx.settings.workflows, i));
     let (defaults, workflow) = {
         let s = &mut *cx.settings;
         (s.destinations.clone(), &mut s.workflows[i])
@@ -208,6 +211,7 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                 ui.horizontal(|ui| {
                     if st.id_unlocked {
                         ui_kit::text_input(ui, "Workflow id", &mut workflow.id, "", 260.0);
+                        clash_line(ui, "id", &id_clash);
                     } else {
                         ui.label(RichText::new(&workflow.id).monospace());
                         if ui_kit::link(ui, "Change").clicked() {
@@ -225,6 +229,7 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                 if ui_kit::text_input(ui, "Command name", &mut c, "for example region", 220.0).changed() {
                     workflow.trigger.cli_name = if c.is_empty() { None } else { Some(c) };
                 }
+                clash_line(ui, "command name", &cli_clash);
             });
         ui.add_space(3.0);
         Field::new("Hotkey").issues(&issues, &format!("{p}.trigger.hotkey")).show(ui, |ui| {
@@ -284,6 +289,17 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             });
             ui.add_space(2.0);
         }
+    });
+}
+
+/// "Also used by X" as an error line, when another workflow has the same value.
+fn clash_line(ui: &mut Ui, what: &str, others: &[String]) {
+    if others.is_empty() {
+        return;
+    }
+    ui.horizontal_top(|ui| {
+        ui_kit::severity_icon(ui, Severity::Error);
+        ui.add(egui::Label::new(RichText::new(format!("The {what} is also used by {}; it must be unique.", others.join(", "))).size(12.0).color(ui_kit::ERROR_TEXT)).wrap());
     });
 }
 

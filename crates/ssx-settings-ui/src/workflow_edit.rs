@@ -141,6 +141,22 @@ pub fn delete(list: &mut Vec<Workflow>, index: usize) -> Option<usize> {
     if list.is_empty() { None } else { Some(index.min(list.len() - 1)) }
 }
 
+/// The other workflows (by index) that have the same command name as `list[index]`.
+pub fn others_with_cli(list: &[Workflow], index: usize) -> Vec<usize> {
+    let Some(mine) = list.get(index).and_then(|w| w.trigger.cli_name.as_deref()).filter(|c| !c.is_empty()) else {
+        return Vec::new();
+    };
+    (0..list.len()).filter(|i| *i != index && list[*i].trigger.cli_name.as_deref() == Some(mine)).collect()
+}
+
+/// The other workflows (by index) that have the same id as `list[index]`.
+pub fn others_with_id(list: &[Workflow], index: usize) -> Vec<usize> {
+    let Some(mine) = list.get(index).map(|w| w.id.as_str()).filter(|c| !c.is_empty()) else {
+        return Vec::new();
+    };
+    (0..list.len()).filter(|i| *i != index && list[*i].id == mine).collect()
+}
+
 // ---- names and steps ----------------------------------------------------------------------
 
 /// Every input kind, with the words shown in the UI.
@@ -363,6 +379,23 @@ mod tests {
         assert_eq!(unique_cli("Upload Files", &[]), "upload-files");
         assert_eq!(unique_cli("a.b_c", &[]), "a-b-c");
         assert!(unique_cli(&"y".repeat(80), &[]).len() <= 32);
+    }
+
+    #[test]
+    fn duplicates_of_the_id_and_the_command_name_are_found_from_either_side() {
+        let list = builtin_workflows();
+        assert!(others_with_cli(&list, 0).is_empty());
+        assert!(others_with_id(&list, 0).is_empty());
+        let mut list = list;
+        list[3].trigger.cli_name = Some("region".into());
+        list[5].id = list[1].id.clone();
+        assert_eq!(others_with_cli(&list, 0), [3]);
+        assert_eq!(others_with_cli(&list, 3), [0]);
+        assert_eq!(others_with_id(&list, 1), [5]);
+        assert_eq!(others_with_id(&list, 5), [1]);
+        list[0].trigger.cli_name = None;
+        assert!(others_with_cli(&list, 0).is_empty());
+        assert!(others_with_cli(&list, 99).is_empty());
     }
 
     #[test]

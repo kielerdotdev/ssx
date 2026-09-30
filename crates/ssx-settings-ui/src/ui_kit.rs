@@ -355,7 +355,8 @@ fn chip_padded(ui: &mut Ui, text: &str, selected: bool, pad: f32) -> Response {
 pub fn badge(ui: &mut Ui, text: &str, color: Color32) {
     let font = FontId::proportional(11.0);
     let galley = ui.painter().layout_no_wrap(text.to_owned(), font, color);
-    let (rect, _) = ui.allocate_exact_size(vec2(galley.size().x + 12.0, 18.0), Sense::hover());
+    let (rect, resp) = ui.allocate_exact_size(vec2(galley.size().x + 12.0, 18.0), Sense::hover());
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, text));
     ui.painter().rect_filled(rect, CornerRadius::same(9), color.gamma_multiply(0.18));
     ui.painter().rect_stroke(rect, CornerRadius::same(9), Stroke::new(1.0, color.gamma_multiply(0.55)), StrokeKind::Inside);
     ui.painter().galley(pos2(rect.left() + 6.0, rect.center().y - galley.size().y / 2.0), galley, color);

@@ -64,7 +64,8 @@ pub fn destination_picker(
             let _ = ui.selectable_label(true, format!("{n}  (unknown)"));
         }
     });
-    combo.response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, label));
+    let shown = current.as_deref().map_or_else(|| none_label.to_owned(), |n| describe(registry, n));
+    combo.response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::ComboBox, true, format!("{label}: {shown}")));
     if let Some(n) = current.as_deref()
         && let Some(p) = registry.problem_for(ty, n)
     {

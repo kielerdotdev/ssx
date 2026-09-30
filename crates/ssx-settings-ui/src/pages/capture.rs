@@ -116,7 +116,7 @@ fn capture_card(ui: &mut Ui, cx: &mut Cx<'_>) {
                 ui.horizontal(|ui| {
                     ssx_editor_ui::ui::widgets::input_style(ui);
                     let mut ms = cx.settings.capture.delay_ms;
-                    let r = ui.add(egui::DragValue::new(&mut ms).range(0..=60_000).suffix(" ms").speed(10.0));
+                    let r = ui.add(egui::DragValue::new(&mut ms).range(0..=60_000).clamp_existing_to_range(false).suffix(" ms").speed(10.0));
                     r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::DragValue, true, "Delay"));
                     if r.changed() {
                         cx.settings.capture.delay_ms = ms;
@@ -187,7 +187,13 @@ fn hdr_card(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
 
 fn slider(ui: &mut Ui, label: &str, v: &mut f32, range: std::ops::RangeInclusive<f32>, suffix: &str, log: bool) {
     ssx_editor_ui::ui::widgets::input_style(ui);
-    let mut s = egui::Slider::new(v, range).trailing_fill(true).max_decimals(2).suffix(suffix.to_owned());
+    let mut s = egui::Slider::new(v, range)
+        .trailing_fill(true)
+        .max_decimals(2)
+        .suffix(suffix.to_owned())
+        // A value that is out of range (from a hand-edited file) must be shown and reported,
+        // not silently pulled into range just because the page was opened.
+        .clamping(egui::SliderClamping::Edits);
     if log {
         s = s.logarithmic(true);
     }

@@ -812,7 +812,7 @@ fn defaults(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         Field::new("At the same time").issues(&issues, "post_file.max_parallel_uploads").help("How many files are uploaded at once (1 to 16).").show(ui, |ui| {
             input_style(ui);
             let mut n = cx.settings.post_file.max_parallel_uploads;
-            let r = ui.add(egui::DragValue::new(&mut n).range(1..=16).suffix(" files"));
+            let r = ui.add(egui::DragValue::new(&mut n).range(1..=16).clamp_existing_to_range(false).suffix(" files"));
             r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::DragValue, true, "Parallel uploads"));
             if r.changed() {
                 cx.settings.post_file.max_parallel_uploads = n;

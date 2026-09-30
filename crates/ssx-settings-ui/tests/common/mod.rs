@@ -55,10 +55,17 @@ pub fn app(page: Page) -> (SettingsApp, Fixture) {
 
 /// Like [`app`] with the given settings written to disk first.
 pub fn app_with(page: Page, settings: Settings) -> (SettingsApp, Fixture) {
+    app_custom(page, settings, |_, _| {})
+}
+
+/// Like [`app_with`], letting the test replace parts of the (sandboxed) host first.
+pub fn app_custom(page: Page, settings: Settings, customise: impl FnOnce(&mut Host, &Path)) -> (SettingsApp, Fixture) {
     let fx = Fixture { dir: tempfile::tempdir().unwrap() };
-    let host = Host::sandboxed(fx.root());
+    let mut host = Host::sandboxed(fx.root());
+    customise(&mut host, fx.root());
     std::fs::create_dir_all(&host.paths.config_dir).unwrap();
-    settings.save(&fx.settings_file()).unwrap();
+    // written without validation: some tests start from settings that have problems
+    std::fs::write(fx.settings_file(), settings.to_toml_string().unwrap()).unwrap();
     let model = SettingsModel::load(fx.settings_file()).unwrap();
     let mut a = SettingsApp::new(model, host, page, no_wake());
     a.set_now(chrono::DateTime::parse_from_rfc3339("2025-03-09T14:05:06+01:00").unwrap());
@@ -128,20 +135,62 @@ pub fn click_contains(h: &mut Harness<'_, SettingsApp>, label: &str) {
     settle(h);
 }
 
+fn text_box<'h>(h: &'h Harness<'_, SettingsApp>, label: &'h str) -> egui_kittest::Node<'h> {
+    h.get_by_role_and_label(egui::accesskit::Role::TextInput, label)
+}
+
 /// Replaces the text of the text box called `label`.
 pub fn set_text(h: &mut Harness<'_, SettingsApp>, label: &str, text: &str) {
-    let n = h.get_by_label(label);
-    n.focus();
+    text_box(h, label).focus();
     h.step();
     h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
     h.step();
-    h.get_by_label(label).type_text(text);
+    if text.is_empty() {
+        h.key_press(egui::Key::Backspace);
+    } else {
+        text_box(h, label).type_text(text);
+    }
     settle(h);
 }
 
 /// The value of the text box called `label`.
 pub fn text_of(h: &Harness<'_, SettingsApp>, label: &str) -> String {
-    h.get_by_label(label).value().unwrap_or_default()
+    text_box(h, label).value().unwrap_or_default()
+}
+
+/// Every accessible label currently on screen (for debugging a failing test).
+pub fn labels(h: &Harness<'_, SettingsApp>) -> Vec<String> {
+    use egui_kittest::kittest::NodeT;
+    h.root()
+        .children_recursive()
+        .filter_map(|n| n.accesskit_node().label().map(|l| l.to_string()))
+        .collect()
+}
+
+/// Whether some widget's label contains `text` (never panics on several matches).
+pub fn has(h: &Harness<'_, SettingsApp>, text: &str) -> bool {
+    h.query_all_by_label_contains(text).next().is_some()
+}
+
+/// Whether some widget is labelled exactly `text`.
+pub fn has_exact(h: &Harness<'_, SettingsApp>, text: &str) -> bool {
+    h.query_all_by_label(text).next().is_some()
+}
+
+/// Clicks `label` and returns what was put on the clipboard while the click was processed.
+pub fn click_and_copied(h: &mut Harness<'_, SettingsApp>, label: &str) -> Vec<String> {
+    h.get_by_label(label).click();
+    let mut out = Vec::new();
+    for _ in 0..4 {
+        h.step();
+        for c in &h.output().platform_output.commands {
+            if let egui::OutputCommand::CopyText(t) = c {
+                out.push(t.clone());
+            }
+        }
+    }
+    settle(h);
+    out
 }
 
 /// Presses at `from`, moves in a few steps, releases at `to`.

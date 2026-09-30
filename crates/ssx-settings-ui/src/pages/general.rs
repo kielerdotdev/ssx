@@ -148,7 +148,7 @@ impl State {
 
 fn number(ui: &mut Ui, label: &str, v: &mut u32, range: std::ops::RangeInclusive<u32>, suffix: &str) -> egui::Response {
     ssx_editor_ui::ui::widgets::input_style(ui);
-    let r = ui.add(egui::DragValue::new(v).range(range).suffix(suffix.to_owned()).speed(1.0));
+    let r = ui.add(egui::DragValue::new(v).range(range).clamp_existing_to_range(false).suffix(suffix.to_owned()).speed(1.0));
     r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::DragValue, true, label));
     r
 }
@@ -318,7 +318,7 @@ fn file_names(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                     j
                 };
                 let r = ui.add(egui::Label::new(job).wrap().selectable(true));
-                r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, "File name preview"));
+                r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Label, true, format!("Preview: {}", p.full.display())));
                 if let Some(e) = &p.error {
                     ui.label(RichText::new(e).size(12.0).color(ui_kit::ERROR_TEXT));
                 }
@@ -410,7 +410,7 @@ fn images(ui: &mut Ui, cx: &mut Cx<'_>) {
                 ui.add_enabled_ui(lossy, |ui| {
                     ssx_editor_ui::ui::widgets::input_style(ui);
                     let mut q = u32::from(cx.settings.general.image_quality);
-                    let r = ui.add(egui::Slider::new(&mut q, 1..=100).trailing_fill(true));
+                    let r = ui.add(egui::Slider::new(&mut q, 1..=100).trailing_fill(true).clamping(egui::SliderClamping::Edits));
                     r.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Slider, true, "Quality"));
                     if r.changed() {
                         cx.settings.general.image_quality = q.clamp(1, 100) as u8;
