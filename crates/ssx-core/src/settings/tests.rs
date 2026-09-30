@@ -366,7 +366,8 @@ fn hdr_default_is_faithful_and_presets_validate() {
     let mut s = Settings::default();
     for preset in [HdrConfig::faithful(), HdrConfig::preserve_highlights()] {
         s.capture.hdr = preset;
-        assert!(s.validate().is_ok(), "{preset:?} must be a valid configuration");
+        let issues = s.validate();
+        assert!(issues.is_empty(), "{preset:?} must be a valid configuration: {issues:?}");
     }
     assert!(HdrConfig::preserve_highlights().knee < 1.0);
 }
