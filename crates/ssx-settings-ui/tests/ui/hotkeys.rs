@@ -77,7 +77,7 @@ fn the_strategy_is_explained_for_x11_wayland_portals_and_windows() {
 fn the_snippet_is_generated_from_the_workflows_and_can_be_copied() {
     let (mut h, _fx) = open_with(|_, _| {});
     assert!(has(&h, "bindsym Ctrl+Print exec /usr/local/bin/ssx run region"));
-    assert!(has(&h, "4 bindings for sway"));
+    assert!(has(&h, "6 bindings for sway"));
     let copied = click_and_copied(&mut h, "Copy");
     assert!(
         copied.iter().any(|t| t.contains("bindsym Ctrl+Print exec")),

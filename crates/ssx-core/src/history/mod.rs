@@ -150,6 +150,31 @@ fn to_i64(v: u64) -> i64 {
     i64::try_from(v).unwrap_or(i64::MAX)
 }
 
+/// Runs `op`, retrying with a short exponential back-off while SQLite reports the database as
+/// busy or locked, for at most `timeout`. Other errors, and the final busy error once the
+/// time is up, are returned as they are.
+fn retry_busy<T>(
+    timeout: Duration,
+    mut op: impl FnMut() -> rusqlite::Result<T>,
+) -> rusqlite::Result<T> {
+    let start = std::time::Instant::now();
+    let mut delay = Duration::from_millis(2);
+    loop {
+        match op() {
+            Err(rusqlite::Error::SqliteFailure(e, _))
+                if matches!(
+                    e.code,
+                    rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked
+                ) && start.elapsed() < timeout =>
+            {
+                std::thread::sleep(delay);
+                delay = (delay * 2).min(Duration::from_millis(50));
+            }
+            other => return other,
+        }
+    }
+}
+
 impl History {
     /// Opens (creating and migrating if needed) the database at `path`.
     pub fn open(path: &Path) -> Result<Self, HistoryError> {
@@ -253,7 +278,12 @@ impl History {
         if wal {
             // Returns the resulting mode as a row; "wal" on success. Network file systems
             // may refuse WAL and stay in "delete" mode, which still works, just slower.
-            let mode: String = conn.query_row("PRAGMA journal_mode = WAL", [], |r| r.get(0))?;
+            // Switching the journal mode can fail with BUSY *without* consulting the busy
+            // timeout while another connection is opening the same file (the CLI and the tray
+            // daemon do exactly that), so retry it ourselves for as long as the timeout allows.
+            let mode: String = retry_busy(cfg.busy_timeout, || {
+                conn.query_row("PRAGMA journal_mode = WAL", [], |r| r.get(0))
+            })?;
             if !mode.eq_ignore_ascii_case("wal") {
                 tracing::warn!(mode, "history database could not enter WAL mode");
             }

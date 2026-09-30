@@ -797,3 +797,44 @@ fn error_display_is_actionable() {
     let c = HistoryError::Corrupt { path: None, message: "malformed".into() };
     assert!(c.to_string().contains("malformed"));
 }
+
+fn busy_error() -> rusqlite::Error {
+    rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
+        Some("database is locked".into()),
+    )
+}
+
+#[test]
+fn retry_busy_retries_until_the_operation_succeeds() {
+    let mut calls = 0;
+    let got = super::retry_busy(Duration::from_secs(5), || {
+        calls += 1;
+        if calls < 4 { Err(busy_error()) } else { Ok(calls) }
+    });
+    assert_eq!(got.unwrap(), 4);
+}
+
+#[test]
+fn retry_busy_gives_up_after_the_timeout_and_returns_the_busy_error() {
+    let start = std::time::Instant::now();
+    let got: rusqlite::Result<()> =
+        super::retry_busy(Duration::from_millis(60), || Err(busy_error()));
+    assert!(matches!(
+        got,
+        Err(rusqlite::Error::SqliteFailure(e, _)) if e.code == rusqlite::ErrorCode::DatabaseBusy
+    ));
+    assert!(start.elapsed() >= Duration::from_millis(60), "must keep trying until the deadline");
+    assert!(start.elapsed() < Duration::from_secs(2), "and must not overshoot wildly");
+}
+
+#[test]
+fn retry_busy_does_not_retry_other_errors() {
+    let mut calls = 0;
+    let got: rusqlite::Result<()> = super::retry_busy(Duration::from_secs(5), || {
+        calls += 1;
+        Err(rusqlite::Error::QueryReturnedNoRows)
+    });
+    assert!(matches!(got, Err(rusqlite::Error::QueryReturnedNoRows)));
+    assert_eq!(calls, 1);
+}
