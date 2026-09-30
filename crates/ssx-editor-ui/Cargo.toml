@@ -1,0 +1,43 @@
+[package]
+name = "ssx-editor-ui"
+description = "egui window for the ssx image editor: toolbar, properties bar, canvas, dialogs (library + `ssx-editor-ui` binary)."
+version.workspace = true
+edition.workspace = true
+# egui/eframe 0.35 need a newer compiler than the workspace floor.
+rust-version = "1.92"
+license.workspace = true
+repository.workspace = true
+publish = false
+default-run = "ssx-editor-ui"
+
+[lib]
+name = "ssx_editor_ui"
+
+[[bin]]
+name = "ssx-editor-ui"
+path = "src/main.rs"
+
+[dependencies]
+ssx-types.workspace = true
+ssx-editor.workspace = true
+ssx-imgfx = { path = "../ssx-imgfx" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+image.workspace = true
+eframe = { version = "0.35", default-features = false, features = ["accesskit", "default_fonts", "wayland", "x11", "wgpu"] }
+egui = "0.35"
+arboard = { version = "3", default-features = false, features = ["image-data", "wayland-data-control"] }
+rfd = { version = "0.17", default-features = false, features = ["xdg-portal", "wayland"] }
+directories = "6"
+clap = { version = "4", features = ["derive"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter"] }
+
+[dev-dependencies]
+egui_kittest = { version = "0.35", features = ["wgpu", "snapshot"] }
+proptest = "1"
+tempfile = "3"
+
+[lints]
+workspace = true
