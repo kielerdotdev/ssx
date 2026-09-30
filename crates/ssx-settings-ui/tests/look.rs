@@ -11,12 +11,9 @@ use ssx_settings_ui::nav::Page;
 /// The height that shows the whole page.
 fn tall(page: Page) -> f32 {
     match page {
-        Page::General => 1500.0,
-        Page::Capture => 1500.0,
+        Page::General | Page::Capture | Page::Hotkeys | Page::Integration => 1500.0,
         Page::Workflows => 1300.0,
-        Page::Hotkeys => 1500.0,
         Page::Uploaders => 1100.0,
-        Page::Integration => 1500.0,
         _ => 900.0,
     }
 }

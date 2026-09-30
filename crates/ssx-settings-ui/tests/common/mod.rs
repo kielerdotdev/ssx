@@ -197,10 +197,7 @@ pub fn text_of(h: &Harness<'_, SettingsApp>, label: &str) -> String {
 /// Every accessible label currently on screen (for debugging a failing test).
 pub fn labels(h: &Harness<'_, SettingsApp>) -> Vec<String> {
     use egui_kittest::kittest::NodeT;
-    h.root()
-        .children_recursive()
-        .filter_map(|n| n.accesskit_node().label().map(|l| l.to_string()))
-        .collect()
+    h.root().children_recursive().filter_map(|n| n.accesskit_node().label()).collect()
 }
 
 /// Whether some widget's label contains `text` (never panics on several matches).

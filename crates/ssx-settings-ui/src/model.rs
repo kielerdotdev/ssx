@@ -229,10 +229,9 @@ impl SettingsModel {
 
     /// Compares the file with the fingerprint taken at the last load or save.
     pub fn check_external(&mut self) -> External {
-        let now = match FileStamp::read(&self.path) {
-            Ok(s) => s,
-            // Unreadable right now (permissions, a network share hiccup): not a change.
-            Err(_) => return External::Unchanged,
+        // Unreadable right now (permissions, a network share hiccup): not a change.
+        let Ok(now) = FileStamp::read(&self.path) else {
+            return External::Unchanged;
         };
         if now == self.stamp {
             return External::Unchanged;

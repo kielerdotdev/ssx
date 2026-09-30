@@ -4,7 +4,7 @@
 //! |---|---|---|
 //! | Linux | XDG autostart entry `~/.config/autostart/ssx.desktop` | delete it |
 //! | Windows | value `ssx` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` | delete the value |
-//! | macOS | LaunchAgent `~/Library/LaunchAgents/io.ssx.tray.plist` (`RunAtLoad`) | delete it |
+//! | macOS | `LaunchAgent` `~/Library/LaunchAgents/io.ssx.tray.plist` (`RunAtLoad`) | delete it |
 //!
 //! What is written is produced by pure functions ([`desktop_entry`], [`launch_agent_plist`],
 //! [`run_key_value`]) that are tested on every platform; the OS access is a few lines behind
@@ -16,6 +16,7 @@
 //! executable with `--background` (the tray app does not exist in every build yet; the UI says
 //! so when the file is missing instead of pretending).
 
+use std::fmt::Write as _;
 use std::{
     fmt,
     path::{Path, PathBuf},
@@ -30,7 +31,7 @@ pub const DESKTOP_FILE_NAME: &str = "ssx.desktop";
 pub const RUN_VALUE_NAME: &str = "ssx";
 /// Registry key (below `HKEY_CURRENT_USER`) that holds the auto-run values.
 pub const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
-/// Label (and file stem) of the macOS LaunchAgent.
+/// Label (and file stem) of the macOS `LaunchAgent`.
 pub const LAUNCH_AGENT_LABEL: &str = "io.ssx.tray";
 /// The line that marks a file as written by ssx (desktop entries and plists).
 pub const MARKER: &str = "X-SSX-Managed";
@@ -171,11 +172,11 @@ fn xml_escape(s: &str) -> String {
     out
 }
 
-/// The macOS LaunchAgent property list.
+/// The macOS `LaunchAgent` property list.
 pub fn launch_agent_plist(label: &str, cmd: &AutostartCommand) -> String {
     let mut args = format!("    <string>{}</string>\n", xml_escape(&cmd.program.to_string_lossy()));
     for a in &cmd.args {
-        args.push_str(&format!("    <string>{}</string>\n", xml_escape(a)));
+        let _ = writeln!(args, "    <string>{}</string>", xml_escape(a));
     }
     format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\

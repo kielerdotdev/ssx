@@ -6,6 +6,7 @@
 //! else writes the file. There is no "restart": the running ssx watches the file and reloads
 //! it, so a successful Apply is all it takes.
 
+use std::fmt::Write as _;
 use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset, Local};
@@ -106,7 +107,7 @@ pub fn footer_status(
     let names: Vec<&str> = dirty.iter().map(|p| p.label()).collect();
     let mut s = format!("Unsaved changes in {}", names.join(", "));
     if warnings > 0 {
-        s.push_str(&format!("; {warnings} warning{}", if warnings == 1 { "" } else { "s" }));
+        let _ = write!(s, "; {warnings} warning{}", if warnings == 1 { "" } else { "s" });
     }
     (s, Tone::Pending)
 }
@@ -603,7 +604,6 @@ impl SettingsApp {
                 if revert.on_hover_text("Discard the changes made since the last save").clicked() {
                     self.revert(&ctx);
                 }
-                let _ = why;
             });
         });
     }
@@ -696,7 +696,7 @@ fn nav_item(
         label.push_str(", unsaved changes");
     }
     if errors > 0 {
-        label.push_str(&format!(", {errors} problem{}", if errors == 1 { "" } else { "s" }));
+        let _ = write!(label, ", {errors} problem{}", if errors == 1 { "" } else { "s" });
     }
     resp.widget_info(|| {
         egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, selected, label.clone())

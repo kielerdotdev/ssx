@@ -1,6 +1,6 @@
 //! The *real binary* in a real X11 window: starts `ssx-settings-ui` under Xvfb on the Vulkan
 //! software rasteriser (lavapipe), switches through every page with the real keyboard
-//! shortcuts (`xdotool`), screenshots each with ImageMagick's `import`, changes a setting with
+//! shortcuts (`xdotool`), screenshots each with `ImageMagick`'s `import`, changes a setting with
 //! a real mouse click, saves with a real click, and checks the file on disk and the exit code.
 //!
 //! The process gets a private `HOME`, so nothing outside the test folder is touched. Skips
@@ -9,7 +9,7 @@
 
 mod common;
 
-use std::{path::Path, process::Command};
+use std::{fmt::Write as _, path::Path, process::Command};
 
 use common::tools::*;
 use ssx_core::settings::Settings;
@@ -85,7 +85,7 @@ fn the_real_window_shows_every_page_saves_a_real_edit_and_exits_cleanly() {
             Page::Capture => 4,
             _ => 2,
         };
-        steps.push_str(&format!("xdotool key ctrl+{digit}\nsleep {wait}\nshot {}\n", page.slug()));
+        let _ = writeln!(steps, "xdotool key ctrl+{digit}\nsleep {wait}\nshot {}", page.slug());
         if page == Page::Capture {
             steps.push_str("xdotool mousemove 660 400\nxdotool click --repeat 14 --delay 60 5\nsleep 1.5\nxdotool mousemove 700 850\nsleep 0.5\nshot capture-preview\nxdotool mousemove 660 400\nxdotool click --repeat 20 --delay 60 4\nsleep 1\nxdotool mousemove 700 850\n");
         }

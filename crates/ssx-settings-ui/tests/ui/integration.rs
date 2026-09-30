@@ -198,7 +198,10 @@ fn about_shows_the_version_the_licence_and_the_third_party_notices() {
 fn the_source_link_opens_through_the_opener() {
     let opener = std::sync::Arc::new(RecordingOpener::default());
     let o2 = opener.clone();
-    let (app, _fx) = app_custom(Page::About, Default::default(), move |host, _| host.opener = o2);
+    let (app, _fx) =
+        app_custom(Page::About, ssx_core::settings::Settings::default(), move |host, _| {
+            host.opener = o2;
+        });
     let mut h = window(app, vec2(1200.0, 1300.0));
     click(&mut h, REPOSITORY);
     assert_eq!(*opener.urls.lock().unwrap(), [REPOSITORY]);

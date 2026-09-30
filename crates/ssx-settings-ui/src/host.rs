@@ -392,7 +392,7 @@ impl Host {
                 user: "marius".into(),
                 domain: "WORKGROUP".into(),
                 machine: "laptop".into(),
-                files: Default::default(),
+                files: std::collections::BTreeMap::default(),
             }),
             autostart: Arc::new(FakeAutostart::new(false)),
             autostart_command: cmd,
@@ -454,10 +454,7 @@ mod tests {
         let out =
             r.run("gsettings", &["get".into(), "x".into(), "custom-keybindings".into()]).unwrap();
         assert_eq!(out.stdout, "@as []");
-        assert!(
-            r.run("gsettings", &["get".into(), "x".into(), "name".into()]).unwrap().success
-                == false
-        );
+        assert!(!r.run("gsettings", &["get".into(), "x".into(), "name".into()]).unwrap().success);
         assert_eq!(r.calls.lock().unwrap().len(), 2);
     }
 

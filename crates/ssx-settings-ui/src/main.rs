@@ -16,7 +16,7 @@ struct Args {
     /// integration or about
     #[arg(long, value_name = "PAGE", default_value = "general")]
     page: Page,
-    /// Use this folder for settings and data instead of the default (like SSX_CONFIG_DIR)
+    /// Use this folder for settings and data instead of the default (like `SSX_CONFIG_DIR`)
     #[arg(long, value_name = "DIR")]
     config_dir: Option<PathBuf>,
     /// Print how the window ended as one line of JSON on stdout

@@ -1,9 +1,7 @@
 //! Workflows: create, duplicate, delete and reorder workflows, and edit what each one does.
 
 use egui::{Color32, RichText, Ui};
-use ssx_core::settings::{
-    AfterCapture, AfterUpload, Settings, Severity, Workflow, builtin_workflows,
-};
+use ssx_core::settings::{AfterUpload, Settings, Severity, Workflow, builtin_workflows};
 use ssx_editor_ui::{
     icons::Icon,
     ui::{theme, widgets::input_style},
@@ -17,10 +15,10 @@ use crate::{
     ui_kit::{self, Answer, Field},
     validation::{Issues, workflow_path},
     workflow_edit::{
-        CAPTURE_STEPS, DESTINATION_ROWS, INPUT_KINDS, RUN_COMMAND_PLACEHOLDERS,
-        addable_capture_steps, addable_upload_steps, capture_step_blurb, capture_step_label,
-        delete, duplicate, input_blurb, input_label, instantiate, others_with_cli, others_with_id,
-        set_destination, set_input, templates, upload_step_blurb, upload_step_label,
+        DESTINATION_ROWS, INPUT_KINDS, RUN_COMMAND_PLACEHOLDERS, addable_capture_steps,
+        addable_upload_steps, capture_step_blurb, capture_step_label, delete, duplicate,
+        input_blurb, input_label, instantiate, others_with_cli, others_with_id, set_destination,
+        set_input, templates, upload_step_blurb, upload_step_label,
     },
 };
 
@@ -484,8 +482,6 @@ fn capture_steps_card(ui: &mut Ui, i: usize, p: &str, w: &mut Workflow, issues: 
             });
         });
     });
-    let _ = CAPTURE_STEPS;
-    let _ = AfterCapture::Upload;
 }
 
 fn upload_steps_card(ui: &mut Ui, i: usize, p: &str, w: &mut Workflow, issues: &Issues) {
@@ -543,14 +539,7 @@ fn upload_steps_card(ui: &mut Ui, i: usize, p: &str, w: &mut Workflow, issues: &
                 });
                 ui_kit::hint(ui, upload_step_blurb(&steps[k]));
                 if let AfterUpload::RunCommand { program, args } = &mut steps[k] {
-                    run_command_editor(
-                        ui,
-                        (i, k),
-                        program,
-                        args,
-                        issues,
-                        &format!("{p}.after_upload[{k}]"),
-                    );
+                    run_command_editor(ui, program, args);
                 }
                 ui_kit::issue_lines(ui, issues, &format!("{p}.after_upload[{k}]"));
             },
@@ -593,14 +582,7 @@ fn upload_steps_card(ui: &mut Ui, i: usize, p: &str, w: &mut Workflow, issues: &
     });
 }
 
-fn run_command_editor(
-    ui: &mut Ui,
-    id: (usize, usize),
-    program: &mut String,
-    args: &mut Vec<String>,
-    _issues: &Issues,
-    _path: &str,
-) {
+fn run_command_editor(ui: &mut Ui, program: &mut String, args: &mut Vec<String>) {
     ui.add_space(2.0);
     egui::Frame::new()
         .fill(theme::CANVAS_BG)
@@ -646,7 +628,6 @@ fn run_command_editor(
                     ph.join(", ")
                 ),
             );
-            let _ = id;
         });
 }
 

@@ -247,6 +247,11 @@ mod tests {
         let r = e.latest().expect("a result");
         assert_eq!(r.params, params(1.0));
         assert!(r.rendered.as_ref().unwrap().readouts[0].ui_untouched());
+        // the worker wakes the UI right after delivering, so the count can trail by a moment
+        let end = Instant::now() + Duration::from_secs(5);
+        while woken.load(Ordering::SeqCst) == 0 && Instant::now() < end {
+            std::thread::sleep(Duration::from_millis(5));
+        }
         assert!(woken.load(Ordering::SeqCst) >= 1);
         assert!(!e.busy());
     }
@@ -321,7 +326,7 @@ mod tests {
         p.sdr_white_nits = 480.0;
         e.request(p, Instant::now());
         assert!(e.wait_idle(Duration::from_secs(30)));
-        assert_eq!(e.latest().unwrap().params.sdr_white_nits, 480.0);
+        assert!((e.latest().unwrap().params.sdr_white_nits - 480.0).abs() < 1e-6);
         assert!(e.latest().unwrap().rendered.as_ref().unwrap().readouts[0].ui_untouched());
     }
 }

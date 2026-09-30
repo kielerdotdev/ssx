@@ -745,7 +745,6 @@ mod tests {
 
     #[test]
     fn severity_colours_are_distinct_and_readable() {
-        assert_ne!(severity_color(Severity::Error), severity_color(Severity::Warning));
         fn lum(c: Color32) -> f32 {
             let f = |v: u8| {
                 let v = f32::from(v) / 255.0;
@@ -753,6 +752,7 @@ mod tests {
             };
             0.2126 * f(c.r()) + 0.7152 * f(c.g()) + 0.0722 * f(c.b())
         }
+        assert_ne!(severity_color(Severity::Error), severity_color(Severity::Warning));
         let contrast = |a: Color32, b: Color32| {
             let (x, y) = (lum(a), lum(b));
             (x.max(y) + 0.05) / (x.min(y) + 0.05)

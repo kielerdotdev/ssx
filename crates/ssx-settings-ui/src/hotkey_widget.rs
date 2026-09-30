@@ -2,8 +2,8 @@
 //! a **Record** button that turns the next key combination pressed into the shortcut.
 //!
 //! The translation of key presses lives in [`crate::hotkey_keys`] (pure and tested); this file
-//! only handles focus and drawing. Why not *only* recording: egui cannot see PrintScreen,
-//! Pause or the Windows key as key events, and PrintScreen is the classic screenshot key, so
+//! only handles focus and drawing. Why not *only* recording: egui cannot see `PrintScreen`,
+//! Pause or the Windows key as key events, and `PrintScreen` is the classic screenshot key, so
 //! the modifier toggles and the key list are first-class, not a fallback.
 
 use egui::{Color32, EventFilter, Id, RichText, Ui, WidgetInfo, WidgetType};
@@ -40,8 +40,7 @@ pub fn hotkey_field(
     // What to show: an unfinished draft, else the stored value.
     let stored = value.as_deref().map(HotkeyDraft::from_setting);
     let mut draft = match (&mem.draft, &stored) {
-        (Some(d), _) => *d,
-        (None, Some(Ok(d))) => *d,
+        (Some(d), _) | (None, Some(Ok(d))) => *d,
         _ => HotkeyDraft::default(),
     };
     let stored_unreadable = matches!(stored, Some(Err(_))) && mem.draft.is_none();

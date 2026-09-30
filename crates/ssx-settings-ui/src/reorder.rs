@@ -71,7 +71,7 @@ pub fn gap_at(centers: &[f32], y: f32) -> usize {
 /// Between two items it sits in the middle of the space between them.
 pub fn marker_y(rows: &[(f32, f32)], gap: usize) -> Option<f32> {
     match (gap.checked_sub(1).and_then(|i| rows.get(i)), rows.get(gap)) {
-        (Some(above), Some(below)) => Some((above.1 + below.0) / 2.0),
+        (Some(above), Some(below)) => Some(f32::midpoint(above.1, below.0)),
         (None, Some(below)) => Some(below.0),
         (Some(above), None) => Some(above.1),
         (None, None) => None,

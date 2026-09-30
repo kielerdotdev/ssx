@@ -15,7 +15,7 @@
 //! codes), so [`translate`] takes the physical key when egui has one; Shift+2 is `2` with
 //! Shift, not `@`.
 //!
-//! **What egui cannot see.** `egui::Key` has no PrintScreen, Pause, ScrollLock or Menu, and
+//! **What egui cannot see.** `egui::Key` has no `PrintScreen`, Pause, `ScrollLock` or Menu, and
 //! `egui::Modifiers` has no Windows/Super key. The widget therefore also offers a key list
 //! ([`key_groups`]) and tracks the Super key from its own key events.
 
@@ -292,7 +292,7 @@ impl HotkeyDraft {
     /// Text for the widget: `Ctrl+Shift+PrintScreen`, or `Ctrl+…` while the key is missing.
     pub fn display(&self) -> String {
         let mut parts: Vec<String> = self.mods.iter().map(|m| m.name().to_owned()).collect();
-        parts.push(self.key.map_or_else(|| "\u{2026}".to_owned(), |k| display_key(k)));
+        parts.push(self.key.map_or_else(|| "\u{2026}".to_owned(), display_key));
         parts.join("+")
     }
 }

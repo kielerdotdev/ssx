@@ -28,8 +28,8 @@ pub fn slugify(name: &str, max: usize, fallback: &str) -> String {
         }
     }
     let trimmed = out.trim_matches(['-', '.', '_']);
-    let mut s: String = trimmed.chars().take(max).collect();
-    s = s.trim_end_matches(['-', '.', '_']).to_owned();
+    let s: String = trimmed.chars().take(max).collect();
+    let s = s.trim_end_matches(['-', '.', '_']).to_owned();
     if s.is_empty() { fallback.to_owned() } else { s }
 }
 
@@ -37,7 +37,7 @@ fn unique(base: &str, max: usize, taken: &dyn Fn(&str) -> bool) -> String {
     if !taken(base) {
         return base.to_owned();
     }
-    (2..)
+    (2..=usize::MAX)
         .map(|n: usize| {
             let suffix = format!("-{n}");
             let keep = max.saturating_sub(suffix.len());
@@ -69,7 +69,7 @@ pub fn unique_name(base: &str, existing: &[Workflow]) -> String {
     if !existing.iter().any(|w| w.name == base) {
         return base.to_owned();
     }
-    (2..)
+    (2..=usize::MAX)
         .map(|n| format!("{base} ({n})"))
         .find(|c| !existing.iter().any(|w| &w.name == c))
         .unwrap_or_else(|| base.to_owned())
@@ -246,7 +246,7 @@ pub const fn image_only(s: AfterCapture) -> bool {
     )
 }
 
-/// After-upload steps that can be added (RunCommand starts empty).
+/// After-upload steps that can be added (`RunCommand` starts empty).
 pub fn upload_step_kinds() -> [AfterUpload; 7] {
     [
         AfterUpload::CopyUrl,
@@ -384,8 +384,7 @@ mod tests {
     fn unique_ids_count_up_within_the_limit() {
         let mut list = vec![];
         for _ in 0..4 {
-            let mut w = Workflow::default();
-            w.id = unique_id("shot", &list);
+            let w = Workflow { id: unique_id("shot", &list), ..Workflow::default() };
             list.push(w);
         }
         let ids: Vec<&str> = list.iter().map(|w| w.id.as_str()).collect();
@@ -592,7 +591,7 @@ mod tests {
             prop_assert!(s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-')));
             let w = Workflow { id: s, name: "n".into(), ..Workflow::default() };
             let settings = Settings { workflows: vec![w], ..Settings::default() };
-            prop_assert!(!settings.validate().iter().any(|i| i.path.ends_with(".id")));
+            prop_assert!(!settings.validate().iter().any(|i| i.path.rsplit('.').next() == Some("id")));
         }
 
         #[test]

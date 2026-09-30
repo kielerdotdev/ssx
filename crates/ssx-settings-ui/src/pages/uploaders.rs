@@ -1,10 +1,11 @@
 //! Uploaders: the destinations that exist, which one each kind of content goes to, importing
-//! ShareX `.sxcu` files, editing the built-in kinds, and a test upload.
+//! `ShareX` `.sxcu` files, editing the built-in kinds, and a test upload.
 //!
 //! Secrets never pass through the settings: a secret field shows only *whether* a value is
 //! stored and where, takes a new value in a password box, and hands it to the credential
 //! store on a worker thread; the settings hold the `keyring:<name>` reference.
 
+use std::fmt::Write as _;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -106,13 +107,16 @@ pub enum SecretMsg {
     },
 }
 
+/// What an upload in flight has sent so far: `(sent, total)`, shared with the worker.
+pub type SharedProgress = Arc<Mutex<Option<(u64, Option<u64>)>>>;
+
 /// A test upload.
 #[derive(Debug, Default)]
 pub struct TestState {
     /// Which destination is being or was tested.
     pub name: String,
     slot: Slot<Result<UploadOutcome, String>>,
-    progress: Arc<Mutex<Option<(u64, Option<u64>)>>>,
+    progress: SharedProgress,
     cancel: Option<CancelToken>,
     /// The finished result.
     pub result: Option<Result<UploadOutcome, String>>,
@@ -272,7 +276,7 @@ pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     ui.add_space(8.0);
     match st.tab {
         Tab::Destinations => {
-            ui_kit::page_scroll(ui, "uploaders-dest", |ui| destinations(ui, st, cx))
+            ui_kit::page_scroll(ui, "uploaders-dest", |ui| destinations(ui, st, cx));
         }
         Tab::Defaults => ui_kit::page_scroll(ui, "uploaders-defaults", |ui| defaults(ui, st, cx)),
     }
@@ -523,7 +527,7 @@ fn detail_panel(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
             }
         }
         Source::Builtin => {
-            ui_kit::hint(ui, "Built-in destinations need no setup and cannot be removed.")
+            ui_kit::hint(ui, "Built-in destinations need no setup and cannot be removed.");
         }
     }
 }
@@ -720,7 +724,7 @@ fn secret_field(
     }
     let env_var = secret_name
         .as_deref()
-        .filter(|n| vault.from_environment(n))
+        .filter(|n| vault.is_from_environment(n))
         .map(ssx_services::secrets::env_var_name);
     let line = secret_line(
         &reference,
@@ -883,7 +887,7 @@ pub fn start_test(st: &mut State, cx: &Cx<'_>, name: &str) {
     };
     let uploads = cx.host.uploads.clone();
     let (c, p) = (cancel.clone(), progress.clone());
-    st.test.name = name.to_owned();
+    name.clone_into(&mut st.test.name);
     st.test.result = None;
     st.test.cancel = Some(cancel);
     st.test.progress = progress;
@@ -1049,8 +1053,7 @@ fn extension_card(
                 let default = registry
                     .choices_for(DestinationType::File)
                     .first()
-                    .map(|e| e.name.clone())
-                    .unwrap_or_else(|| "local".to_owned());
+                    .map_or_else(|| "local".to_owned(), |e| e.name.clone());
                 cx.settings.destinations.extension_overrides.insert(ext, default);
                 st.new_extension.clear();
             }
@@ -1239,7 +1242,11 @@ fn confirm_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
     let refs = Registry::references_to(cx.settings, &name);
     let mut body = format!("\"{name}\": {what}");
     if !refs.is_empty() {
-        body.push_str(&format!("\n\nStill used by: {}. They will report that the destination does not exist until you change them.", refs.join("; ")));
+        let _ = write!(
+            body,
+            "\n\nStill used by: {}. They will report that the destination does not exist until you change them.",
+            refs.join("; ")
+        );
     }
     match ui_kit::confirm(ctx, "up-confirm", title, &body, verb, true) {
         Some(Answer::Confirm) => {

@@ -35,7 +35,7 @@ use crate::{
     task::Slot,
     thumbs::{Cache, Loader, Request, State as ThumbState},
     ui_kit::{self, Answer},
-    uploader_registry::{TestJob, mime_for},
+    uploader_registry::TestJob,
 };
 
 /// Grid or list.
@@ -87,7 +87,7 @@ pub struct Reupload {
     /// The destination chosen (`None`: the default for its type).
     pub destination: Option<String>,
     slot: Slot<Result<(UploadOutcome, String), String>>,
-    progress: Arc<Mutex<Option<(u64, Option<u64>)>>>,
+    progress: super::uploaders::SharedProgress,
     cancel: Option<CancelToken>,
     /// Why the last attempt failed.
     pub error: Option<String>,
@@ -264,7 +264,8 @@ fn poll(st: &mut State, cx: &mut Cx<'_>, ctx: &egui::Context) {
                 }
             }
             OpResult::Pruned(n) => {
-                cx.toasts.success(t, format!("Pruned {n} entr{}", if n == 1 { "y" } else { "ies" }))
+                cx.toasts
+                    .success(t, format!("Pruned {n} entr{}", if n == 1 { "y" } else { "ies" }));
             }
             OpResult::MissingRemoved(n) => cx.toasts.success(
                 t,
@@ -793,7 +794,6 @@ fn list(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         resp.on_hover_text(title);
         ui.add_space(2.0);
     }
-    let _ = cx;
 }
 
 fn empty(ui: &mut Ui, st: &State) {
@@ -820,7 +820,7 @@ fn detail(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
         });
         return;
     };
-    let file_exists = e.local_path.as_deref().is_some_and(|p| p.exists());
+    let file_exists = e.local_path.as_deref().is_some_and(std::path::Path::exists);
     let folder_exists = e.local_path.as_deref().and_then(Path::parent).is_some_and(Path::exists);
     let actions = EntryActions::of(&e, file_exists && !st.is_orphan(e.id), folder_exists);
     ui_kit::card(ui, None, |ui| {
@@ -1077,7 +1077,7 @@ fn reupload_dialog(ctx: &egui::Context, st: &mut State, cx: &mut Cx<'_>) {
     let default = cx
         .settings
         .destinations
-        .resolve(ty, &Default::default(), ext.as_deref())
+        .resolve(ty, &ssx_core::settings::DestinationOverride::default(), ext.as_deref())
         .map(str::to_owned);
     let none_label = match &default {
         Some(d) => format!("Default for {} ({d})", crate::uploader_registry::type_word(ty)),
@@ -1197,7 +1197,6 @@ fn start_reupload(r: &mut Reupload, cx: &Cx<'_>, dest: &str, path: &Path, ty: De
         progress.clone(),
         dest.to_owned(),
     );
-    let _ = mime_for;
     r.error = None;
     r.cancel = Some(cancel);
     r.progress = progress;
@@ -1255,7 +1254,7 @@ mod tests {
         let id = db.insert(&e).unwrap();
         match delete_entry(&db, id, Some(&sub)) {
             OpResult::Deleted { entries: 1, file_error: Some(msg) } => {
-                assert!(msg.contains("d"), "{msg}")
+                assert!(msg.contains('d'), "{msg}");
             }
             other => panic!("{other:?}"),
         }

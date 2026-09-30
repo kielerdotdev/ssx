@@ -231,7 +231,7 @@ fn the_sdr_white_level_changes_the_preview_but_not_the_settings() {
     click(&mut h, "480 nits");
     wait_preview(&mut h);
     assert_eq!(working(&h), before);
-    assert_eq!(h.state().capture.latest().unwrap().params.sdr_white_nits, 480.0);
+    assert!((h.state().capture.latest().unwrap().params.sdr_white_nits - 480.0).abs() < 1e-6);
     assert!(has(&h, "at 480 nits SDR white"));
     // and the guarantee holds at that level too
     assert!(has(&h, "UI stays byte-identical"));
@@ -242,7 +242,7 @@ fn an_out_of_range_value_pauses_the_preview_and_blocks_saving() {
     let mut s = Settings::default();
     s.capture.hdr.knee = 2.5;
     let (app, _fx) = app_with(Page::Capture, s);
-    let mut h = window(app, vec2(1120.0, 1700.0));
+    let h = window(app, vec2(1120.0, 1700.0));
     assert!(has(&h, "The preview is paused until the values above are in range"));
     assert!(has(&h, "knee must be between 0 and 1"));
 }

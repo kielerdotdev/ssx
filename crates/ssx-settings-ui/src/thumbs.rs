@@ -9,7 +9,7 @@
 //!   scrolled away is what gets evicted.
 //! * [`Loader`]: two worker threads that turn a request into RGBA pixels. The stored PNG
 //!   thumbnail is read from the database (`History::get`, on the worker, so the UI thread
-//!   never waits for SQLite); an entry without one falls back to decoding and shrinking the
+//!   never waits for `SQLite`); an entry without one falls back to decoding and shrinking the
 //!   local image file, with size limits so a stray 200 MB file cannot stall a worker.
 
 use std::{
@@ -496,6 +496,12 @@ mod tests {
         // asking again after the answer is allowed
         assert!(l.request(Request { id: ids[0], kind: EntryKind::Image, path: None }));
         let _ = l.wait_all(std::time::Duration::from_secs(20));
+        // a worker wakes the UI right after delivering, so the count can trail by a moment
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while woken.load(std::sync::atomic::Ordering::SeqCst) < 4 && std::time::Instant::now() < end
+        {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
         assert!(woken.load(std::sync::atomic::Ordering::SeqCst) >= 4);
     }
 }

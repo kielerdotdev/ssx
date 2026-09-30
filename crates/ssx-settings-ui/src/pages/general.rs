@@ -12,7 +12,7 @@ use crate::{
     autostart::AutostartError,
     pattern_info::{
         CHEAT_SHEET, EXAMPLE_FILE_PATTERNS, PatternKind, PatternReport, SampleInputs, TokenDoc,
-        analyze, names_in, preview_paths, unsupported_tokens,
+        analyze, preview_paths, unsupported_tokens,
     },
     task::Slot,
     ui_kit::{self, Field},
@@ -267,6 +267,7 @@ fn save_location(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
     });
 }
 
+#[allow(clippy::too_many_arguments)] // one call site per pattern; a struct would only rename the arguments
 fn pattern_row(
     ui: &mut Ui,
     st: &mut State,
@@ -340,7 +341,7 @@ fn file_names(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
                         .on_hover_text(*pattern)
                         .clicked()
                     {
-                        cx.settings.general.file_name_pattern = (*pattern).to_owned();
+                        (*pattern).clone_into(&mut cx.settings.general.file_name_pattern);
                     }
                 }
             });
@@ -468,10 +469,10 @@ fn cheat_sheet(ui: &mut Ui, st: &State, cx: &mut Cx<'_>) {
                 {
                     match st.target {
                         PatternTarget::File => {
-                            append_token(&mut cx.settings.general.file_name_pattern, s)
+                            append_token(&mut cx.settings.general.file_name_pattern, s);
                         }
                         PatternTarget::Folder => {
-                            append_token(&mut cx.settings.general.folder_pattern, s)
+                            append_token(&mut cx.settings.general.folder_pattern, s);
                         }
                     }
                 }
@@ -488,7 +489,6 @@ fn cheat_sheet(ui: &mut Ui, st: &State, cx: &mut Cx<'_>) {
             ui.label(RichText::new(*why).size(12.5).color(ui_kit::DIM_TEXT));
         });
     }
-    let _ = names_in;
 }
 
 fn images(ui: &mut Ui, cx: &mut Cx<'_>) {
@@ -646,6 +646,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::permissions_set_readonly_false)] // a temp folder that is deleted right after
     fn read_only_folders_are_flagged() {
         let dir = tempfile::tempdir().unwrap();
         let ro = dir.path().join("ro");

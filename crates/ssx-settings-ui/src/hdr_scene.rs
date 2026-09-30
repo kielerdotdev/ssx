@@ -486,7 +486,7 @@ mod tests {
         assert_eq!(s.frame.width(), SCENE_W);
         assert_eq!(s.frame.height(), SCENE_H);
         assert_eq!(s.ui_reference.len(), UI_REGION.area());
-        assert!(UI_REGION.x1 <= SCENE_W && UI_REGION.y1 <= SCENE_H);
+        const { assert!(UI_REGION.x1 <= SCENE_W && UI_REGION.y1 <= SCENE_H) };
     }
 
     fn pixel(s: &Scene, x: u32, y: u32) -> [f32; 3] {
@@ -537,7 +537,7 @@ mod tests {
             assert!(r.ui_untouched(), "{nits} nits: {}", r.headline());
             assert_eq!(r.white_out, [255, 255, 255]);
             assert_eq!(r.ui_max_deviation, 0);
-            assert_eq!(r.white_dimming_percent(), 0.0);
+            assert!(r.white_dimming_percent().abs() < 1e-6);
             assert!(r.headline().contains("byte-identical"));
         }
     }

@@ -134,7 +134,7 @@ fn severity_word(s: DoctorSeverity) -> &'static str {
     }
 }
 
-fn poll(st: &mut State, ctx: &egui::Context) {
+fn poll(st: &mut State) {
     if let Some(done) = st.shell_slot.poll() {
         st.states = done.states;
         st.states_loaded = true;
@@ -145,13 +145,11 @@ fn poll(st: &mut State, ctx: &egui::Context) {
     if let Some(r) = st.doctor_slot.poll() {
         st.doctor = Some(r);
     }
-    let _ = ctx;
 }
 
 /// Draws the page.
 pub fn ui(ui: &mut Ui, st: &mut State, cx: &mut Cx<'_>) {
-    let ctx = ui.ctx().clone();
-    poll(st, &ctx);
+    poll(st);
     if !st.states_loaded && !st.shell_slot.running() {
         let shell = cx.host.shell.clone();
         st.states_loaded = true;

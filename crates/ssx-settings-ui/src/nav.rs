@@ -102,8 +102,8 @@ impl Page {
 
     /// The page after / before this one (wrapping), for keyboard navigation.
     pub fn step(self, delta: isize) -> Page {
-        let n = Self::ALL.len() as isize;
-        let i = Self::ALL.iter().position(|p| *p == self).unwrap_or(0) as isize;
+        let n = Self::ALL.len().cast_signed();
+        let i = Self::ALL.iter().position(|p| *p == self).unwrap_or(0).cast_signed();
         Self::ALL[(i + delta).rem_euclid(n) as usize]
     }
 }

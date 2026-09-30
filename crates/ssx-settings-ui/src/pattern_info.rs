@@ -327,7 +327,7 @@ mod tests {
             user: "marius".into(),
             domain: "WORK".into(),
             machine: "laptop".into(),
-            files: Default::default(),
+            files: std::collections::BTreeMap::default(),
         }
     }
 

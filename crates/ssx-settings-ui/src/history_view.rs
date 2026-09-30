@@ -164,7 +164,7 @@ impl HistoryFilter {
     /// Changes the search text (back to the first page when it changed).
     pub fn set_text(&mut self, text: &str) {
         if self.text != text {
-            self.text = text.to_owned();
+            text.clone_into(&mut self.text);
             self.page = 0;
         }
     }

@@ -273,3 +273,32 @@ fn a_file_write_failure_is_reported_not_swallowed() {
     assert!(has(&h, "Could not save"), "{:?}", h.state().save_error);
     assert_eq!(h.state().outcome().writes, 0);
 }
+
+#[test]
+fn edits_on_several_pages_are_saved_together_and_a_new_window_sees_them() {
+    let (app, fx) = app(Page::General);
+    let mut h = window(app, vec2(1120.0, 1700.0));
+    set_text(&mut h, "File name pattern", "multi-%s");
+    key(&mut h, egui::Modifiers::COMMAND, egui::Key::Num2);
+    click(&mut h, "3 s");
+    key(&mut h, egui::Modifiers::COMMAND, egui::Key::Num3);
+    click(&mut h, "Duplicate");
+    key(&mut h, egui::Modifiers::COMMAND, egui::Key::Num5);
+    click(&mut h, "New destination");
+    click(&mut h, "Local folder");
+    click(&mut h, "Create");
+    assert!(h.state().model.dirty_pages().len() >= 4, "{:?}", h.state().model.dirty_pages());
+    let expected = working(&h);
+    click(&mut h, "Save");
+    assert!(h.state().outcome().saved);
+    // what is on disk is exactly the working copy, and a brand new window starts from it
+    let on_disk = fx.load();
+    assert_eq!(on_disk, expected);
+    assert_eq!(on_disk.general.file_name_pattern, "multi-%s");
+    assert_eq!(on_disk.capture.delay_ms, 3000);
+    assert_eq!(on_disk.workflows.len(), Settings::default().workflows.len() + 1);
+    assert!(on_disk.uploaders.contains_key("local-2"), "the built-in name was avoided");
+    let model = ssx_settings_ui::model::SettingsModel::load(fx.settings_file()).unwrap();
+    assert_eq!(model.working(), &expected);
+    assert!(!model.is_dirty());
+}

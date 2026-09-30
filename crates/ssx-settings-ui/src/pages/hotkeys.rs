@@ -5,7 +5,7 @@ use std::path::Path;
 
 use egui::{Color32, RichText, Ui};
 use ssx_core::settings::{Settings, Severity};
-use ssx_editor_ui::ui::{theme, widgets::input_style};
+use ssx_editor_ui::ui::widgets::input_style;
 use ssx_hotkeys::bindings::{Dirs, Target, files};
 
 use super::Cx;

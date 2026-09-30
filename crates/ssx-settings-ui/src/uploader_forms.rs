@@ -402,7 +402,7 @@ pub fn free_name(base: &str, taken: &[String]) -> String {
     if !taken.contains(&base) {
         return base;
     }
-    (2..).map(|n| format!("{base}-{n}")).find(|c| !taken.contains(c)).unwrap_or(base)
+    (2..=usize::MAX).map(|n| format!("{base}-{n}")).find(|c| !taken.contains(c)).unwrap_or(base)
 }
 
 #[cfg(test)]

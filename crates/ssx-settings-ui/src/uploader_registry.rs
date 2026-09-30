@@ -557,8 +557,8 @@ mod tests {
         let mut s = Settings::default();
         s.uploaders.insert(
             "imgur".into(),
-            r#"type='imgur'
-client_id='abc'"#
+            r"type='imgur'
+client_id='abc'"
                 .parse()
                 .unwrap(),
         );
@@ -765,7 +765,7 @@ client_id='abc'"#
         let seen = Mutex::new(Vec::new());
         let out = f
             .test(&job(Settings::default(), "x", dir.path()), &CancelToken::new(), &|p| {
-                seen.lock().unwrap().push(p.sent)
+                seen.lock().unwrap().push(p.sent);
             })
             .unwrap();
         assert!(out.url.contains("ssx-test"));

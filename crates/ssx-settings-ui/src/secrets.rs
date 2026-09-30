@@ -90,7 +90,7 @@ pub trait SecretVault: Send + Sync + fmt::Debug {
     fn exists(&self, name: &str) -> Result<bool, String>;
     /// `true` if the value comes from the `SSX_SECRET_<NAME>` environment variable (which the
     /// window cannot change).
-    fn from_environment(&self, name: &str) -> bool;
+    fn is_from_environment(&self, name: &str) -> bool;
     /// Stores `value` under `name`.
     fn set(&self, name: &str, value: &str) -> Result<(), String>;
     /// Removes the value stored under `name`.
@@ -154,7 +154,7 @@ impl SecretVault for SystemVault {
     fn exists(&self, name: &str) -> Result<bool, String> {
         self.store_blocking().get(name).map(|v| v.is_some()).map_err(|e| e.to_string())
     }
-    fn from_environment(&self, name: &str) -> bool {
+    fn is_from_environment(&self, name: &str) -> bool {
         std::env::var(env_var_name(name)).is_ok_and(|v| !v.is_empty())
     }
     fn set(&self, name: &str, value: &str) -> Result<(), String> {
@@ -242,10 +242,10 @@ impl MemoryVault {
 
 impl SecretVault for MemoryVault {
     fn exists(&self, name: &str) -> Result<bool, String> {
-        Ok(self.from_environment(name)
+        Ok(self.is_from_environment(name)
             || self.values.lock().unwrap_or_else(PoisonError::into_inner).contains_key(name))
     }
-    fn from_environment(&self, name: &str) -> bool {
+    fn is_from_environment(&self, name: &str) -> bool {
         self.env.lock().unwrap_or_else(PoisonError::into_inner).iter().any(|n| n == name)
     }
     fn set(&self, name: &str, value: &str) -> Result<(), String> {
@@ -315,8 +315,8 @@ mod tests {
     fn environment_secrets_count_and_are_flagged() {
         let v = MemoryVault::memory_only().with_env("imgur-token");
         assert_eq!(v.exists("imgur-token"), Ok(true));
-        assert!(v.from_environment("imgur-token"));
-        assert!(!v.from_environment("other"));
+        assert!(v.is_from_environment("imgur-token"));
+        assert!(!v.is_from_environment("other"));
     }
 
     #[test]
@@ -331,7 +331,7 @@ mod tests {
     fn the_trait_has_no_way_to_read_a_value() {
         // Compile-time documentation: everything a page can call returns bool / () / location.
         fn takes(v: &dyn SecretVault) -> (Result<bool, String>, bool, SecretLocation) {
-            (v.exists("x"), v.from_environment("x"), v.location())
+            (v.exists("x"), v.is_from_environment("x"), v.location())
         }
         let v = MemoryVault::keyring();
         let _ = takes(&v);
@@ -342,6 +342,6 @@ mod tests {
         let v = SystemVault::open();
         // The probe may or may not have finished; both answers are valid.
         let _ = v.location();
-        let _ = v.from_environment("definitely-not-set-anywhere");
+        let _ = v.is_from_environment("definitely-not-set-anywhere");
     }
 }

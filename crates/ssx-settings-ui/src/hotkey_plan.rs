@@ -79,7 +79,7 @@ pub fn bindings(settings: &Settings) -> Vec<(Owner, Hotkey)> {
         }
     }
     for (name, text) in settings.hotkeys.entries() {
-        if let Some(hk) = text.parse::<Hotkey>().ok() {
+        if let Ok(hk) = text.parse::<Hotkey>() {
             out.push((Owner::Global(name), hk));
         }
     }

@@ -1,4 +1,4 @@
-//! Finding the external programs the process-level tests need (Xvfb, sway, ImageMagick, a
+//! Finding the external programs the process-level tests need (Xvfb, sway, `ImageMagick`, a
 //! Vulkan software driver) and building the folder the real binary is pointed at.
 
 use std::{

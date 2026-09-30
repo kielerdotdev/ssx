@@ -8,7 +8,7 @@
 use std::{sync::Arc, time::Duration};
 
 use egui::vec2;
-use egui_kittest::{Harness, kittest::Queryable};
+use egui_kittest::Harness;
 use ssx_core::history::History;
 use ssx_settings_ui::{
     SettingsApp,
@@ -415,5 +415,9 @@ fn the_history_never_dirties_the_settings() {
     click(&mut h, "Video Screenshot_2025-03-09_10-28-00.mp4");
     assert!(!h.state().model.is_dirty());
     let db: Arc<History> = h.state().host.history.open().unwrap();
-    assert_eq!(db.count(&Default::default()).unwrap(), 40, "browsing deletes nothing");
+    assert_eq!(
+        db.count(&ssx_core::history::Query::default()).unwrap(),
+        40,
+        "browsing deletes nothing"
+    );
 }
