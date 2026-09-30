@@ -109,6 +109,9 @@ impl TestEnv {
         std::fs::create_dir_all(&home).expect("home");
         let mut e = Self { dir, cfg, home, env: Vec::new() };
         e.set("SSX_CONFIG_DIR", e.cfg.display().to_string());
+        // Hermetic: never pick up an `ssx-editor-ui` that happens to be built next to `ssx`.
+        // Tests that exercise the editor override this with a fake helper.
+        e.set("SSX_EDITOR_UI", "none");
         e.set("HOME", e.home.display().to_string());
         e.set("XDG_CONFIG_HOME", e.home.join(".config").display().to_string());
         e.set("XDG_DATA_HOME", e.home.join(".local/share").display().to_string());

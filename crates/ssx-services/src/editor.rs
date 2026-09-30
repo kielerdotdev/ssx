@@ -21,7 +21,9 @@
 //! * Anything else is a failure; the last few KiB of its stderr are shown to the user.
 //!
 //! The helper is found via the `SSX_EDITOR_UI` environment variable (a full path), then next
-//! to the running executable, then on `PATH`.
+//! to the running executable, then on `PATH`. Setting `SSX_EDITOR_UI=none` (or `off`, or an
+//! empty value) disables the editor entirely, which keeps tests hermetic even when the helper
+//! happens to be built next to the binary under test.
 
 use std::{
     path::{Path, PathBuf},
@@ -54,8 +56,12 @@ pub struct ExternalEditor {
 impl ExternalEditor {
     /// Looks for the helper (environment variable, next to the executable, `PATH`).
     pub fn discover() -> Self {
+        let var = std::env::var_os(HELPER_ENV);
+        if var.as_deref().is_some_and(is_disabled) {
+            return Self { helper: None };
+        }
         Self::discover_with(
-            std::env::var_os(HELPER_ENV).map(PathBuf::from),
+            var.map(PathBuf::from),
             std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)),
         )
     }
@@ -78,6 +84,13 @@ impl ExternalEditor {
     pub fn helper(&self) -> Option<&Path> {
         self.helper.as_deref()
     }
+}
+
+/// `SSX_EDITOR_UI` values that mean "no editor": empty, `none` or `off` (any case).
+fn is_disabled(value: &std::ffi::OsStr) -> bool {
+    let v = value.to_string_lossy();
+    let v = v.trim();
+    v.is_empty() || v.eq_ignore_ascii_case("none") || v.eq_ignore_ascii_case("off")
 }
 
 impl Editor for ExternalEditor {
@@ -139,6 +152,17 @@ impl Editor for ExternalEditor {
 
 #[cfg(all(test, unix))]
 mod tests {
+    #[test]
+    fn disable_values_are_recognised() {
+        use std::ffi::OsStr;
+        for v in ["", "  ", "none", "NONE", "Off", " off "] {
+            assert!(super::is_disabled(OsStr::new(v)), "{v:?} should disable the editor");
+        }
+        for v in ["/usr/bin/ssx-editor-ui", "ssx-editor-ui", "nonexistent"] {
+            assert!(!super::is_disabled(OsStr::new(v)), "{v:?} is a path, not a disable switch");
+        }
+    }
+
     use std::{os::unix::fs::PermissionsExt, time::Instant};
 
     use super::*;
