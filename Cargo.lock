@@ -5651,6 +5651,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "ssx-settings-ui"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "eframe",
+ "egui",
+ "egui_kittest",
+ "half",
+ "image",
+ "proptest",
+ "rfd",
+ "serde",
+ "serde_json",
+ "ssx-cli",
+ "ssx-core",
+ "ssx-editor-ui",
+ "ssx-hdr",
+ "ssx-hotkeys",
+ "ssx-services",
+ "ssx-shell",
+ "ssx-types",
+ "ssx-upload",
+ "tempfile",
+ "thiserror 2.0.21",
+ "toml 0.9.12+spec-1.1.0",
+ "tracing",
+ "tracing-subscriber",
+ "windows-registry",
+]
+
+[[package]]
 name = "ssx-shell"
 version = "0.1.0"
 dependencies = [
