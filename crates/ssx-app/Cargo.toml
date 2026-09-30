@@ -66,5 +66,13 @@ zbus = { version = "5", default-features = false, features = ["async-io"] }
 async-io = "2"
 futures-lite = "2"
 
+# Headless sway tests drive the overlay with virtual pointer/keyboard protocols (the harness is
+# shared with ssx-overlay's tests through `#[path]`).
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+rustix = { version = "1", features = ["fs", "event", "time"] }
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+wayland-protocols-misc = { version = "0.3", features = ["client"] }
+
 [lints]
 workspace = true

@@ -215,6 +215,13 @@ impl TestEnv {
         self
     }
 
+    /// Uses `dir` as `XDG_RUNTIME_DIR` (a compositor's socket lives there).
+    pub fn with_run_dir(mut self, dir: &Path) -> Self {
+        self.run = dir.to_path_buf();
+        self.set("XDG_RUNTIME_DIR", dir.display().to_string());
+        self
+    }
+
     /// The data directory (`<cfg>/data`).
     pub fn data(&self) -> PathBuf {
         self.cfg.join("data")
