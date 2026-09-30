@@ -1,4 +1,4 @@
-//! One opened FFmpeg video encoder plus the per-encoder tuning table.
+//! One opened `FFmpeg` video encoder plus the per-encoder tuning table.
 //!
 //! [`VideoEncoder::open`] is shared by the runtime prober and the real encoder, so a
 //! probe exercises exactly the code path a recording will use (options, pixel format,
@@ -17,7 +17,7 @@ use crate::encode::{
 /// Encoder options derived from user settings for one candidate.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub(crate) struct Tuning {
-    /// AVOptions passed to `avcodec_open2`.
+    /// `AVOptions` passed to `avcodec_open2`.
     pub opts: Vec<(String, String)>,
     /// Target bitrate in bit/s (for rate-controlled encoders).
     pub bit_rate: Option<usize>,
@@ -57,10 +57,9 @@ fn crf_for(name: &str, p: QualityPreset) -> Option<u32> {
         "libx265" => [32, 28, 24, 20],
         "libvpx-vp9" => [40, 33, 27, 20],
         "libsvtav1" | "libaom-av1" => [42, 35, 28, 22],
-        "h264_nvenc" | "hevc_nvenc" | "av1_nvenc" => [30, 25, 21, 17],
-        "h264_amf" | "hevc_amf" | "av1_amf" => [30, 25, 21, 17],
+        "h264_nvenc" | "hevc_nvenc" | "av1_nvenc" | "h264_amf" | "hevc_amf" | "av1_amf"
+        | "h264_vaapi" | "hevc_vaapi" | "av1_vaapi" | "vp9_vaapi" => [30, 25, 21, 17],
         "h264_qsv" | "hevc_qsv" | "av1_qsv" | "vp9_qsv" => [32, 26, 22, 18],
-        "h264_vaapi" | "hevc_vaapi" | "av1_vaapi" | "vp9_vaapi" => [30, 25, 21, 17],
         _ => return None,
     };
     Some(table[i])
@@ -80,7 +79,7 @@ pub(crate) fn estimate_bitrate_kbps(codec: Codec, params: &VideoParams, p: Quali
     ((px_per_s * bpp * eff / 1000.0).round() as u32).max(200)
 }
 
-/// Builds the encoder options for `cand`. Pure, so it is unit-tested without FFmpeg.
+/// Builds the encoder options for `cand`. Pure, so it is unit-tested without `FFmpeg`.
 pub(crate) fn tuning(cand: &Candidate, s: &VideoSettings, p: &VideoParams) -> Tuning {
     let mut t = Tuning::default();
     let gop = (s.keyframe_interval.as_secs_f64() * p.fps.as_f64()).round() as u32;
@@ -285,11 +284,7 @@ impl VideoEncoder {
             } else {
                 ff::threading::Type::Frame
             };
-            ctx.set_threading(ff::threading::Config {
-                kind,
-                count: tune.threads,
-                ..Default::default()
-            });
+            ctx.set_threading(ff::threading::Config { kind, count: tune.threads });
         }
         let mut video = ctx.encoder().video().map_err(|e| format!("not a video encoder: {e}"))?;
         let time_base = Rational(params.fps.den() as i32, params.fps.num() as i32);
@@ -345,7 +340,7 @@ impl VideoEncoder {
         })
     }
 
-    /// Converts a planar frame into an AVFrame (uploading to the GPU if needed).
+    /// Converts a planar frame into an `AVFrame` (uploading to the GPU if needed).
     fn make_frame(&mut self, planar: &PlanarFrame, pts: i64) -> Result<frame::Video, String> {
         if planar.kind != self.input || (planar.width, planar.height) != self.size {
             return Err(format!(

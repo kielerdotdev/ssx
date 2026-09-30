@@ -122,7 +122,7 @@ impl Default for PipelineSettings {
 pub struct RecordConfig {
     /// Output file. Its extension is not consulted; `container` decides.
     pub output: PathBuf,
-    /// Container (MP4, WebM, MKV or GIF).
+    /// Container (MP4, `WebM`, MKV or GIF).
     pub container: Container,
     /// Constant output frame rate.
     pub fps: Fps,
@@ -241,7 +241,7 @@ pub struct SessionInfo {
     pub has_audio: bool,
 }
 
-/// Creates the encoder on the encoder thread (FFmpeg contexts are not `Send`).
+/// Creates the encoder on the encoder thread (`FFmpeg` contexts are not `Send`).
 pub type EncoderFactory = Box<dyn FnOnce(&OutputSpec) -> Result<Box<dyn Encoder>> + Send>;
 
 struct ConvItem {

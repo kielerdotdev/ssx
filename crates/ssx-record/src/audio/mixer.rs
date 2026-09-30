@@ -329,7 +329,7 @@ mod tests {
         let mut out = Vec::new();
         m.pop_ready(t0, &mut out);
         assert!(out.iter().all(|s| *s > 0.9 && *s <= 1.0), "{out:?}");
-        assert_eq!(limit(0.5), 0.5);
+        assert!((limit(0.5) - 0.5).abs() < f32::EPSILON);
         assert!(limit(-3.0) >= -1.0 && limit(-3.0) < -0.99);
     }
 

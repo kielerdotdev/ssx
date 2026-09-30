@@ -1,10 +1,10 @@
-//! FFmpeg encoder backend (`ffmpeg-next`): H.264 / HEVC / AV1 / VP9 into MP4, WebM, MKV.
+//! `FFmpeg` encoder backend (`ffmpeg-next`): H.264 / HEVC / AV1 / VP9 into MP4, `WebM`, MKV.
 //!
 //! Linking: the `system` feature links the distribution's `libav*` dynamically (development
-//! default), the `static` feature compiles FFmpeg from source and links it statically
+//! default), the `static` feature compiles `FFmpeg` from source and links it statically
 //! (see `build/README.md`). The Rust code is identical for both.
 //!
-//! Everything happens on one thread (the session's encoder thread): FFmpeg contexts are
+//! Everything happens on one thread (the session's encoder thread): `FFmpeg` contexts are
 //! not `Send`, so the encoder is *created* on that thread too.
 
 use std::{
@@ -35,7 +35,7 @@ use crate::{
 
 static INIT: Once = Once::new();
 
-/// Initialises FFmpeg once per process (log level, network off). FFmpeg's log output is
+/// Initialises `FFmpeg` once per process (log level, network off). `FFmpeg`'s log output is
 /// limited to errors so probing hardware encoders does not spam the console.
 pub fn init() {
     INIT.call_once(|| {
@@ -46,11 +46,11 @@ pub fn init() {
     });
 }
 
-/// Names of the video encoders compiled into the linked FFmpeg that ssx knows about,
+/// Names of the video encoders compiled into the linked `FFmpeg` that ssx knows about,
 /// for diagnostics (`available` means "listed", not "works": use the prober for that).
 pub fn listed_encoders() -> Vec<&'static str> {
-    init();
     use super::select::{Platform, candidates};
+    init();
     let mut names: Vec<&'static str> = Vec::new();
     for platform in [Platform::Windows, Platform::Linux, Platform::MacOs] {
         for codec in [
@@ -213,7 +213,7 @@ impl FfmpegEncoder {
                     &mut octx,
                     spec.container,
                     params,
-                    &spec.audio_settings,
+                    spec.audio_settings,
                     global_header,
                 ) {
                     Ok(a) => Some(a),

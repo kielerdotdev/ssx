@@ -9,7 +9,7 @@
 //!
 //! Tests skip with a printed reason when `sway` is missing.
 #![cfg(all(target_os = "linux", feature = "ffmpeg"))]
-#![allow(clippy::too_many_lines)]
+#![allow(clippy::too_many_lines, clippy::cast_possible_wrap)] // small sizes and timestamps
 
 #[path = "../../ssx-capture-wayland/tests/common/mod.rs"]
 mod common;
@@ -173,10 +173,10 @@ impl Dispatch<wl_buffer::WlBuffer, usize> for AState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let wl_buffer::Event::Release = ev {
-            if let Some(b) = st.bufs.get_mut(*i) {
-                b.busy = false;
-            }
+        if let wl_buffer::Event::Release = ev
+            && let Some(b) = st.bufs.get_mut(*i)
+        {
+            b.busy = false;
         }
     }
 }

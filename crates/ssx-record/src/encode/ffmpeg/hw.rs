@@ -1,7 +1,7 @@
-//! The few raw FFmpeg calls the safe wrapper does not cover: codec tags and the VA-API
+//! The few raw `FFmpeg` calls the safe wrapper does not cover: codec tags and the VA-API
 //! hardware frame upload.
 //!
-//! Every other hardware encoder we use (NVENC, AMF, QSV, Media Foundation, VideoToolbox)
+//! Every other hardware encoder we use (NVENC, AMF, QSV, Media Foundation, `VideoToolbox`)
 //! accepts ordinary NV12 system-memory frames, so only VA-API needs a hardware device and
 //! a frame pool. Zero-copy import of GPU textures into these encoders is documentation
 //! only (see the crate README).
@@ -14,7 +14,7 @@
 
 use ffmpeg_next::{self as ff, ffi, frame};
 
-/// Sets the FourCC written to the container for this stream (`hvc1` for HEVC in MP4).
+/// Sets the `FourCC` written to the container for this stream (`hvc1` for HEVC in MP4).
 pub(crate) fn set_codec_tag(video: &mut ff::encoder::video::Video, tag: [u8; 4]) {
     // SAFETY: `as_mut_ptr` returns the live AVCodecContext owned by `video`, and
     // `codec_tag` is a plain integer field that is only read when the encoder is opened.
@@ -30,7 +30,7 @@ pub(crate) struct HwUpload {
 }
 
 impl HwUpload {
-    /// Creates the VA-API device (`$SSX_VAAPI_DEVICE`, else FFmpeg's default render node)
+    /// Creates the VA-API device (`$SSX_VAAPI_DEVICE`, else `FFmpeg`'s default render node)
     /// and attaches an NV12 frame pool to the not-yet-opened encoder context.
     pub(crate) fn vaapi(
         video: &mut ff::encoder::video::Video,
@@ -44,7 +44,7 @@ impl HwUpload {
         // string that outlives the call; the options dictionary is null (none).
         let ret = unsafe {
             ffi::av_hwdevice_ctx_create(
-                &mut device,
+                &raw mut device,
                 ffi::AVHWDeviceType::AV_HWDEVICE_TYPE_VAAPI,
                 device_path.as_ref().map_or(std::ptr::null(), |p| p.as_ptr()),
                 std::ptr::null_mut(),
@@ -66,6 +66,8 @@ impl HwUpload {
         // it is initialised; `av_hwframe_ctx_init` is the documented next step, and
         // `av_buffer_ref` gives the encoder its own reference to the pool.
         unsafe {
+            // The buffer's data is a malloc'd (suitably aligned) AVHWFramesContext.
+            #[allow(clippy::cast_ptr_alignment)]
             let fc = (*frames).data.cast::<ffi::AVHWFramesContext>();
             (*fc).format = ffi::AVPixelFormat::AV_PIX_FMT_VAAPI;
             (*fc).sw_format = ffi::AVPixelFormat::AV_PIX_FMT_NV12;
@@ -112,10 +114,10 @@ impl Drop for HwUpload {
         // `av_buffer_unref` accepts a pointer to a pointer and nulls it.
         unsafe {
             if !self.frames.is_null() {
-                ffi::av_buffer_unref(&mut self.frames);
+                ffi::av_buffer_unref(&raw mut self.frames);
             }
             if !self.device.is_null() {
-                ffi::av_buffer_unref(&mut self.device);
+                ffi::av_buffer_unref(&raw mut self.device);
             }
         }
     }

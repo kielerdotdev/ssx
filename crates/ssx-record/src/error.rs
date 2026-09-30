@@ -25,7 +25,7 @@ pub enum SourceError {
     #[error("capture target not found: {0}")]
     TargetNotFound(String),
     /// The captured surface is delivered in a form we cannot read (for example
-    /// DMA-BUF-only PipeWire buffers).
+    /// DMA-BUF-only `PipeWire` buffers).
     #[error("unsupported buffer type: {0}")]
     UnsupportedBuffer(String),
     /// The capture backend failed while running.
@@ -92,7 +92,7 @@ pub enum RecordError {
     /// The configuration is inconsistent (odd size, unknown container, ...).
     #[error("invalid recording configuration: {0}")]
     InvalidConfig(String),
-    /// The build has no FFmpeg (the `ffmpeg` feature is off) but a video container was
+    /// The build has no `FFmpeg` (the `ffmpeg` feature is off) but a video container was
     /// requested.
     #[error("this build has no FFmpeg support (enable the `system` or `static` feature)")]
     NoFfmpeg,

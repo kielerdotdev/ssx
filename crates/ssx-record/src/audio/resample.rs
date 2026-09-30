@@ -247,7 +247,7 @@ mod tests {
         let rms = (mid.iter().map(|s| s * s).sum::<f32>() / mid.len() as f32).sqrt();
         assert!((rms - 0.5 / std::f32::consts::SQRT_2).abs() < 0.01, "rms {rms}");
         // Both channels identical (mono duplicated).
-        assert!(out.chunks(2).all(|f| f[0] == f[1]));
+        assert!(out.chunks(2).all(|f| f[0].to_bits() == f[1].to_bits()));
     }
 
     #[test]

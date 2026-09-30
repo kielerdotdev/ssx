@@ -1,7 +1,7 @@
 //! Encoder auto-selection: an ordered candidate chain, filtered by policy, walked with a
 //! [`Prober`] that finds out what *actually works* on this machine.
 //!
-//! Whether FFmpeg lists `h264_nvenc` says nothing about whether this PC has an NVIDIA GPU
+//! Whether `FFmpeg` lists `h264_nvenc` says nothing about whether this PC has an NVIDIA GPU
 //! and a working driver, so selection never trusts the encoder list. The production prober
 //! ([`crate::encode::ffmpeg::FfmpegProber`]) opens each candidate with a tiny test frame
 //! and encodes a few frames; [`CachingProber`] remembers the answer for the lifetime of the
@@ -13,10 +13,10 @@
 //!
 //! 1. hardware encoders of the requested codec, in vendor order for the platform
 //!    (Windows NVENC, AMF, QSV, Media Foundation; Linux NVENC, VAAPI, QSV; macOS
-//!    VideoToolbox);
+//!    `VideoToolbox`);
 //! 2. software encoders of that codec (`libx264` if GPL is allowed, `libopenh264`, ...);
-//! 3. if allowed, the same for other codecs the container can hold, ending in FFmpeg's
-//!    native `mpeg4`, which every FFmpeg build has.
+//! 3. if allowed, the same for other codecs the container can hold, ending in `FFmpeg`'s
+//!    native `mpeg4`, which every `FFmpeg` build has.
 
 use std::{collections::HashMap, sync::Mutex};
 
@@ -37,7 +37,7 @@ pub enum HwApi {
     Qsv,
     /// VA-API (Intel/AMD on Linux).
     Vaapi,
-    /// Apple VideoToolbox.
+    /// Apple `VideoToolbox`.
     VideoToolbox,
     /// Windows Media Foundation (vendor MFTs).
     MediaFoundation,
@@ -50,7 +50,7 @@ pub enum EncoderKind {
     Hardware(HwApi),
     /// A software library (libx264, libvpx, ...).
     Software,
-    /// FFmpeg's own software encoder (`mpeg4`).
+    /// `FFmpeg`'s own software encoder (`mpeg4`).
     Native,
 }
 
@@ -83,7 +83,7 @@ impl Platform {
 pub struct Candidate {
     /// Codec family it produces.
     pub codec: Codec,
-    /// FFmpeg encoder name.
+    /// `FFmpeg` encoder name.
     pub name: &'static str,
     /// Hardware or software.
     pub kind: EncoderKind,
@@ -201,7 +201,7 @@ pub struct SelectionRequest {
     pub allow_codec_fallback: bool,
     /// Platform whose hardware chain to use.
     pub platform: Platform,
-    /// A specific FFmpeg encoder name to force.
+    /// A specific `FFmpeg` encoder name to force.
     pub encoder_override: Option<String>,
 }
 
@@ -367,7 +367,7 @@ pub fn select(req: &SelectionRequest, prober: &dyn Prober) -> Result<Selection, 
     })
 }
 
-/// Finds the known candidate with this FFmpeg encoder name.
+/// Finds the known candidate with this `FFmpeg` encoder name.
 fn override_candidate(name: &str) -> Result<Candidate, RecordError> {
     for codec in [Codec::H264, Codec::Hevc, Codec::Av1, Codec::Vp9, Codec::Mpeg4] {
         for platform in [Platform::Windows, Platform::Linux, Platform::MacOs] {

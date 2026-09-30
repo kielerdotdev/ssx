@@ -166,7 +166,7 @@ fn record_error(e: RecordError) -> ServiceError {
     }
 }
 
-/// A prober for builds without FFmpeg: nothing but GIF works.
+/// A prober for builds without `FFmpeg`: nothing but GIF works.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoFfmpegProber;
 
@@ -191,7 +191,7 @@ impl std::fmt::Debug for SsxRecorder {
 }
 
 impl SsxRecorder {
-    /// A recorder with the default source factory and the real FFmpeg prober (cached).
+    /// A recorder with the default source factory and the real `FFmpeg` prober (cached).
     pub fn new(settings: RecorderSettings) -> Self {
         #[cfg(feature = "ffmpeg")]
         let prober: Arc<dyn Prober + Send + Sync> =

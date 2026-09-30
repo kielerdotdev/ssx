@@ -1,11 +1,11 @@
-//! Real audio devices through `cpal`, against a private headless PipeWire.
+//! Real audio devices through `cpal`, against a private headless `PipeWire`.
 //!
 //! The graph: a `null-audio-sink` that is the **default sink** (what "system audio" is), and a
 //! `pw-loopback` that exposes a virtual **default microphone**. `pw-play` puts a 300 Hz tone
 //! on the sink and a 700 Hz tone into the microphone. A recording with `CpalSource`s for
 //! both must contain both tones (mixed) and stay aligned with the video.
 //!
-//! What this proves: cpal's PipeWire host offers loopback and input capture, our device
+//! What this proves: cpal's `PipeWire` host offers loopback and input capture, our device
 //! selection and timestamping work, and the mix reaches the file. What it cannot prove:
 //! WASAPI loopback (needs Windows) or ALSA/PulseAudio-only systems.
 #![cfg(all(target_os = "linux", feature = "audio", feature = "ffmpeg"))]

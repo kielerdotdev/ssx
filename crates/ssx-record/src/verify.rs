@@ -1,6 +1,6 @@
 //! Decode-back verification of recordings (tests, the example's `--verify`, diagnostics).
 //!
-//! [`inspect`] fully decodes a file with FFmpeg and reports what a *player* would see:
+//! [`inspect`] fully decodes a file with `FFmpeg` and reports what a *player* would see:
 //! container and stream properties, every video frame's timestamp and (for the synthetic
 //! test pattern) its burnt-in frame counter, the first and last picture as RGB, the audio
 //! samples as `f32`, whether an MP4 has its `moov` atom in front (`faststart`), and
@@ -160,7 +160,7 @@ impl Mp4Layout {
 /// Everything [`inspect`] learned about a file.
 #[derive(Debug, Clone)]
 pub struct MediaReport {
-    /// FFmpeg demuxer name (`mov,mp4,m4a,3gp,3g2,mj2`, `matroska,webm`, `gif`).
+    /// `FFmpeg` demuxer name (`mov,mp4,m4a,3gp,3g2,mj2`, `matroska,webm`, `gif`).
     pub format: String,
     /// Container duration in seconds.
     pub duration: f64,
@@ -209,29 +209,31 @@ pub fn mp4_layout(path: &Path) -> std::io::Result<Mp4Layout> {
     Ok(Mp4Layout { boxes })
 }
 
+struct VState {
+    dec: ff::decoder::Video,
+    tb: Rational,
+    sws: Option<Sws>,
+    rep: VideoReport,
+}
+
+struct AState {
+    dec: ff::decoder::Audio,
+    tb: Rational,
+    rs: Option<resampling::Context>,
+    rep: AudioReport,
+}
+
 /// Decodes `path` completely. See the module docs.
 pub fn inspect(path: &Path) -> Result<MediaReport, String> {
     crate::encode::ffmpeg::init();
     let size = std::fs::metadata(path).map_err(|e| e.to_string())?.len();
-    let mut ictx = format::input(&path).map_err(|e| format!("cannot open {path:?}: {e}"))?;
+    let mut ictx =
+        format::input(&path).map_err(|e| format!("cannot open {}: {e}", path.display()))?;
     let format_name = ictx.format().name().to_owned();
     let duration = ictx.duration() as f64 / f64::from(ff::ffi::AV_TIME_BASE);
 
     let v_idx = ictx.streams().best(media::Type::Video).map(|s| s.index());
     let a_idx = ictx.streams().best(media::Type::Audio).map(|s| s.index());
-
-    struct VState {
-        dec: ff::decoder::Video,
-        tb: Rational,
-        sws: Option<Sws>,
-        rep: VideoReport,
-    }
-    struct AState {
-        dec: ff::decoder::Audio,
-        tb: Rational,
-        rs: Option<resampling::Context>,
-        rep: AudioReport,
-    }
 
     let mut v = match v_idx {
         Some(i) => {

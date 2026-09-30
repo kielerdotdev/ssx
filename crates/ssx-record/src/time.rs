@@ -134,7 +134,7 @@ impl Clock {
         if let Some(wait) = deadline.checked_sub(now)
             && wait > SPIN
         {
-            std::thread::sleep(wait - SPIN);
+            std::thread::sleep(wait.checked_sub(SPIN).unwrap());
         }
         while self.now() < deadline {
             std::hint::spin_loop();

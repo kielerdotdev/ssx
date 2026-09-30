@@ -4,8 +4,8 @@
 //! |---|---|---|
 //! | Windows | Windows Graphics Capture | the only API with window capture and float HDR frames |
 //! | Wayland, wlroots (sway, Hyprland, ...) | [`WlrootsSource`](super::wlroots::WlrootsSource) | prompt-free, damage driven |
-//! | Wayland, GNOME / KDE | xdg-desktop-portal ScreenCast + PipeWire | the only sanctioned way there; shows the compositor's picker once, then remembers the choice |
-//! | X11 (and XWayland as a last resort) | MIT-SHM `GetImage` loop | prompt-free |
+//! | Wayland, GNOME / KDE | xdg-desktop-portal `ScreenCast` + `PipeWire` | the only sanctioned way there; shows the compositor's picker once, then remembers the choice |
+//! | X11 (and `XWayland` as a last resort) | MIT-SHM `GetImage` loop | prompt-free |
 //!
 //! `Auto` probes in that order and returns the first that can connect; every failure is
 //! kept so the final error says why each path was rejected.
@@ -19,11 +19,11 @@ pub enum SourceKind {
     /// Choose for the running session (see the module docs).
     #[default]
     Auto,
-    /// X11 / XWayland `GetImage` loop.
+    /// X11 / `XWayland` `GetImage` loop.
     X11,
     /// Direct wlroots protocols.
     Wayland,
-    /// xdg-desktop-portal ScreenCast (GNOME, KDE, anything with a portal).
+    /// xdg-desktop-portal `ScreenCast` (GNOME, KDE, anything with a portal).
     Portal,
     /// Windows Graphics Capture.
     Windows,
@@ -91,6 +91,7 @@ fn open_wayland(_: SourceConfig) -> Result<Box<dyn FrameSource>, SourceError> {
 }
 
 #[cfg(all(target_os = "linux", feature = "portal"))]
+#[allow(clippy::unnecessary_wraps)] // same signature as the unsupported-platform variant
 fn open_portal(cfg: SourceConfig) -> Result<Box<dyn FrameSource>, SourceError> {
     Ok(Box::new(super::portal::PortalSource::new(cfg)))
 }
@@ -101,6 +102,7 @@ fn open_portal(_: SourceConfig) -> Result<Box<dyn FrameSource>, SourceError> {
 }
 
 #[cfg(windows)]
+#[allow(clippy::unnecessary_wraps)] // same signature as the other platforms' variant
 fn open_windows(cfg: SourceConfig) -> Result<Box<dyn FrameSource>, SourceError> {
     Ok(Box::new(super::windows::WgcSource::new(cfg)))
 }

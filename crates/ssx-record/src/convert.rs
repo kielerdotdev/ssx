@@ -105,7 +105,7 @@ impl Converter {
     pub fn convert(&mut self, frame: &Frame) -> Result<EncoderInput> {
         let hdr = frame.format().is_float();
         match self.cfg.kind {
-            InputKind::Rgba8 => self.to_rgba(frame),
+            InputKind::Rgba8 => self.make_rgba(frame),
             InputKind::Yuv420p | InputKind::Nv12 => {
                 if hdr && frame.size() == self.cfg.out_size {
                     #[cfg(feature = "gpu")]
@@ -113,13 +113,13 @@ impl Converter {
                         return Ok(EncoderInput::Planar(planar));
                     }
                 }
-                self.to_planar_cpu(frame)
+                self.make_planar_cpu(frame)
             }
         }
     }
 
     /// 8-bit sRGB RGBA at the source size (GIF; gifski scales itself).
-    fn to_rgba(&mut self, frame: &Frame) -> Result<EncoderInput> {
+    fn make_rgba(&mut self, frame: &Frame) -> Result<EncoderInput> {
         if frame.format().is_float() {
             self.cpu_hdr_frames += 1;
         }
@@ -158,7 +158,7 @@ impl Converter {
     }
 
     #[cfg(feature = "ffmpeg")]
-    fn to_planar_cpu(&mut self, frame: &Frame) -> Result<EncoderInput> {
+    fn make_planar_cpu(&mut self, frame: &Frame) -> Result<EncoderInput> {
         let sdr;
         let src = if frame.format().is_float() {
             self.cpu_hdr_frames += 1;
@@ -173,13 +173,14 @@ impl Converter {
             slot => slot.insert(sws::Scaler::new()),
         };
         let planar = scaler
-            .to_planar(src, self.cfg.out_size, self.cfg.kind)
+            .make_planar(src, self.cfg.out_size, self.cfg.kind)
             .map_err(RecordError::Convert)?;
         Ok(EncoderInput::Planar(planar))
     }
 
     #[cfg(not(feature = "ffmpeg"))]
-    fn to_planar_cpu(&mut self, _frame: &Frame) -> Result<EncoderInput> {
+    #[allow(clippy::unused_self)] // same signature as the FFmpeg build
+    fn make_planar_cpu(&mut self, _frame: &Frame) -> Result<EncoderInput> {
         Err(RecordError::NoFfmpeg)
     }
 }
@@ -250,8 +251,8 @@ pub(crate) mod sws {
         // documented constants; the remaining arguments are plain integers
         // (brightness 0, contrast and saturation 1.0 in 16.16 fixed point).
         unsafe {
-            let bt709 = ffi::sws_getCoefficients(ffi::SWS_CS_ITU709 as i32);
-            let default = ffi::sws_getCoefficients(ffi::SWS_CS_DEFAULT as i32);
+            let bt709 = ffi::sws_getCoefficients(ffi::SWS_CS_ITU709);
+            let default = ffi::sws_getCoefficients(ffi::SWS_CS_DEFAULT);
             let (inv, table) = if to_yuv { (default, bt709) } else { (bt709, default) };
             ffi::sws_setColorspaceDetails(
                 ctx.as_mut_ptr(),
@@ -290,7 +291,7 @@ pub(crate) mod sws {
         }
 
         /// Converts an 8-bit RGB frame to planar YUV of `out` size.
-        pub(crate) fn to_planar(
+        pub(crate) fn make_planar(
             &mut self,
             src: &Frame,
             out: Size,
@@ -299,7 +300,7 @@ pub(crate) mod sws {
             let src_fmt = match src.format() {
                 PixelFormat::Bgra8 => Pixel::BGRA,
                 PixelFormat::Rgba8 => Pixel::RGBA,
-                other => {
+                other @ PixelFormat::Rgba16F => {
                     return Err(format!("cannot convert {} directly", super::format_name(other)));
                 }
             };

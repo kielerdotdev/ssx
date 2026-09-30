@@ -453,7 +453,7 @@ mod tests {
             }
         }
         assert!(stamps.windows(2).all(|w| w[1] >= w[0]));
-        let span = stamps[11] - stamps[0];
+        let span = stamps[11].checked_sub(stamps[0]).unwrap();
         // 11 intervals of 16.67 ms.
         assert!(
             span >= Duration::from_millis(170) && span < Duration::from_millis(230),

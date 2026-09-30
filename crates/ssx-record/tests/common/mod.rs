@@ -23,7 +23,7 @@ pub fn sw_settings() -> VideoSettings {
     VideoSettings { hw: HwPolicy::SoftwareOnly, ..VideoSettings::default() }
 }
 
-/// Selects an encoder with the real FFmpeg prober.
+/// Selects an encoder with the real `FFmpeg` prober.
 pub fn select(container: Container, settings: &VideoSettings) -> Selection {
     encode::select(&SelectionRequest::from_settings(container, settings), &FfmpegProber)
         .expect("an encoder must be available on the test machine")

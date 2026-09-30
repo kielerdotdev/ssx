@@ -1,24 +1,24 @@
-//! GNOME / KDE (and any desktop with a portal): xdg-desktop-portal **ScreenCast** delivered
-//! through a **PipeWire** stream.
+//! GNOME / KDE (and any desktop with a portal): xdg-desktop-portal **`ScreenCast`** delivered
+//! through a **`PipeWire`** stream.
 //!
 //! Flow: `CreateSession` -> `SelectSources` (with the saved *restore token*) -> `Start` (the
 //! compositor's picker appears **once**; with a valid token it is skipped) ->
-//! `OpenPipeWireRemote` (a socket to the PipeWire instance the compositor exports the
-//! stream on) -> a PipeWire capture stream on the node the portal returned.
+//! `OpenPipeWireRemote` (a socket to the `PipeWire` instance the compositor exports the
+//! stream on) -> a `PipeWire` capture stream on the node the portal returned.
 //!
 //! * **Restore token.** After a successful `Start` the returned token is stored in the
 //!   application's data directory (`portal-restore-token`), so the next recording of the
 //!   same source starts without a prompt (`PersistMode::ExplicitlyRevoked`). A stale token is
 //!   ignored by the portal, which then shows the picker again.
-//! * **Buffers.** The format offered to PipeWire carries no DRM modifier, which tells the
-//!   compositor to fall back to plain shared memory (memfd / `MemPtr`), mapped by PipeWire
+//! * **Buffers.** The format offered to `PipeWire` carries no DRM modifier, which tells the
+//!   compositor to fall back to plain shared memory (memfd / `MemPtr`), mapped by `PipeWire`
 //!   (`MAP_BUFFERS`) and copied out with safe slices. If a compositor still delivers a
 //!   DMA-BUF the stream ends with [`SourceError::UnsupportedBuffer`] naming the problem.
 //!   Zero-copy DMA-BUF import into the GPU path is documentation only (see the README).
 //! * **Variable frame rate.** GNOME and KDE send a buffer only when the screen changed;
 //!   the newest one waits in a one-slot [`Mailbox`], so a slow consumer never builds up
 //!   a backlog, and the session's pacer repeats the last frame during idle time.
-//! * **Threads.** The PipeWire main loop runs on its own thread; the portal handshake
+//! * **Threads.** The `PipeWire` main loop runs on its own thread; the portal handshake
 //!   runs on the calling thread (`async-io`, no tokio).
 
 use std::{
@@ -31,7 +31,10 @@ use std::{
 
 use ashpd::desktop::{
     CreateSessionOptions, PersistMode, Session,
-    screencast::{CursorMode, Screencast, SelectSourcesOptions, SourceType},
+    screencast::{
+        CursorMode, OpenPipeWireRemoteOptions, Screencast, SelectSourcesOptions, SourceType,
+        StartCastOptions,
+    },
 };
 use pipewire as pw;
 use pw::{properties::properties, spa};
@@ -54,7 +57,7 @@ struct Negotiated {
 
 type Shared = Arc<(Mutex<Option<Negotiated>>, Condvar)>;
 
-/// Records a portal ScreenCast stream. See the module docs.
+/// Records a portal `ScreenCast` stream. See the module docs.
 pub struct PortalSource {
     cfg: SourceConfig,
     token_path: Option<PathBuf>,
@@ -120,7 +123,7 @@ impl PortalSource {
         self.used_restore_token
     }
 
-    /// The PipeWire node id the portal granted.
+    /// The `PipeWire` node id the portal granted.
     pub fn node_id(&self) -> u32 {
         self.node_id
     }
@@ -219,7 +222,7 @@ async fn negotiate(
         .response()
         .map_err(|e| portal_err(&e))?;
     let started = proxy
-        .start(&session, None, Default::default())
+        .start(&session, None, StartCastOptions::default())
         .await
         .map_err(|e| portal_err(&e))?
         .response()
@@ -233,7 +236,7 @@ async fn negotiate(
         .ok_or_else(|| SourceError::PermissionDenied("the portal granted no streams".into()))?;
     let node_id = stream.pipe_wire_node_id();
     let fd = proxy
-        .open_pipe_wire_remote(&session, Default::default())
+        .open_pipe_wire_remote(&session, OpenPipeWireRemoteOptions::default())
         .await
         .map_err(|e| portal_err(&e))?;
     Ok(Granted { session, fd, node_id, used_token: token.is_some() })
@@ -292,7 +295,7 @@ fn format_object(fps: crate::time::Fps) -> spa::pod::Object {
     )
 }
 
-/// Converts one mapped PipeWire buffer to a tightly packed BGRA frame.
+/// Converts one mapped `PipeWire` buffer to a tightly packed BGRA frame.
 fn to_frame(
     fmt: spa::param::video::VideoFormat,
     data: &[u8],
@@ -347,17 +350,24 @@ fn to_frame(
         .map_err(|e| SourceError::InvalidFrame(e.to_string()))
 }
 
-#[allow(clippy::too_many_lines)] // one linear PipeWire setup + main loop
-fn run_pipewire(
+/// What the `PipeWire` thread needs from its owner.
+struct PwJob {
     fd: OwnedFd,
     node_id: u32,
     fps: crate::time::Fps,
     clock: Clock,
-    shared: &Shared,
-    mailbox: &Arc<Mailbox<VideoFrame>>,
+    shared: Shared,
+    mailbox: Arc<Mailbox<VideoFrame>>,
+}
+
+#[allow(clippy::too_many_lines)] // one linear PipeWire setup + main loop
+fn run_pipewire(
+    job: PwJob,
     quit_rx: pw::channel::Receiver<()>,
     ready: &std::sync::mpsc::Sender<Result<(), SourceError>>,
 ) {
+    let PwJob { fd, node_id, fps, clock, shared, mailbox } = job;
+    let (shared, mailbox) = (&shared, &mailbox);
     pw::init();
     let setup = (|| -> Result<_, pw::Error> {
         let mainloop = pw::main_loop::MainLoopRc::new(None)?;
@@ -527,7 +537,8 @@ impl FrameSource for PortalSource {
             std::thread::Builder::new()
                 .name("ssx-pipewire".into())
                 .spawn(move || {
-                    run_pipewire(fd, node_id, fps, clock, &sh2, &mb2, quit_rx, &ready_tx)
+                    let job = PwJob { fd, node_id, fps, clock, shared: sh2, mailbox: mb2 };
+                    run_pipewire(job, quit_rx, &ready_tx);
                 })
                 .map_err(|e| {
                     SourceError::backend(BACKEND, format!("cannot start the PipeWire thread: {e}"))

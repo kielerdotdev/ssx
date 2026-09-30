@@ -1,4 +1,4 @@
-//! The audio half of the FFmpeg muxer: AAC / Opus encoding of the mixed `f32` stream.
+//! The audio half of the `FFmpeg` muxer: AAC / Opus encoding of the mixed `f32` stream.
 //!
 //! The pipeline delivers interleaved `f32` at the encoder's sample rate; this module
 //! only buffers to the encoder's fixed frame size (AAC wants exactly 1024 samples per
@@ -18,7 +18,7 @@ use crate::encode::{
     settings::{AudioCodec, AudioSettings, Container},
 };
 
-/// FFmpeg encoder names to try, in order.
+/// `FFmpeg` encoder names to try, in order.
 pub(crate) fn codec_names(container: Container, pref: AudioCodec) -> Vec<&'static str> {
     match (pref, container) {
         (AudioCodec::Aac, _) => vec!["aac"],
@@ -64,7 +64,7 @@ impl AudioEncoder {
         octx: &mut format::context::Output,
         container: Container,
         params: AudioParams,
-        settings: &AudioSettings,
+        settings: AudioSettings,
         global_header: bool,
     ) -> Result<Self, String> {
         let mut errors = Vec::new();
@@ -81,7 +81,7 @@ impl AudioEncoder {
         octx: &mut format::context::Output,
         name: &'static str,
         params: AudioParams,
-        settings: &AudioSettings,
+        settings: AudioSettings,
         global_header: bool,
     ) -> Result<Self, String> {
         let codec = encoder::find_by_name(name).ok_or("not built into this FFmpeg")?;

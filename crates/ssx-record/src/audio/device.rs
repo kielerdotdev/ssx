@@ -5,13 +5,13 @@
 //! | Platform | Microphone | System audio ("loopback") |
 //! |---|---|---|
 //! | Windows (WASAPI) | default input | an **input stream opened on an output device** turns on `AUDCLNT_STREAMFLAGS_LOOPBACK` |
-//! | Linux, PipeWire host | default source | sinks are exposed as duplex devices; an input stream on one sets `stream.capture.sink`, i.e. captures what plays to that sink |
-//! | Linux, PulseAudio host | default source | no loopback API, but monitor sources are ordinary sources: we pick the input device whose name says "monitor" |
+//! | Linux, `PipeWire` host | default source | sinks are exposed as duplex devices; an input stream on one sets `stream.capture.sink`, i.e. captures what plays to that sink |
+//! | Linux, `PulseAudio` host | default source | no loopback API, but monitor sources are ordinary sources: we pick the input device whose name says "monitor" |
 //! | Linux, plain ALSA | default | none (only via a sound-server plugin) |
-//! | macOS (CoreAudio) | default input | aggregate-device loopback, macOS 14.6+ |
+//! | macOS (`CoreAudio`) | default input | aggregate-device loopback, macOS 14.6+ |
 //!
-//! So [`CpalSource`] needs no extra dependency for loopback: it prefers the PipeWire host,
-//! then PulseAudio, then whatever `cpal` defaults to, and reports a clear
+//! So [`CpalSource`] needs no extra dependency for loopback: it prefers the `PipeWire` host,
+//! then `PulseAudio`, then whatever `cpal` defaults to, and reports a clear
 //! [`AudioError::NoDevice`] when a host offers no way to capture the system output.
 //!
 //! The stream lives on a dedicated worker thread (some `cpal` streams are `!Send`), which
@@ -83,9 +83,8 @@ fn err(e: &cpal::Error) -> AudioError {
 fn hosts() -> Vec<cpal::Host> {
     let mut ids = cpal::available_hosts();
     let rank = |name: &str| match name.to_ascii_lowercase().as_str() {
-        "pipewire" => 0,
+        "pipewire" | "wasapi" | "coreaudio" => 0,
         "pulseaudio" => 1,
-        "wasapi" | "coreaudio" => 0,
         "jack" => 8,
         _ => 5,
     };
@@ -225,7 +224,7 @@ fn pick_config(dev: &Device) -> Result<(StreamConfig, SampleFormat), AudioError>
     });
     match f32_cfg {
         Some(c) => Ok((c.with_sample_rate(want).into(), SampleFormat::F32)),
-        None => Ok((default.clone().into(), default.sample_format())),
+        None => Ok((default.into(), default.sample_format())),
     }
 }
 
@@ -280,16 +279,18 @@ impl CpalSource {
     }
 }
 
-fn worker(
+/// What the capture thread needs from its owner.
+struct Job {
     kind: DeviceKind,
     sel: DeviceSelector,
     clock: Clock,
     tx: SyncSender<AudioChunk>,
-    ready: &mpsc::Sender<Result<Ready, AudioError>>,
-    stop: &Receiver<()>,
     failure: Arc<Mutex<Option<String>>>,
     dropped: Arc<AtomicU64>,
-) {
+}
+
+fn worker(job: Job, ready: &mpsc::Sender<Result<Ready, AudioError>>, stop: &Receiver<()>) {
+    let Job { kind, sel, clock, tx, failure, dropped } = job;
     let opened = (|| {
         let mut last = AudioError::NoDevice("no audio host is available".into());
         for host in hosts() {
@@ -398,7 +399,9 @@ impl AudioSource for CpalSource {
         let dropped = Arc::clone(&self.dropped);
         let thread = std::thread::Builder::new()
             .name("ssx-audio-capture".into())
-            .spawn(move || worker(kind, sel, clock, tx, &ready_tx, &stop_rx, failure, dropped))
+            .spawn(move || {
+                worker(Job { kind, sel, clock, tx, failure, dropped }, &ready_tx, &stop_rx);
+            })
             .map_err(|e| AudioError::Backend { backend: "cpal", message: e.to_string() })?;
         let ready =
             ready_rx.recv_timeout(Duration::from_secs(10)).map_err(|_| AudioError::Backend {

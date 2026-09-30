@@ -4,7 +4,7 @@
 //! implementations exist:
 //!
 //! * [`ffmpeg::FfmpegEncoder`] (feature `ffmpeg`, enabled by `system` and `static`):
-//!   H.264 / HEVC / AV1 / VP9 into MP4, WebM or MKV, with hardware encoders first and
+//!   H.264 / HEVC / AV1 / VP9 into MP4, `WebM` or MKV, with hardware encoders first and
 //!   software fallbacks. Which encoder is used is decided by [`select`] against a
 //!   [`select::Prober`] that really tries to open each candidate.
 //! * [`gif::GifEncoder`] (feature `gif`): high quality animated GIF through `gifski`.
@@ -89,7 +89,7 @@ impl PlanarFrame {
         let (w, h) = (self.width as usize, self.height as usize);
         let luma = w * h;
         match (self.kind, i) {
-            (InputKind::Yuv420p, 0) | (InputKind::Nv12, 0) => Some((0, w, h, w)),
+            (InputKind::Yuv420p | InputKind::Nv12, 0) => Some((0, w, h, w)),
             (InputKind::Yuv420p, 1) => Some((luma, w / 2, h / 2, w / 2)),
             (InputKind::Yuv420p, 2) => Some((luma + luma / 4, w / 2, h / 2, w / 2)),
             (InputKind::Nv12, 1) => Some((luma, w, h / 2, w)),

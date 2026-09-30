@@ -9,7 +9,7 @@ use ssx_types::Size;
 pub enum Container {
     /// MP4 (H.264 / HEVC / AV1, AAC).
     Mp4,
-    /// WebM (VP9 / AV1, Opus).
+    /// `WebM` (VP9 / AV1, Opus).
     WebM,
     /// Matroska (anything).
     Mkv,
@@ -28,7 +28,7 @@ impl Container {
         }
     }
 
-    /// FFmpeg muxer name (`None` for GIF, which does not use FFmpeg).
+    /// `FFmpeg` muxer name (`None` for GIF, which does not use `FFmpeg`).
     pub const fn muxer(self) -> Option<&'static str> {
         match self {
             Self::Mp4 => Some("mp4"),
@@ -52,9 +52,8 @@ impl Container {
     /// Video codecs this container can hold.
     pub const fn supports(self, codec: Codec) -> bool {
         match self {
-            Self::Mp4 => !matches!(codec, Codec::Auto),
+            Self::Mp4 | Self::Mkv => !matches!(codec, Codec::Auto),
             Self::WebM => matches!(codec, Codec::Vp9 | Codec::Av1),
-            Self::Mkv => !matches!(codec, Codec::Auto),
             Self::Gif => false,
         }
     }
@@ -71,7 +70,7 @@ impl Container {
 /// Video codec family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Codec {
-    /// Pick by container (H.264 for MP4/MKV, VP9 for WebM).
+    /// Pick by container (H.264 for MP4/MKV, VP9 for `WebM`).
     #[default]
     Auto,
     /// H.264 / AVC.
@@ -82,7 +81,7 @@ pub enum Codec {
     Av1,
     /// VP9.
     Vp9,
-    /// MPEG-4 part 2 (the always-available last resort of FFmpeg's native encoders).
+    /// MPEG-4 part 2 (the always-available last resort of `FFmpeg`'s native encoders).
     Mpeg4,
 }
 
@@ -198,7 +197,7 @@ pub struct VideoSettings {
     /// If no encoder for `codec` works, try another codec the container can hold
     /// (H.264 to MPEG-4 to VP9...) instead of failing.
     pub allow_codec_fallback: bool,
-    /// Force one FFmpeg encoder by name (skips selection; for debugging and tests).
+    /// Force one `FFmpeg` encoder by name (skips selection; for debugging and tests).
     pub encoder_override: Option<String>,
     /// MP4 layout.
     pub mp4: Mp4Mode,
@@ -229,10 +228,10 @@ impl Default for VideoSettings {
 /// Audio codec choice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AudioCodec {
-    /// AAC for MP4/MKV, Opus for WebM.
+    /// AAC for MP4/MKV, Opus for `WebM`.
     #[default]
     Auto,
-    /// AAC (FFmpeg's native encoder).
+    /// AAC (`FFmpeg`'s native encoder).
     Aac,
     /// Opus (`libopus`).
     Opus,

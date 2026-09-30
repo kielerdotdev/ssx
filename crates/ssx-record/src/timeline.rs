@@ -53,11 +53,11 @@ impl Timeline {
                 break;
             }
             match end {
-                Some(end) if t >= end => paused += end - start,
+                Some(end) if t >= end => paused += end.checked_sub(start).unwrap(),
                 _ => return None,
             }
         }
-        Some(t - paused)
+        Some(t.checked_sub(paused).unwrap())
     }
 
     /// Total time spent paused before clock time `t` (an open pause counts up to `t`).
@@ -67,7 +67,7 @@ impl Timeline {
             if t <= start {
                 break;
             }
-            paused += end.unwrap_or(t).min(t) - start;
+            paused += end.unwrap_or(t).min(t).checked_sub(start).unwrap();
         }
         paused
     }
@@ -208,8 +208,9 @@ mod tests {
         }
         for (a, b) in [(0u64, 2000u64), (50, 950), (1500, 1800), (0, 100)] {
             let total: Duration =
-                t.active_segments(ms(a), ms(b)).iter().map(|(s, e)| *e - *s).sum();
-            let expected = (ms(b) - t.paused_before(ms(b))) - (ms(a) - t.paused_before(ms(a)));
+                t.active_segments(ms(a), ms(b)).iter().map(|(s, e)| e.saturating_sub(*s)).sum();
+            let recorded = |x: u64| ms(x).saturating_sub(t.paused_before(ms(x)));
+            let expected = recorded(b).saturating_sub(recorded(a));
             assert_eq!(total, expected, "[{a},{b})");
         }
     }

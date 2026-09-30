@@ -2,6 +2,7 @@
 //! degradation. Files are decoded back and compared with what the counters claim.
 
 #![cfg(feature = "ffmpeg")]
+#![allow(clippy::cast_possible_wrap)] // small counts and timestamps
 
 use std::{
     path::{Path, PathBuf},
@@ -388,7 +389,7 @@ fn max_size_stops_and_finalises_the_file() {
     let r = s.stop().unwrap();
     assert_eq!(why, Some(EndReason::MaxSize), "{r:?}");
     let size = std::fs::metadata(&path).unwrap().len();
-    assert!(size >= 150_000 && size < 1_500_000, "{size}");
+    assert!((150_000..1_500_000).contains(&size), "{size}");
     let rep = inspect(&path).unwrap();
     assert!(rep.seekable && rep.mp4.unwrap().has_moov());
 }

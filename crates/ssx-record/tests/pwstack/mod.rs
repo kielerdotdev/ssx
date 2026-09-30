@@ -1,4 +1,4 @@
-//! Test support shared by the PipeWire tests: a private D-Bus session bus and a private,
+//! Test support shared by the `PipeWire` tests: a private D-Bus session bus and a private,
 //! headless `pipewire` + `wireplumber` pair (no sound card, no desktop needed).
 #![allow(dead_code)] // each test binary uses a different subset
 

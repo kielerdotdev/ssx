@@ -1,19 +1,19 @@
-//! ScreenCast portal -> PipeWire recording, end to end without a desktop:
+//! `ScreenCast` portal -> `PipeWire` recording, end to end without a desktop:
 //!
 //! * a private D-Bus session bus (`dbus-daemon`),
 //! * a headless `pipewire` + `wireplumber` pair in a private runtime directory,
 //! * a **video producer node** (`Video/Source`) drawing a moving box, standing in for the
 //!   compositor's screen-cast node,
 //! * a **mock `org.freedesktop.portal.ScreenCast`** service that implements the portal's
-//!   request/response protocol (CreateSession, SelectSources, Start, OpenPipeWireRemote)
-//!   and hands out a socket to the private PipeWire instance.
+//!   request/response protocol (`CreateSession`, `SelectSources`, Start, `OpenPipeWireRemote`)
+//!   and hands out a socket to the private `PipeWire` instance.
 //!
 //! `PortalSource` talks to all of that exactly as it would to GNOME or KDE. What this does
 //! *not* prove: a real compositor's stream (buffer types, damage behaviour), and the
 //! compositor's picker UI. Tests skip with a printed reason when `dbus-daemon`, `pipewire` or
 //! `wireplumber` are missing.
 #![cfg(all(target_os = "linux", feature = "portal", feature = "ffmpeg"))]
-#![allow(clippy::too_many_lines)]
+#![allow(clippy::too_many_lines, clippy::used_underscore_binding, clippy::cast_possible_wrap)] // zbus macro expansion; small ids
 
 use std::{
     collections::HashMap,
@@ -182,7 +182,7 @@ impl Producer {
                     let c = d.chunk_mut();
                     *c.offset_mut() = 0;
                     *c.stride_mut() = (W * 4) as i32;
-                    *c.size_mut() = (W * H * 4) as u32;
+                    *c.size_mut() = W * H * 4;
                 })
                 .register()
                 .expect("listener");

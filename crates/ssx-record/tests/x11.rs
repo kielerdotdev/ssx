@@ -3,6 +3,7 @@
 //! right speed. Skips (with a printed reason) when Xvfb is not installed.
 
 #![cfg(all(feature = "ffmpeg", unix, not(target_vendor = "apple")))]
+#![allow(clippy::cast_possible_wrap)] // small window sizes
 
 use std::{
     io::{BufRead, BufReader},
@@ -111,12 +112,12 @@ impl Animator {
                 0,
                 WindowClass::INPUT_OUTPUT,
                 0,
-                &CreateWindowAux::new().background_pixel(0x000000).override_redirect(1),
+                &CreateWindowAux::new().background_pixel(0).override_redirect(1),
             )
             .unwrap();
             conn.map_window(win).unwrap();
             let red = conn.generate_id().unwrap();
-            conn.create_gc(red, win, &CreateGCAux::new().foreground(0xff0000)).unwrap();
+            conn.create_gc(red, win, &CreateGCAux::new().foreground(0x00ff_0000)).unwrap();
             conn.flush().unwrap();
             let _ = ready_tx.send(());
             let t0 = Instant::now();

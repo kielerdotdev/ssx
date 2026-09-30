@@ -11,8 +11,8 @@
 //! * `next_frame(timeout)` sleeps to the deadline with [`Clock::sleep_until`] and returns
 //!   [`SourceEvent::Timeout`] instead if the next slot is beyond `timeout`.
 //!
-//! Cursor: XFixes `GetCursorImage` blended into the frame by the capture crate on every
-//! call when [`SourceConfig::cursor`] is set. XDamage is *not* used: `GetImage` of the
+//! Cursor: `XFixes` `GetCursorImage` blended into the frame by the capture crate on every
+//! call when [`SourceConfig::cursor`] is set. `XDamage` is *not* used: `GetImage` of the
 //! root window costs about the same as a damage round trip on the local server and the
 //! pacer already turns static content into cheap duplicates downstream.
 //!
@@ -28,7 +28,7 @@ use ssx_types::{ColorSpace, Frame, PixelFormat, Size};
 use super::{CaptureTarget, FrameSource, SourceConfig, SourceEvent, SourceInfo, VideoFrame};
 use crate::{error::SourceError, time::Clock};
 
-/// Records an X11 (or XWayland) display.
+/// Records an X11 (or `XWayland`) display.
 #[derive(Debug)]
 pub struct X11Source {
     cfg: SourceConfig,

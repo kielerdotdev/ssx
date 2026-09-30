@@ -193,12 +193,11 @@ impl AudioPipeline {
         lane.alive = false;
         lane.src.stop();
         self.mixer.end_lane(i);
-        match err {
-            Some(e) => {
-                tracing::warn!(source = %lane.name, error = %e, "audio source failed; continuing without it");
-                self.warnings.push(format!("audio source `{}` stopped: {e}", lane.name));
-            }
-            None => tracing::debug!(source = %lane.name, "audio source ended"),
+        if let Some(e) = err {
+            tracing::warn!(source = %lane.name, error = %e, "audio source failed; continuing without it");
+            self.warnings.push(format!("audio source `{}` stopped: {e}", lane.name));
+        } else {
+            tracing::debug!(source = %lane.name, "audio source ended");
         }
     }
 
@@ -216,24 +215,24 @@ impl AudioPipeline {
         let dur = Duration::from_secs_f64(frames as f64 / rate);
         let segments = self.timeline.with(|tl| tl.active_segments(ts, ts + dur));
         for (s, e) in segments {
-            let a = ((s - ts).as_secs_f64() * rate).round() as usize;
-            let b = (((e - ts).as_secs_f64() * rate).round() as usize).min(frames);
+            let a = (s.checked_sub(ts).unwrap().as_secs_f64() * rate).round() as usize;
+            let b =
+                ((e.checked_sub(ts).unwrap().as_secs_f64() * rate).round() as usize).min(frames);
             if b <= a {
                 continue;
             }
             let rec = self.timeline.map(s).unwrap_or(s);
             let samples = &chunk.samples[a * ch..b * ch];
-            match origin {
-                Some(o) => self.process_segment(i, rec, samples, o),
-                None => {
-                    let l = &mut self.lanes[i];
-                    l.pending.push((rec, samples.to_vec()));
-                    l.pending_frames += b - a;
-                    // Bound the memory held while waiting for the first video frame.
-                    while l.pending_frames as f64 / rate > MAX_PRE_ORIGIN.as_secs_f64() {
-                        let (_, old) = l.pending.remove(0);
-                        l.pending_frames -= old.len() / ch;
-                    }
+            if let Some(o) = origin {
+                self.process_segment(i, rec, samples, o);
+            } else {
+                let l = &mut self.lanes[i];
+                l.pending.push((rec, samples.to_vec()));
+                l.pending_frames += b - a;
+                // Bound the memory held while waiting for the first video frame.
+                while l.pending_frames as f64 / rate > MAX_PRE_ORIGIN.as_secs_f64() {
+                    let (_, old) = l.pending.remove(0);
+                    l.pending_frames -= old.len() / ch;
                 }
             }
         }
@@ -263,13 +262,14 @@ impl AudioPipeline {
 
         // Trim what precedes the video's first frame.
         let (t, mut samples) = if rec >= origin {
-            (rec - origin, samples)
+            (rec.checked_sub(origin).unwrap(), samples)
         } else {
-            let skip = ((origin - rec).as_secs_f64() * rate_in).round() as usize;
+            let skip = (origin.checked_sub(rec).unwrap().as_secs_f64() * rate_in).round() as usize;
             if skip * ch >= samples.len() {
                 return;
             }
-            let t = Duration::from_secs_f64(skip as f64 / rate_in).saturating_sub(origin - rec);
+            let t = Duration::from_secs_f64(skip as f64 / rate_in)
+                .saturating_sub(origin.checked_sub(rec).unwrap());
             (t, &samples[skip * ch..])
         };
 

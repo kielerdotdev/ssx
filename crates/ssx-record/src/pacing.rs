@@ -1,6 +1,6 @@
 //! Constant-frame-rate pacing: turning irregular source frames into a fixed slot grid.
 //!
-//! Screen sources are *damage driven* (PipeWire, WGC deliver a frame only when something
+//! Screen sources are *damage driven* (`PipeWire`, WGC deliver a frame only when something
 //! changed) or jittery (a polling loop wakes up a little early or late). Encoders and
 //! players want a constant rate. [`CfrPacer`] maps source frames onto slots
 //! `0, 1, 2, ...` at `slot_time(k) = k / fps`:
@@ -218,7 +218,9 @@ mod tests {
         // and every emitted slot is accounted for.
         let mut seed = 0x1234_5678_9abc_def0_u64;
         let mut rnd = move || {
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
             (seed >> 33) as u32
         };
         for fps in [Fps::FPS_24, Fps::FPS_30, Fps::FPS_60, Fps::new(30_000, 1001)] {

@@ -336,7 +336,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                     st.wlr = Some(registry.bind(name, version.min(3), qh, ()));
                 }
                 "ext_image_copy_capture_manager_v1" => {
-                    st.ext = Some(registry.bind(name, 1, qh, ()))
+                    st.ext = Some(registry.bind(name, 1, qh, ()));
                 }
                 "ext_output_image_capture_source_manager_v1" => {
                     st.ext_src = Some(registry.bind(name, 1, qh, ()));
@@ -406,11 +406,11 @@ impl Dispatch<ZwlrScreencopyFrameV1, (usize, u64)> for State {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
+        use zwlr_screencopy_frame_v1::Event;
         let Some(s) = st.slots.get_mut(*slot) else { return };
         if s.generation != *generation {
             return;
         }
-        use zwlr_screencopy_frame_v1::Event;
         match event {
             Event::Buffer { format, width, height, stride } => {
                 s.wlr.buffers.push((raw(format), width, height, stride));
@@ -438,8 +438,8 @@ impl Dispatch<ExtImageCopyCaptureSessionV1, usize> for State {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        let Some(s) = st.slots.get_mut(*slot) else { return };
         use ext_image_copy_capture_session_v1::Event;
+        let Some(s) = st.slots.get_mut(*slot) else { return };
         let e = &mut s.ext;
         let begin = |e: &mut ExtProgress| {
             if e.fresh {
@@ -475,11 +475,11 @@ impl Dispatch<ExtImageCopyCaptureFrameV1, (usize, u64)> for State {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
+        use ext_image_copy_capture_frame_v1::Event;
         let Some(s) = st.slots.get_mut(*slot) else { return };
         if s.generation != *generation {
             return;
         }
-        use ext_image_copy_capture_frame_v1::Event;
         match event {
             Event::Transform { transform } => s.ext.transform = Transform::from_wl(raw(transform)),
             Event::Ready => s.ext.ready = true,
@@ -795,17 +795,16 @@ fn select_outputs(
     };
     // Frames are stitched at native resolution, so an output must be 1:1 with its
     // rectangle in the desktop layout.
-    if chosen.iter().any(|o| o.native_size != o.rect.size()) {
-        if chosen.len() > 1 || crop.is_some() {
-            warnings.push(
+    if chosen.iter().any(|o| o.native_size != o.rect.size()) && (chosen.len() > 1 || crop.is_some())
+    {
+        warnings.push(
                 "outputs with different or fractional scales are not resampled per frame; recording the first output only"
                     .into(),
             );
-            chosen.truncate(1);
-            return Ok((chosen, None));
-        }
-        // A single output scaled against the layout is fine: we record it natively.
+        chosen.truncate(1);
+        return Ok((chosen, None));
     }
+    // A single output scaled against the layout is fine: we record it natively.
     Ok((chosen, crop))
 }
 
