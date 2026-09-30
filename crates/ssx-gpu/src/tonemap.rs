@@ -210,10 +210,8 @@ impl GpuTonemapper {
 
     fn pipeline(&self, h: &Arc<DeviceHandle>) -> Result<Arc<Pipeline>> {
         let mut cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(p) = &cache.pipeline {
-            if p.generation == h.generation() {
-                return Ok(Arc::clone(p));
-            }
+        if let Some(p) = cache.pipeline.as_ref().filter(|p| p.generation == h.generation()) {
+            return Ok(Arc::clone(p));
         }
         cache.scratch.clear();
         let kernel = ComputeKernel::new(
@@ -590,7 +588,8 @@ mod tests {
         let p = params_bytes(&s, Some(200.0)).unwrap();
         let g = PixelParams::new(&s, 200.0).to_gpu();
         assert_eq!(bytemuck::bytes_of(&p).len(), 48);
-        assert!(p.scale.to_bits() == g.scale.to_bits() && p.mode == g.mode && p.c == g.c);
+        assert!(p.scale.to_bits() == g.scale.to_bits() && p.mode == g.mode);
+        assert!(p.c.iter().zip(&g.c).all(|(a, b)| a.to_bits() == b.to_bits()));
     }
 
     #[test]

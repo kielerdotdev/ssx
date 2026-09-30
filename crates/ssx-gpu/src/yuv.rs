@@ -114,7 +114,7 @@ fn q16(v: f64) -> i32 {
 }
 
 impl YuvOptions {
-    pub(crate) fn coeffs(&self) -> Coeffs {
+    pub(crate) fn coeffs(self) -> Coeffs {
         let (kr, kb) = self.matrix.kr_kb();
         let kg = 1.0 - kr - kb;
         let (ys, yo, cs, range) = match self.range {
@@ -305,11 +305,12 @@ pub mod cpu {
     use ssx_types::{Frame, PixelFormat};
 
     use super::{Coeffs, GpuError, Result, YuvFrame, YuvLayout, YuvOptions, even};
+    use crate::util::to_i32;
 
     /// RGB of pixel `(x, y)` of an 8-bit frame with coordinates clamped to the frame.
     fn rgb_at(frame: &Frame, x: i32, y: i32) -> [i32; 3] {
-        let x = x.clamp(0, frame.width() as i32 - 1) as usize;
-        let y = y.clamp(0, frame.height() as i32 - 1) as u32;
+        let x = x.clamp(0, to_i32(frame.width() as usize) - 1) as usize;
+        let y = y.clamp(0, to_i32(frame.height() as usize) - 1) as u32;
         let p = &frame.row(y)[x * 4..x * 4 + 4];
         match frame.format() {
             PixelFormat::Bgra8 => [i32::from(p[2]), i32::from(p[1]), i32::from(p[0])],
@@ -348,7 +349,7 @@ pub mod cpu {
         let mut data = Vec::with_capacity(cw * ch * 3 / 2);
         for y in 0..ch {
             for x in 0..cw {
-                data.push(luma(&k, rgb_at(frame, x as i32, y as i32)));
+                data.push(luma(&k, rgb_at(frame, to_i32(x), to_i32(y))));
             }
         }
         let chroma_at = |cx: usize, cy: usize| {
@@ -356,7 +357,7 @@ pub mod cpu {
             for r in 0..2 {
                 for (t, w) in k.taps.iter().enumerate() {
                     if *w != 0 {
-                        let p = rgb_at(frame, (2 * cx + t) as i32 - 1, (2 * cy + r) as i32);
+                        let p = rgb_at(frame, to_i32(2 * cx + t) - 1, to_i32(2 * cy + r));
                         for c in 0..3 {
                             sum[c] += w * p[c];
                         }

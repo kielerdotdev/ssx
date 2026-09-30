@@ -233,7 +233,7 @@ fn hdr_gradients_up_to_ten_times_white() {
 #[test]
 fn random_colours_including_negative_channels() {
     let Some(t) = tonemapper() else { return };
-    let mut rng = Rng(0xC0FFEE);
+    let mut rng = Rng(0x00C0_FFEE);
     let mut total = Diff::default();
     for (lo, hi) in [(0.0, 1.0), (-1.0, 3.0), (-3.0, 25.0), (-0.05, 0.05), (-100.0, 100.0)] {
         let f = random_frame(&mut rng, 256, 128, 8, 203.0, lo, hi);
@@ -552,6 +552,17 @@ fn device_loss_is_recovered() {
     );
 }
 
+fn assert_send_sync<T: Send + Sync>() {}
+
+#[test]
+fn handles_are_send_and_sync() {
+    assert_send_sync::<GpuContext>();
+    assert_send_sync::<GpuTonemapper>();
+    assert_send_sync::<ssx_gpu::YuvConverter>();
+    assert_send_sync::<ssx_gpu::GpuFx>();
+    assert_send_sync::<ssx_gpu::DeviceHandle>();
+}
+
 #[test]
 fn global_context_is_shared() {
     let Ok(a) = GpuContext::global() else {
@@ -561,11 +572,6 @@ fn global_context_is_shared() {
     let b = GpuContext::global().unwrap();
     assert!(std::ptr::eq(a, b));
     assert!(GpuContext::global().is_ok());
-    fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<GpuContext>();
-    assert_send_sync::<GpuTonemapper>();
-    assert_send_sync::<ssx_gpu::YuvConverter>();
-    assert_send_sync::<ssx_gpu::GpuFx>();
 }
 
 // --- GPU-resident path -------------------------------------------------------------

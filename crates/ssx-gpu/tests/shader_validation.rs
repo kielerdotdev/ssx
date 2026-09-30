@@ -41,14 +41,12 @@ fn all_shaders_parse_and_validate() {
 /// `(name, offset)` of every member and the total span of the WGSL struct `name`.
 fn wgsl_struct(module: &naga::Module, name: &str) -> (Vec<(String, u32)>, u32) {
     for (_, ty) in module.types.iter() {
-        if ty.name.as_deref() == Some(name) {
-            if let TypeInner::Struct { members, span } = &ty.inner {
-                let m = members
-                    .iter()
-                    .map(|m| (m.name.clone().unwrap_or_default(), m.offset))
-                    .collect();
-                return (m, *span);
-            }
+        if ty.name.as_deref() == Some(name)
+            && let TypeInner::Struct { members, span } = &ty.inner
+        {
+            let m =
+                members.iter().map(|m| (m.name.clone().unwrap_or_default(), m.offset)).collect();
+            return (m, *span);
         }
     }
     panic!("struct {name} not found");

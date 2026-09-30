@@ -340,7 +340,7 @@ impl YuvConverter {
                 reason: format!("planes need {cap} bytes, device limit {limit}; convert in bands"),
             });
         }
-        h.scoped(|| Ok(make_pass(&h, pair, input, kind, opts, cap)))
+        h.scoped(|| Ok(make_pass(&h, pair, input, kind, *opts, cap)))
     }
 
     /// Converts an 8-bit sRGB frame (`Rgba8`/`Bgra8`) to 4:2:0 on the GPU.
@@ -397,7 +397,7 @@ impl YuvConverter {
         let mut attempt = 0;
         loop {
             let h = self.ctx.handle()?;
-            match self.convert_once(&h, frame, kind, tonemap.as_ref(), opts) {
+            match self.convert_once(&h, frame, kind, tonemap.as_ref(), *opts) {
                 Err(e) if e.is_device_lost() && attempt == 0 => {
                     attempt += 1;
                     tracing::warn!("device lost during YUV conversion; retrying: {e}");
@@ -413,7 +413,7 @@ impl YuvConverter {
         frame: &Frame,
         kind: YuvInput,
         tonemap: Option<&ParamsBytes>,
-        opts: &YuvOptions,
+        opts: YuvOptions,
     ) -> Result<YuvFrame> {
         let (w, height) = (frame.width(), frame.height());
         let limits = *self.limits.lock().unwrap_or_else(PoisonError::into_inner);
@@ -457,7 +457,7 @@ impl YuvConverter {
             if let (Some(t), Some(buf)) = (tonemap, band.pass.tonemap_params.as_ref()) {
                 h.queue().write_buffer(buf, 0, bytemuck::bytes_of(t));
             }
-            band.pass.opts = *opts;
+            band.pass.opts = opts;
             let mut y0 = 0;
             while y0 < height {
                 let rows = band_h.min(height - y0);
@@ -469,7 +469,7 @@ impl YuvConverter {
         match result {
             Ok(()) => {
                 self.put_band(band);
-                YuvFrame::new(opts, w, height, data, frame.timestamp)
+                YuvFrame::new(&opts, w, height, data, frame.timestamp)
             }
             Err(e) => Err(e),
         }
@@ -479,7 +479,7 @@ impl YuvConverter {
         &self,
         h: &Arc<DeviceHandle>,
         kind: YuvInput,
-        opts: &YuvOptions,
+        opts: YuvOptions,
         alloc: (u32, u32),
     ) -> Result<Band> {
         let pair = self.pair(h, kind.is_hdr())?;
@@ -551,23 +551,22 @@ impl YuvConverter {
                 *k = Kernels { generation: h.generation(), ..Kernels::default() };
                 self.bands.lock().unwrap_or_else(PoisonError::into_inner).clear();
             }
-            match &k.inverse {
-                Some(p) => Arc::clone(p),
-                None => {
-                    let p = Arc::new(ComputeKernel::new(
-                        &h,
-                        "ssx yuv->rgb",
-                        YUV_TO_RGB_WGSL,
-                        "main",
-                        &[
-                            (0, Bind::Uniform),
-                            (1, Bind::StorageRead),
-                            (2, Bind::StorageTexture(wgpu::TextureFormat::Rgba8Unorm)),
-                        ],
-                    )?);
-                    k.inverse = Some(Arc::clone(&p));
-                    p
-                }
+            if let Some(p) = &k.inverse {
+                Arc::clone(p)
+            } else {
+                let p = Arc::new(ComputeKernel::new(
+                    &h,
+                    "ssx yuv->rgb",
+                    YUV_TO_RGB_WGSL,
+                    "main",
+                    &[
+                        (0, Bind::Uniform),
+                        (1, Bind::StorageRead),
+                        (2, Bind::StorageTexture(wgpu::TextureFormat::Rgba8Unorm)),
+                    ],
+                )?);
+                k.inverse = Some(Arc::clone(&p));
+                p
             }
         };
         let (w, hgt) = (yuv.width(), yuv.height());
@@ -688,7 +687,7 @@ fn make_pass(
     kernels: Arc<Pair>,
     input: &wgpu::TextureView,
     kind: YuvInput,
-    opts: &YuvOptions,
+    opts: YuvOptions,
     capacity: u64,
 ) -> YuvPass {
     let dev = h.device();
@@ -731,7 +730,7 @@ fn make_pass(
         kernels,
         handle: Arc::clone(h),
         input_kind: kind,
-        opts: *opts,
+        opts,
         bind_luma,
         bind_chroma,
         yuv_params,
@@ -829,14 +828,14 @@ mod tests {
     fn wgsl_members(src: &str, name: &str) -> (Vec<(String, u32)>, u32) {
         let module = naga::front::wgsl::parse_str(src).expect("shader parses");
         for (_, ty) in module.types.iter() {
-            if ty.name.as_deref() == Some(name) {
-                if let naga::TypeInner::Struct { members, span } = &ty.inner {
-                    let m = members
-                        .iter()
-                        .map(|m| (m.name.clone().unwrap_or_default(), m.offset))
-                        .collect();
-                    return (m, *span);
-                }
+            if ty.name.as_deref() == Some(name)
+                && let naga::TypeInner::Struct { members, span } = &ty.inner
+            {
+                let m = members
+                    .iter()
+                    .map(|m| (m.name.clone().unwrap_or_default(), m.offset))
+                    .collect();
+                return (m, *span);
             }
         }
         panic!("struct {name} not found");

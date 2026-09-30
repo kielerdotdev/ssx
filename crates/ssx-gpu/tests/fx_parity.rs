@@ -71,7 +71,7 @@ fn blur_properties() {
     let out = fx.gaussian_blur_region(&f, region, 3.0).unwrap();
     for y in 0..40u32 {
         for x in 0..50u32 {
-            let inside = region.contains(ssx_types::Point::new(x as i32, y as i32));
+            let inside = region.contains(ssx_types::Point::new(x.cast_signed(), y.cast_signed()));
             let (a, b) = (&f.row(y)[x as usize * 4..][..4], &out.row(y)[x as usize * 4..][..4]);
             if !inside {
                 assert_eq!(a, b, "pixel {x},{y} outside the region changed");
@@ -199,7 +199,7 @@ fn resize_properties() {
         let out = fx.resize(&ramp, 32, 4, filter).unwrap();
         for i in 3..29u32 {
             let got = i32::from(out.row(1)[i as usize * 4]);
-            assert!((got - (4 * i as i32 + 1)).abs() <= 1, "{filter:?} output {i}: {got}");
+            assert!((got - (4 * i.cast_signed() + 1)).abs() <= 1, "{filter:?} output {i}: {got}");
         }
     }
     // Timestamps carry over.

@@ -15,7 +15,7 @@ pub fn gpu() -> Option<&'static GpuContext> {
     static CTX: OnceLock<Option<GpuContext>> = OnceLock::new();
     let ctx = CTX.get_or_init(|| match GpuContext::new_default() {
         Ok(c) => {
-            eprintln!("ssx-gpu tests: using {:?}", c);
+            eprintln!("ssx-gpu tests: using {c:?}");
             Some(c)
         }
         Err(e) => {
@@ -104,6 +104,7 @@ pub struct Diff {
     pub pixels: usize,
     pub channels_differing: usize,
     pub pixels_differing: usize,
+    #[allow(clippy::struct_field_names)] // `d.max_diff` reads best at the call sites
     pub max_diff: u32,
     /// Pixels differing by more than one code.
     pub pixels_over_one: usize,
@@ -163,10 +164,6 @@ pub fn rgba_frame(
 
 /// SMPTE-style colour bars over a grey ramp: top 2/3 bars, bottom third ramp.
 pub fn colour_bars(x: u32, y: u32, w: u32, h: u32) -> [u8; 4] {
-    if y * 3 >= h * 2 {
-        let v = (x * 255 / w.max(2).saturating_sub(1).max(1)).min(255) as u8;
-        return [v, v, v, 255];
-    }
     const BARS: [[u8; 3]; 8] = [
         [255, 255, 255],
         [255, 255, 0],
@@ -177,6 +174,10 @@ pub fn colour_bars(x: u32, y: u32, w: u32, h: u32) -> [u8; 4] {
         [0, 0, 255],
         [0, 0, 0],
     ];
+    if y * 3 >= h * 2 {
+        let v = (x * 255 / w.max(2).saturating_sub(1).max(1)).min(255) as u8;
+        return [v, v, v, 255];
+    }
     let b = BARS[(x * 8 / w.max(1)).min(7) as usize];
     [b[0], b[1], b[2], 255]
 }

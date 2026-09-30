@@ -10,6 +10,12 @@ use crate::{
 /// `wgpu::COPY_BYTES_PER_ROW_ALIGNMENT` as `usize`.
 pub(crate) const ROW_ALIGN: usize = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
 
+/// `usize` to `i32`, saturating (pixel coordinates never get near the limit; saturating
+/// keeps the conversion total instead of wrapping).
+pub(crate) fn to_i32(v: usize) -> i32 {
+    i32::try_from(v).unwrap_or(i32::MAX)
+}
+
 /// Rounds `v` up to a multiple of `a` (`a > 0`).
 pub(crate) const fn align_up(v: usize, a: usize) -> usize {
     v.div_ceil(a) * a

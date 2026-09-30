@@ -87,7 +87,7 @@ pub fn gaussian_taps(len: u32, sigma: f32) -> Result<Taps> {
     let taps = row.len() as u32;
     let mut weights = Vec::with_capacity(len as usize * row.len());
     let mut starts = Vec::with_capacity(len as usize);
-    for i in 0..len as i32 {
+    for i in 0..len.cast_signed() {
         starts.push(i - radius);
         weights.extend_from_slice(&row);
     }
@@ -134,7 +134,9 @@ pub fn resize_taps(src_len: u32, dst_len: u32, filter: ResizeFilter) -> Taps {
             let j = (center.floor() as i64).clamp(0, i64::from(src_len) - 1);
             rows.push((j as i32, vec![1.0]));
         } else {
-            w.iter_mut().for_each(|v| *v /= sum);
+            for v in &mut w {
+                *v /= sum;
+            }
             rows.push((lo as i32, w));
         }
     }
@@ -605,6 +607,8 @@ fn paste(frame: &Frame, region: Rect, pixels: &[u8]) -> Result<Frame> {
 pub mod cpu {
     use ssx_types::{Frame, PixelFormat, Rect};
 
+    use crate::util::to_i32;
+
     use super::{
         GpuError, MAX_BLOCK, ResizeFilter, Result, Taps, check_region, gaussian_taps, paste,
         require_sdr8, resize_taps,
@@ -639,11 +643,11 @@ pub mod cpu {
         let mut out = Vec::with_capacity(dw * dh);
         for y in 0..dh {
             for x in 0..dw {
-                let (i, last) = if horizontal { (x, sw as i32 - 1) } else { (y, sh as i32 - 1) };
+                let (i, last) = if horizontal { (x, to_i32(sw) - 1) } else { (y, to_i32(sh) - 1) };
                 let (start, w) = (t.starts[i], t.row(i));
                 let mut acc = [0.0f32; 4];
                 for (k, wk) in w.iter().enumerate() {
-                    let s = (start + k as i32).clamp(0, last) as usize;
+                    let s = (start + to_i32(k)).clamp(0, last) as usize;
                     let p = if horizontal { src[y * sw + s] } else { src[s * sw + x] };
                     for c in 0..4 {
                         acc[c] += wk * p[c];
@@ -722,6 +726,7 @@ pub mod cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::to_i32;
 
     #[test]
     fn gaussian_rows_are_normalised_and_symmetric() {
@@ -733,7 +738,7 @@ mod tests {
             for i in 0..row.len() / 2 {
                 assert!((row[i] - row[row.len() - 1 - i]).abs() < 1e-7);
             }
-            assert_eq!(t.starts[2], 2 - (row.len() as i32 / 2));
+            assert_eq!(t.starts[2], 2 - to_i32(row.len()) / 2);
         }
     }
 
@@ -765,7 +770,7 @@ mod tests {
         for i in 0..9 {
             let row = t.row(i);
             let peak = row.iter().position(|w| *w > 0.99).expect("delta");
-            assert_eq!(t.starts[i] + peak as i32, i as i32);
+            assert_eq!(t.starts[i] + to_i32(peak), to_i32(i));
         }
     }
 }

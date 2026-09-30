@@ -73,7 +73,7 @@ pub struct GpuOptions {
     /// Case-insensitive substring of the adapter name, or `#N` for the N-th adapter of the
     /// ranked list. `None` lets the policy decide.
     pub adapter: Option<String>,
-    /// Only consider software / fallback adapters (llvmpipe, WARP, SwiftShader).
+    /// Only consider software / fallback adapters (llvmpipe, WARP, `SwiftShader`).
     pub force_fallback_adapter: bool,
     /// Prefer an integrated GPU over a discrete one (laptops on battery).
     pub prefer_low_power: bool,
@@ -87,9 +87,10 @@ impl GpuOptions {
         let backend =
             std::env::var("SSX_GPU_BACKEND").ok().or_else(|| std::env::var("WGPU_BACKEND").ok());
         if let Some(b) = backend {
-            match BackendChoice::parse(&b) {
-                Some(c) => o.backend = c,
-                None => tracing::warn!("ignoring unknown GPU backend `{b}`"),
+            if let Some(c) = BackendChoice::parse(&b) {
+                o.backend = c;
+            } else {
+                tracing::warn!("ignoring unknown GPU backend `{b}`");
             }
         }
         o.adapter = std::env::var("SSX_GPU_ADAPTER").ok().filter(|s| !s.trim().is_empty());
