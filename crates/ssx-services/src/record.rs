@@ -31,11 +31,12 @@ use ssx_record::{
     adapter::{
         AudioSelection, OpenedSources, RecorderSettings, SourceFactory, SsxRecorder, default_audio,
     },
-    encode::Mp4Mode,
     source::{CaptureTarget, SourceConfig, auto::SourceKind},
     time::Fps,
 };
 use ssx_types::{Monitor, Rect};
+
+pub use ssx_record::encode::Mp4Mode;
 
 use crate::{
     capture::{LastRegionStore, PickRequest, RegionSelector, ScreenCapturer},
