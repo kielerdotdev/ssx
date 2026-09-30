@@ -134,10 +134,13 @@ pub fn select_via_helper_timed(
         .map_err(|source| HelperError::Spawn { path: helper.to_path_buf(), source })?;
     let mut guard = ChildGuard(Some(child));
 
-    // Feed the request; a helper that dies early makes this fail, which we report through
-    // the exit status below rather than as a bare broken pipe.
+    // Feed the request from a thread: a wedged helper that never reads must not be able to
+    // block us past the timeout (large window lists exceed the pipe buffer). A helper that
+    // dies early makes the write fail, which is reported through its exit status below.
     if let Some(mut stdin) = guard.child().stdin.take() {
-        let _ = stdin.write_all(&json);
+        thread::spawn(move || {
+            let _ = stdin.write_all(&json);
+        });
     }
     let mut stdout = guard.child().stdout.take().expect("piped");
     let mut stderr = guard.child().stderr.take().expect("piped");

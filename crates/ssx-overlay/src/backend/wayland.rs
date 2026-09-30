@@ -225,6 +225,8 @@ struct Surf {
     rect: Rect,
     /// Logical size from the compositor's configure.
     logical: Option<(u32, u32)>,
+    /// The output's own logical size, used when a configure says "your choice" (0x0).
+    fallback: (u32, u32),
     viewport: Option<WpViewport>,
     bufs: Vec<Buf>,
     configured: bool,
@@ -623,9 +625,9 @@ impl State {
     fn configured(&mut self, idx: usize, size: (i32, i32)) {
         let Some(s) = self.surfs.get(idx) else { return };
         // Compositors may send 0x0 meaning "your choice": fall back to the output's
-        // logical size (derived from the desktop rectangle).
-        let lw = if size.0 > 0 { size.0 as u32 } else { s.rect.width };
-        let lh = if size.1 > 0 { size.1 as u32 } else { s.rect.height };
+        // logical size.
+        let lw = if size.0 > 0 { size.0 as u32 } else { s.fallback.0 };
+        let lh = if size.1 > 0 { size.1 as u32 } else { s.fallback.1 };
         let rect = s.rect;
         let first = !s.configured;
         if first && let Err(e) = self.alloc_buffers(idx) {
@@ -959,6 +961,7 @@ pub(super) fn run(app: &mut OverlayApp, flavour: Flavour) -> Result<(), Failure>
             role,
             rect,
             logical: None,
+            fallback: (logical[oi].width.max(1) as u32, logical[oi].height.max(1) as u32),
             viewport: None,
             bufs: Vec::new(),
             configured: false,
