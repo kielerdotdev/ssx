@@ -366,6 +366,8 @@ impl EditorApp {
 
     fn run_dev_hooks(&mut self, ctx: &Context) {
         if let Some(n) = self.dev.exit_after_frames {
+            // egui repaints on demand; a frame-count exit needs frames to keep coming.
+            ctx.request_repaint();
             if self.frame_index >= u64::from(n) && self.finished.is_none() {
                 self.finished = Some(EditorOutcome::cancelled());
             }

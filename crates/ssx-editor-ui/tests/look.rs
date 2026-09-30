@@ -13,6 +13,10 @@ fn dump_states() {
         eprintln!("SSX_UI_DUMP not set; nothing to dump");
         return;
     }
+    if let Some(dir) = dump_dir() {
+        let _ = std::fs::create_dir_all(&dir);
+        dashboard().save(dir.join("dashboard.png")).expect("write the fixture image");
+    }
     let mut h = window(app_for(dashboard()), [1280.0, 800.0]);
     settle(&mut h);
     annotate::annotate(&mut h);
