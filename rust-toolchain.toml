@@ -1,4 +1,10 @@
+# The toolchain every build uses, locally and in CI, so a new Rust release cannot turn CI red
+# overnight (clippy's pedantic group gains lints every release). Upgrade deliberately:
+#   1. change the version here AND in .github/workflows/*.yml (search for 1.94.1),
+#   2. run `cargo clippy --workspace --all-targets` and fix what the new compiler reports.
+# The non-blocking `lints-latest` CI job shows what the next upgrade will need.
 [toolchain]
-channel = "stable"
+channel = "1.94.1"
 components = ["rustfmt", "clippy"]
 targets = ["x86_64-pc-windows-msvc"]
+profile = "minimal"

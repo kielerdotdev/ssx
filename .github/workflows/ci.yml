@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with: { components: rustfmt }
+        with: { toolchain: "1.94.1", components: rustfmt }
       - run: cargo fmt --all -- --check
 
   # The full workspace, with every live test: X11 (Xvfb), wlroots (headless sway), GPU shaders
@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with: { components: clippy }
+        with: { toolchain: "1.94.1", components: clippy }
       - uses: Swatinem/rust-cache@v2
       - name: System libraries and test tooling
         run: |
@@ -51,6 +51,33 @@ jobs:
       - name: Tests
         run: xvfb-run -a cargo test --workspace --no-fail-fast
 
+  # Informational canary (never blocks): how does the newest stable Rust see this code? A red
+  # result here is the to-do list for the next deliberate toolchain upgrade (see rust-toolchain.toml).
+  lints-latest:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      RUSTUP_TOOLCHAIN: stable
+      RUSTFLAGS: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { components: clippy }
+      - uses: Swatinem/rust-cache@v2
+        with: { key: latest }
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config clang libclang-dev nasm \
+            libwayland-dev libdbus-1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libx11-dev libxcb1-dev libxcb-shm0-dev libxcb-randr0-dev libxcb-xfixes0-dev \
+            libxcb-shape0-dev libxi-dev libxrandr-dev libxcursor-dev libgl-dev libegl-dev \
+            libpulse-dev libasound2-dev libpipewire-0.3-dev libxdo-dev \
+            libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev \
+            libavfilter-dev libavdevice-dev
+      - run: rustc --version && cargo clippy --workspace --all-targets
+
   # Windows has no system FFmpeg, so CI builds the FFmpeg-free ("lite") feature set: everything
   # except MP4/WebM encoding. The vcpkg-FFmpeg build that ships is exercised by release.yml.
   windows:
@@ -63,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with: { components: clippy }
+        with: { toolchain: "1.94.1", components: clippy }
       - uses: Swatinem/rust-cache@v2
       - name: Clippy
         run: |
@@ -96,5 +123,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with: { toolchain: "1.94.1" }
       - uses: Swatinem/rust-cache@v2
       - run: cargo check -p ssx-types -p ssx-hdr -p ssx-capture -p ssx-platform -p ssx-core -p ssx-editor -p ssx-imgfx -p ssx-upload
