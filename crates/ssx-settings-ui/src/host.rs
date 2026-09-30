@@ -156,7 +156,7 @@ impl DoctorSource for SystemDoctor {
             },
             paths: paths.clone(),
             cancel: ssx_core::workflow::CancelToken::new(),
-            first_interrupt: Default::default(),
+            first_interrupt: std::sync::Arc::default(),
             out: Style::plain(),
             err: Style::plain(),
         };

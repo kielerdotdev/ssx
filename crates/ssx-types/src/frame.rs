@@ -483,7 +483,8 @@ mod tests {
         let mut f = Frame::new(Size::new(1, 1), PixelFormat::Rgba16F, ColorSpace::ScRgbLinear);
         f.set_opaque();
         let a = half::f16::from_le_bytes([f.data()[6], f.data()[7]]);
-        assert_eq!(a.to_f32(), 1.0);
+        // 1.0 is exactly representable in f16, so an exact comparison is the point of the test.
+        assert!((a.to_f32() - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]
