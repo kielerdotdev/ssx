@@ -285,8 +285,14 @@ pub fn show(ui: &mut Ui, state: &mut AppState, doc: &EditorDoc) {
             }
             widgets::separator(ui);
             // Right-to-left: add redo first so undo ends up on its left.
-            history_button(ui, state, doc, false);
-            history_button(ui, state, doc, true);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+                history_button(ui, state, doc, false);
+            });
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+                history_button(ui, state, doc, true);
+            });
         });
     });
 }

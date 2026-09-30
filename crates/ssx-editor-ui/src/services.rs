@@ -43,6 +43,10 @@ pub trait FileDialogs {
     fn request(&mut self, purpose: DialogPurpose, dir: Option<&Path>, file_name: Option<&str>);
     /// The answer to a finished dialog, if any.
     fn poll(&mut self) -> Option<DialogReply>;
+    /// Test hook: the scripted fake behind this trait object, if it is one.
+    fn as_fake(&mut self) -> Option<&mut FakeDialogs> {
+        None
+    }
 }
 
 /// System clipboard access.
@@ -74,6 +78,11 @@ impl Services {
             dialogs: Box::new(SystemDialogs::new(repaint)),
             clipboard: Box::new(SystemClipboard::default()),
         }
+    }
+
+    /// The scripted dialogs when these are [`Services::fake`].
+    pub fn dialogs_fake(&mut self) -> Option<&mut FakeDialogs> {
+        self.dialogs.as_fake()
     }
 
     /// Scripted in-memory services for tests.
@@ -241,6 +250,10 @@ impl FileDialogs for FakeDialogs {
 
     fn poll(&mut self) -> Option<DialogReply> {
         self.ready.pop_front()
+    }
+
+    fn as_fake(&mut self) -> Option<&mut FakeDialogs> {
+        Some(self)
     }
 }
 
