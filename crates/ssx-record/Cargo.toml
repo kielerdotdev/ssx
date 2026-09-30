@@ -1,0 +1,24 @@
+[package]
+name = "ssx-record"
+description = "Screen recording: frame sources, audio, encoders (FFmpeg, gifski) and the recording session for ssx."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+ssx-types.workspace = true
+ssx-capture.workspace = true
+ssx-hdr.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+half.workspace = true
+ffmpeg-next = { version = "9" }
+
+[features]
+portal = []
+
+[lints]
+workspace = true
