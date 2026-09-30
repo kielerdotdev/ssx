@@ -96,7 +96,7 @@ pub fn color_button(
     let mut result = None;
     let hsva_id = popup_id.with("hsva");
     let hex_id = popup_id.with("hex");
-    let open_before = Popup::is_id_open(ui.ctx(), Popup::default_response_id(&resp));
+    let open_before = Popup::is_id_open(ui.ctx(), popup_id);
     let popup = Popup::from_toggle_button_response(&resp)
         .close_behavior(PopupCloseBehavior::CloseOnClickOutside)
         .id(popup_id);
@@ -118,6 +118,9 @@ pub fn color_button(
                             StrokeKind::Outside,
                         );
                     }
+                    resp.widget_info(|| {
+                        egui::WidgetInfo::labeled(egui::WidgetType::Button, true, c.to_hex())
+                    });
                     if resp.on_hover_text(c.to_hex()).clicked() {
                         out = Some(c.with_alpha(color.a.max(1)));
                     }
@@ -131,6 +134,13 @@ pub fn color_button(
                 for c in state.prefs.recent_colors.clone() {
                     let (r, resp) = ui.allocate_exact_size(vec2(18.0, 18.0), Sense::click());
                     paint_swatch(ui, r, c, false);
+                    resp.widget_info(|| {
+                        egui::WidgetInfo::labeled(
+                            egui::WidgetType::Button,
+                            true,
+                            format!("Recent {}", c.to_hex()),
+                        )
+                    });
                     if resp.on_hover_text(c.to_hex()).clicked() {
                         out = Some(c);
                     }
@@ -207,7 +217,7 @@ pub fn color_button(
         result = Some(c);
     }
     // Remember the final colour when the popup closes after a change.
-    let open_now = Popup::is_id_open(ui.ctx(), Popup::default_response_id(&resp));
+    let open_now = Popup::is_id_open(ui.ctx(), popup_id);
     if open_before && !open_now {
         if !color.is_transparent() {
             state.note_color(color);

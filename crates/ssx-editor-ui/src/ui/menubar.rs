@@ -136,9 +136,10 @@ fn view_menu(ui: &mut Ui, state: &mut AppState) {
 }
 
 /// Undo/redo button with the history popup on its chevron.
-fn history_chevron(ui: &mut Ui, enabled: bool) -> egui::Response {
+fn history_chevron(ui: &mut Ui, enabled: bool, label: &str) -> egui::Response {
     let chev = ui
         .add_enabled(enabled, egui::Button::new("").min_size(egui::vec2(14.0, 28.0)).frame(false));
+    chev.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, label));
     let colors = crate::icons::IconColors::with_ink(if enabled {
         super::theme::TEXT_DIM
     } else {
@@ -176,13 +177,18 @@ fn history_button(
         (Some(n), true) => format!("{label} {n}"),
         _ => label.to_owned(),
     };
-    let mut chev = if chevron_first { Some(history_chevron(ui, enabled)) } else { None };
+    let mut chev = if chevron_first {
+        Some(history_chevron(ui, enabled, if undo { "Undo history" } else { "Redo history" }))
+    } else {
+        None
+    };
     let r = icon_button(ui, icon, &tip, chord.as_deref(), false, enabled);
     if r.clicked() {
         state.push(action);
     }
     if chev.is_none() {
-        chev = Some(history_chevron(ui, enabled));
+        chev =
+            Some(history_chevron(ui, enabled, if undo { "Undo history" } else { "Redo history" }));
     }
     let Some(chev) = chev else { return };
     // History list, opened from the chevron next to the button.

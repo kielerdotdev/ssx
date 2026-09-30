@@ -24,8 +24,8 @@ use std::{
 
 use egui::{
     Align2, Color32, ColorImage, CursorIcon, Event, FontId, Key, Mesh, MouseWheelUnit,
-    PointerButton, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, TextureHandle, TextureOptions,
-    TextureWrapMode, Ui, Vec2, pos2, vec2,
+    PointerButton, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, TextureHandle, TextureOptions, Ui,
+    Vec2, pos2, vec2,
 };
 use ssx_editor::{Document, Modifiers, ObjectKind, Overlay, PointF, RectF, RenderOptions};
 use ssx_types::Frame;
@@ -53,6 +53,9 @@ const _: () = assert!(TILE == 512);
 pub struct CanvasStats {
     /// Tiles (or tile regions) rendered so far.
     pub regions_rendered: u64,
+    /// Pixels rendered so far (area of all regions), to show that only what is visible or dirty
+    /// is ever rendered.
+    pub pixels_rendered: u64,
     /// Total time spent in the engine's renderer, in milliseconds.
     pub render_ms: f64,
     /// Engine time spent during the last frame, in milliseconds.
@@ -81,7 +84,6 @@ pub struct Canvas {
     planner: TilePlanner,
     textures: HashMap<TileKey, TextureHandle>,
     stale: Option<Stale>,
-    checker: Option<TextureHandle>,
     captured: bool,
     panning: Option<Pan>,
     last_pointer: Option<Pos2>,
@@ -125,6 +127,47 @@ fn frame_to_image(frame: &Frame, w: usize, h: usize) -> ColorImage {
     ColorImage::from_rgba_unmultiplied([w, h], &data)
 }
 
+fn background_is_opaque(d: &Document) -> bool {
+    matches!(d.canvas().background, ssx_editor::Fill::Solid { color } if color.a == 255)
+}
+
+/// Paints the transparency chequerboard over `area`, aligned to `origin` (the canvas corner).
+/// Built from quads rather than a repeating texture so it looks the same on every backend; the
+/// cell grows on huge areas to bound the vertex count.
+fn paint_checker(painter: &egui::Painter, area: Rect, origin: Pos2) {
+    let light = Color32::from_rgb(112, 112, 118);
+    let dark = Color32::from_rgb(88, 88, 94);
+    painter.rect_filled(area, 0.0, light);
+    let mut cell = 8.0f32;
+    while (area.width() / cell) * (area.height() / cell) > 24_000.0 {
+        cell *= 2.0;
+    }
+    let mut mesh = Mesh::default();
+    let (i0, j0) = (
+        ((area.min.x - origin.x) / cell).floor() as i32,
+        ((area.min.y - origin.y) / cell).floor() as i32,
+    );
+    let (i1, j1) = (
+        ((area.max.x - origin.x) / cell).ceil() as i32,
+        ((area.max.y - origin.y) / cell).ceil() as i32,
+    );
+    for j in j0..j1 {
+        for i in i0..i1 {
+            if (i + j).rem_euclid(2) == 1 {
+                let cellr = Rect::from_min_size(
+                    origin + vec2(i as f32 * cell, j as f32 * cell),
+                    Vec2::splat(cell),
+                );
+                let r = cellr.intersect(area);
+                if r.is_positive() {
+                    mesh.add_colored_rect(r, dark);
+                }
+            }
+        }
+    }
+    painter.add(Shape::mesh(mesh));
+}
+
 /// `u32` pixel count to `i32` coordinates (images never approach the limit).
 fn px_i32(v: u32) -> i32 {
     i32::try_from(v).unwrap_or(i32::MAX)
@@ -143,7 +186,6 @@ impl Canvas {
             planner: TilePlanner::new(1.0, (0, 0)),
             textures: HashMap::new(),
             stale: None,
-            checker: None,
             captured: false,
             panning: None,
             last_pointer: None,
@@ -168,25 +210,6 @@ impl Canvas {
         self.panning = None;
         self.probe = None;
         self.reset_tiles();
-    }
-
-    fn checker_texture(&mut self, ctx: &egui::Context) -> egui::TextureId {
-        let tex = self.checker.get_or_insert_with(|| {
-            let a = Color32::from_rgb(112, 112, 118);
-            let b = Color32::from_rgb(88, 88, 94);
-            let img = ColorImage::new([2, 2], vec![a, b, b, a]);
-            ctx.load_texture(
-                "ssx-checker",
-                img,
-                TextureOptions {
-                    magnification: egui::TextureFilter::Nearest,
-                    minification: egui::TextureFilter::Nearest,
-                    wrap_mode: TextureWrapMode::Repeat,
-                    mipmap_mode: None,
-                },
-            )
-        });
-        tex.id()
     }
 
     fn canvas_offset(doc: &Document) -> (f32, f32) {
@@ -226,6 +249,7 @@ impl Canvas {
             doc.doc()
         };
         let (cw, ch) = content_doc.canvas_size();
+        let see_through = !background_is_opaque(content_doc);
         let key = if previewing { preview.revision * 2 + 1 } else { 0 };
         if key != self.source_key {
             self.source_key = key;
@@ -304,22 +328,10 @@ impl Canvas {
             .as_shape(crect, 0.0),
         );
         let visible_c = crect.intersect(rect);
-        if visible_c.is_positive() {
-            let tex = self.checker_texture(&ctx);
-            let cell_pts = 8.0;
-            let uv = Rect::from_min_max(
-                pos2(
-                    (visible_c.min.x - crect.min.x) / (2.0 * cell_pts),
-                    (visible_c.min.y - crect.min.y) / (2.0 * cell_pts),
-                ),
-                pos2(
-                    (visible_c.max.x - crect.min.x) / (2.0 * cell_pts),
-                    (visible_c.max.y - crect.min.y) / (2.0 * cell_pts),
-                ),
-            );
-            let mut m = Mesh::with_texture(tex);
-            m.add_rect_with_uv(visible_c, uv, Color32::WHITE);
-            painter.add(Shape::mesh(m));
+        // The chequerboard only matters where the canvas can be see-through; the default opaque
+        // background (white) never shows it, so skip the work then.
+        if visible_c.is_positive() && see_through {
+            paint_checker(&painter, visible_c, crect.min);
         }
         if let Some(s) = &self.stale {
             let k = zoom / s.zoom;
@@ -653,6 +665,7 @@ impl Canvas {
             self.stats.render_ms += dt.as_secs_f64() * 1000.0;
             self.stats.last_frame_render_ms += dt.as_secs_f32() * 1000.0;
             self.stats.regions_rendered += 1;
+            self.stats.pixels_rendered += (rw as u64) * (rh as u64);
             self.stats.last_frame_regions += 1;
             let image = frame_to_image(&frame, rw as usize, rh as usize);
             let tile_rect = w.key.rect(bounds);

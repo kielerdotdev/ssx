@@ -63,6 +63,8 @@ pub struct EditorApp {
     temp_serial: u32,
     /// The window was asked to close and we answered with the unsaved-changes flow.
     exiting: bool,
+    /// Where the state file goes (`None` = the default location).
+    prefs_path: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for EditorApp {
@@ -109,6 +111,7 @@ impl EditorApp {
             themed: false,
             temp_serial: 0,
             exiting: false,
+            prefs_path: None,
         };
         app.install_document_state();
         app
@@ -429,6 +432,10 @@ impl EditorApp {
                 Event::Key { key, pressed: true, modifiers, repeat, .. } => {
                     if key == Key::Escape && self.state.eyedropper.is_some() {
                         self.state.eyedropper = None;
+                        continue;
+                    }
+                    // Escape closes an open menu or popup first (egui does that itself).
+                    if key == Key::Escape && self.swallow_press {
                         continue;
                     }
                     match keymap::route(key, &modifiers, editing) {
@@ -1143,9 +1150,19 @@ impl EditorApp {
         }
     }
 
+    /// The window title last sent to the window system (`name*  - ssx editor`).
+    pub fn window_title(&self) -> &str {
+        &self.last_title
+    }
+
     /// Finishes: `Some(outcome)` once the session is over.
     pub fn outcome(&self) -> Option<&EditorOutcome> {
         self.finished.as_ref()
+    }
+
+    /// Overrides where [`Self::save_prefs`] writes (tests, portable installs).
+    pub fn set_prefs_path(&mut self, path: Option<PathBuf>) {
+        self.prefs_path = path;
     }
 
     /// Saves preferences (styles, window) at exit.
@@ -1153,8 +1170,15 @@ impl EditorApp {
         self.remember_styles();
         self.state.prefs.last_tool =
             if self.state.tool == ToolId::CutOut { ToolId::Select } else { self.state.tool };
-        if !self.dev.ephemeral_state {
-            self.state.prefs.save();
+        if self.dev.ephemeral_state {
+            return;
+        }
+        if let Some(p) = self.prefs_path.clone().or_else(crate::prefs::default_path) {
+            if let Err(e) = self.state.prefs.save_to(&p) {
+                tracing::warn!("{e}");
+            }
+        } else {
+            tracing::warn!("no config directory; the editor state is not saved");
         }
     }
 
