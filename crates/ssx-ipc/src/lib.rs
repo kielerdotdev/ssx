@@ -20,6 +20,8 @@ mod endpoint;
 mod error;
 mod framing;
 mod instance;
+#[cfg(test)]
+mod pipe_tests;
 mod server;
 mod threaded;
 
