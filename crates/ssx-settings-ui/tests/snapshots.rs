@@ -7,6 +7,12 @@
 //!
 //! Everything a picture shows is fixed: the demo history and settings, the clock, the user
 //! and machine names, and the folder the paths point into.
+//!
+//! Linux only: the golden PNGs were rendered on Linux (lavapipe, this platform's fonts and
+//! rasteriser), and some pages list platform-specific content (file managers). Windows
+//! renders different pixels and different integrations, so comparing against these images
+//! there can only fail; the behaviour is covered by the `ui` tests instead.
+#![cfg(target_os = "linux")]
 
 mod common;
 

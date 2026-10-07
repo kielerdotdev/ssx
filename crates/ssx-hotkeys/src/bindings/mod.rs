@@ -167,6 +167,15 @@ pub(crate) fn validate(bindings: &[(Chord, crate::command::Command)]) -> Result<
     Ok(())
 }
 
+/// A path as it is written into a sway/Hyprland config file: always `/`-separated. Those
+/// files are Linux config syntax, in which `\` is an escape character, so the Windows
+/// separator that `PathBuf::join` produces (tests, sandboxes) must not leak into them.
+/// On Unix a `\` is a legal file-name character and is left alone.
+pub(crate) fn config_file_text(path: &Path) -> String {
+    let text = path.display().to_string();
+    if std::path::MAIN_SEPARATOR == '\\' { text.replace('\\', "/") } else { text }
+}
+
 /// Text safe to put after `# ` in a one-line config comment.
 pub(crate) fn comment_text(s: &str) -> String {
     s.chars().map(|c| if c.is_control() { ' ' } else { c }).collect()
@@ -243,6 +252,15 @@ fn fnv1a(s: &str) -> u32 {
 mod tests {
     use super::*;
     use crate::command::Command;
+
+    #[test]
+    fn config_file_paths_are_written_with_forward_slashes_on_windows_only() {
+        let joined = Path::new("/r").join(".config").join("sway").join("ssx.conf");
+        assert_eq!(config_file_text(&joined), "/r/.config/sway/ssx.conf");
+        // On Unix a backslash is an ordinary file-name character and must survive.
+        #[cfg(unix)]
+        assert_eq!(config_file_text(Path::new("/r/a\\b")), "/r/a\\b");
+    }
 
     pub(crate) fn fixture() -> Vec<(Chord, Command)> {
         vec![

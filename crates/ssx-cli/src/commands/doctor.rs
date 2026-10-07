@@ -391,9 +391,18 @@ pub fn parse_os_release(text: &str) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
-/// The session as seen through `env`.
+/// The session as seen through `env` on this platform.
 pub fn session_info(env: &Environment, forced_backend: Option<String>) -> SessionInfo {
-    let d = detect(env, Platform::current());
+    session_info_on(env, Platform::current(), forced_backend)
+}
+
+/// [`session_info`] for an explicit `platform` (so tests do not depend on the host OS).
+pub fn session_info_on(
+    env: &Environment,
+    platform: Platform,
+    forced_backend: Option<String>,
+) -> SessionInfo {
+    let d = detect(env, platform);
     let (desktop, session) = describe_detection(&d);
     SessionInfo {
         session_type: session.to_ascii_lowercase(),
@@ -1438,7 +1447,7 @@ mod tests {
             ("WAYLAND_DISPLAY", "wayland-0"),
             ("XDG_SESSION_TYPE", "wayland"),
         ]);
-        let s = session_info(&env, Some("x11".into()));
+        let s = session_info_on(&env, Platform::Linux, Some("x11".into()));
         assert_eq!((s.session_type.as_str(), s.desktop.as_str()), ("wayland", "GNOME"));
         assert_eq!(s.forced_backend.as_deref(), Some("x11"));
         assert_eq!(s.wayland_display.as_deref(), Some("wayland-0"));

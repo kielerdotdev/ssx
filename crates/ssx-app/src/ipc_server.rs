@@ -314,6 +314,11 @@ mod tests {
         recording::RecordingController,
     };
 
+    /// An absolute path on every platform (`/tmp/x` is drive-relative on Windows).
+    fn abs(name: &str) -> PathBuf {
+        std::env::temp_dir().join(name)
+    }
+
     /// Finishes every run at once with a summary that names what was asked.
     struct Instant {
         seen: Mutex<Vec<String>>,
@@ -514,7 +519,7 @@ mod tests {
     fn post_files_within_the_window_run_as_one_batch_and_every_waiter_hears_the_result() {
         let r = Arc::new(rig(150));
         let paths = |n: &str| Request::PostFiles {
-            paths: vec![PathBuf::from(format!("/tmp/{n}"))],
+            paths: vec![abs(n)],
             action: PostAction::Upload,
             wait: true,
         };
@@ -545,7 +550,7 @@ mod tests {
     fn a_non_waiting_post_files_answers_at_once_with_the_id_the_run_will_have() {
         let r = rig(80);
         let post = |n: &str| Request::PostFiles {
-            paths: vec![PathBuf::from(format!("/tmp/{n}"))],
+            paths: vec![abs(n)],
             action: PostAction::Edit,
             wait: false,
         };
@@ -565,8 +570,8 @@ mod tests {
     #[test]
     fn post_files_validates_before_it_accepts() {
         let r = rig(50);
-        let post = |paths: Vec<&str>, action: PostAction| Request::PostFiles {
-            paths: paths.into_iter().map(PathBuf::from).collect(),
+        let post = |paths: Vec<PathBuf>, action: PostAction| Request::PostFiles {
+            paths,
             action,
             wait: false,
         };
@@ -574,13 +579,13 @@ mod tests {
             ask(&r, &post(vec![], PostAction::Upload)),
             Response::Error { code: ErrorCode::InvalidRequest, .. }
         ));
-        let rel = ask(&r, &post(vec!["relative.png"], PostAction::Upload));
+        let rel = ask(&r, &post(vec![PathBuf::from("relative.png")], PostAction::Upload));
         assert!(
             matches!(&rel, Response::Error { message, .. } if message.contains("absolute")),
             "{rel:?}"
         );
         assert!(matches!(
-            ask(&r, &post(vec!["/a"], PostAction::Workflow { workflow: "zzz".into() })),
+            ask(&r, &post(vec![abs("a")], PostAction::Workflow { workflow: "zzz".into() })),
             Response::Error { code: ErrorCode::UnknownWorkflow, .. }
         ));
         assert!(r.runner.seen.lock().unwrap().is_empty(), "nothing was queued");
@@ -592,7 +597,7 @@ mod tests {
         // Shut the supervisor down so every submission is refused.
         r.h.sup.shutdown(crate::daemon::ShutdownGrace::default());
         let post =
-            Request::PostFiles { paths: vec!["/a".into()], action: PostAction::Upload, wait: true };
+            Request::PostFiles { paths: vec![abs("a")], action: PostAction::Upload, wait: true };
         let resp = ask(&r, &post);
         assert!(matches!(resp, Response::Error { code: ErrorCode::Busy, .. }), "{resp:?}");
         assert!(r.ui.events().iter().any(|e| matches!(e, UiEvent::Notice { .. })));

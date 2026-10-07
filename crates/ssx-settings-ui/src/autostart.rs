@@ -707,7 +707,7 @@ mod tests {
         assert!(!file.exists());
         assert!(!a.is_enabled().unwrap());
         a.set_enabled(false).unwrap(); // idempotent
-        assert!(a.location().ends_with("autostart/ssx.desktop"));
+        assert!(Path::new(&a.location()).ends_with(Path::new("autostart").join("ssx.desktop")));
     }
 
     #[test]

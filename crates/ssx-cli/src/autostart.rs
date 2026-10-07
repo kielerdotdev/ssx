@@ -470,23 +470,22 @@ mod tests {
 
     #[test]
     fn paths_follow_the_platform_conventions() {
-        let home = Path::new("/home/u");
+        // Roots must be absolute on the platform running the test (`/x/cfg` is not on Windows).
+        let home = std::env::temp_dir().join("home-u");
+        let cfg = std::env::temp_dir().join("x-cfg");
         assert_eq!(
-            linux_entry_path(None, home),
-            Path::new("/home/u/.config/autostart/ssx.desktop")
+            linux_entry_path(None, &home),
+            home.join(".config").join("autostart").join("ssx.desktop")
         );
+        assert_eq!(linux_entry_path(Some(&cfg), &home), cfg.join("autostart").join("ssx.desktop"));
         assert_eq!(
-            linux_entry_path(Some(Path::new("/x/cfg")), home),
-            Path::new("/x/cfg/autostart/ssx.desktop")
-        );
-        assert_eq!(
-            linux_entry_path(Some(Path::new("relative")), home),
-            Path::new("/home/u/.config/autostart/ssx.desktop"),
+            linux_entry_path(Some(Path::new("relative")), &home),
+            home.join(".config").join("autostart").join("ssx.desktop"),
             "a relative XDG_CONFIG_HOME is ignored, as the spec says"
         );
         assert_eq!(
-            mac_agent_path(home),
-            Path::new("/home/u/Library/LaunchAgents/io.ssx.app.plist")
+            mac_agent_path(&home),
+            home.join("Library").join("LaunchAgents").join("io.ssx.app.plist")
         );
     }
 
@@ -499,13 +498,15 @@ mod tests {
         let s = enable(&c, Path::new("/opt/ssx/ssx-app")).unwrap();
         let State::Enabled { command, location } = s else { panic!("{s:?}") };
         assert_eq!(command, "\"/opt/ssx/ssx-app\"");
-        assert!(location.ends_with(".config/autostart/ssx.desktop"), "{location}");
+        // `location` is displayed text: compare by components so `\` and `/` both pass.
+        let tail = Path::new(".config").join("autostart").join("ssx.desktop");
+        assert!(Path::new(&location).ends_with(tail), "{location}");
         // Idempotent, and re-enabling with a new path rewrites our own entry.
         let s = enable(&c, Path::new("/opt/new/ssx-app")).unwrap();
         assert!(matches!(s, State::Enabled { command, .. } if command.contains("/opt/new/")));
         assert!(disable(&c).unwrap());
         assert_eq!(status(&c).unwrap(), State::Disabled);
-        assert!(!d.path().join(".config/autostart/ssx.desktop").exists());
+        assert!(!linux_entry_path(None, d.path()).exists());
     }
 
     #[test]

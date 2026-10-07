@@ -329,21 +329,24 @@ mod standalone {
 
         #[test]
         fn an_output_path_decides_the_kind_and_must_be_mp4_or_gif() {
-            let d = destination(Some(Path::new("/tmp/x/clip.gif")), false, &s(), "t").unwrap();
+            // `/tmp/x` is drive-relative on Windows, so build absolute paths from the temp dir.
+            let tmp = std::env::temp_dir();
+            let x = tmp.join("x");
+            let d = destination(Some(&x.join("clip.gif")), false, &s(), "t").unwrap();
             assert_eq!(d.kind, RecordKind::Gif);
-            assert_eq!((d.dir.as_path(), d.stem.as_str()), (Path::new("/tmp/x"), "clip"));
-            let d = destination(Some(Path::new("/tmp/x/clip.MP4")), false, &s(), "t").unwrap();
+            assert_eq!((d.dir.as_path(), d.stem.as_str()), (x.as_path(), "clip"));
+            let d = destination(Some(&x.join("clip.MP4")), false, &s(), "t").unwrap();
             assert_eq!(d.kind, RecordKind::Video);
-            assert_eq!(d.path, Path::new("/tmp/x/clip.mp4"));
-            let d = destination(Some(Path::new("/tmp/x/noext")), false, &s(), "t").unwrap();
-            assert_eq!(d.path, Path::new("/tmp/x/noext.mp4"));
+            assert_eq!(d.path, x.join("clip.mp4"));
+            let d = destination(Some(&x.join("noext")), false, &s(), "t").unwrap();
+            assert_eq!(d.path, x.join("noext.mp4"));
             assert!(
-                destination(Some(Path::new("/tmp/a.webm")), false, &s(), "t")
+                destination(Some(&tmp.join("a.webm")), false, &s(), "t")
                     .unwrap_err()
                     .contains(".webm")
             );
             assert!(
-                destination(Some(Path::new("/tmp/a.mp4")), true, &s(), "t")
+                destination(Some(&tmp.join("a.mp4")), true, &s(), "t")
                     .unwrap_err()
                     .contains("contradict")
             );
