@@ -53,16 +53,15 @@ client.send_or_spawn(&line, || std::process::Command::new(ssx_exe).arg("daemon")
 
 ## Verification status
 
-Linux: all unit and integration tests run (real sockets, threads). Windows: compiles and is
-clippy-clean for `x86_64-pc-windows-msvc`, **not executed**; the named-pipe path, the ACL and
-the non-blocking polling fallback used for timeouts (named pipes have no native read timeout
-in `interprocess`) are untested on a real Windows host. macOS: not built here; it uses the
-same Unix code with `LOCAL_PEERCRED` via `interprocess`.
+Linux: all unit and integration tests run (real sockets, threads). The Windows transport
+(blocking named-pipe halves driven from helper threads, because pipes have no native timeouts
+and `PIPE_NOWAIT` reports "no data yet" as a hang-up) is additionally covered on Linux by
+`src/pipe_tests.rs`, which runs the framing layer over a double with named-pipe semantics.
+Windows: compiles and is clippy-clean for `x86_64-pc-windows-msvc`; the real named-pipe path
+and the ACL only run in the Windows CI job. macOS: not built here; it uses the same Unix code
+with `LOCAL_PEERCRED` via `interprocess`.
 
-## Known limits
-
-* Windows pipe names are machine-global, so a local attacker could pre-create the pipe name
-  of another user (squatting) and receive their requests. Mitigation planned: include the
-  user SID in the name and verify the server's owner (needs `windows-sys`, i.e. `unsafe`).
-* Windows peer check is ACL-only; the pid is informational.
-* An elevated primary cannot be reached from a non-elevated client (owner is Administrators).
+Known limitation (Windows): a read that times out cannot be cancelled without FFI, so a peer
+that connects and then goes silent keeps one idle helper thread and pipe instance alive until
+it disconnects (or the process exits), even though the server has already given up on it.
+Peers are same-user only (pipe ACL); `CancelIoEx` would close this if it ever matters.
