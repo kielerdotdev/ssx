@@ -171,18 +171,23 @@ jobs:
         if: matrix.variant == 'static'
         env:
           FFMPEG_DIR: ${{ env.FFMPEG_PREFIX }}
-          PKG_CONFIG_PATH: ${{ env.FFMPEG_PREFIX }}/lib/pkgconfig
+          PKG_CONFIG_PATH: ${{ env.FFMPEG_PREFIX }}/lib/pkgconfig:${{ env.FFMPEG_PREFIX }}/lib/x86_64-linux-gnu/pkgconfig:${{ env.FFMPEG_PREFIX }}/lib64/pkgconfig
         run: |
-          set -euo pipefail
+          set -uo pipefail
           # The static FFmpeg archives do not carry their own link dependencies, so hand the linker
           # exactly what FFmpeg's pkg-config files say they need (codec libraries built into the
           # prefix, zlib, ...). VA-API and X11 stay dynamic on purpose: VA-API loads the
-          # distribution's driver stack at run time. --error-limit=0 lists every unresolved symbol.
+          # distribution's driver stack at run time. cmake on Ubuntu installs into a multiarch
+          # subdirectory (lib/x86_64-linux-gnu), so every library directory of the prefix is on the
+          # search path. --error-limit=0 lists every unresolved symbol.
           pkgs=""
           for p in libavcodec libavformat libavutil libswscale libswresample libavfilter libavdevice; do
             if pkg-config --exists "$p"; then pkgs="$pkgs $p"; fi
           done
           link_args=""
+          for d in lib lib/x86_64-linux-gnu lib64; do
+            if [ -d "$FFMPEG_PREFIX/$d" ]; then link_args="$link_args -C link-arg=-L$FFMPEG_PREFIX/$d"; fi
+          done
           # shellcheck disable=SC2046,SC2086  # splitting $pkgs and pkg-config output into words is intended
           for flag in $(pkg-config --static --libs $pkgs); do
             link_args="$link_args -C link-arg=$flag"
@@ -193,7 +198,26 @@ jobs:
           echo "RUSTFLAGS=$RUSTFLAGS"
           # shellcheck disable=SC2086  # $PACKAGES is a list of -p flags; splitting is intended
           cargo build --release --locked --no-default-features $PACKAGES \
-            --features ssx-cli/ffmpeg-static,ssx-app/ffmpeg-static,ssx-app/file-dialog,ssx-settings-ui/ffmpeg-static
+            --features ssx-cli/ffmpeg-static,ssx-app/ffmpeg-static,ssx-app/file-dialog,ssx-settings-ui/ffmpeg-static \
+            2>&1 | tee build.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            # Printed last so it is what the end of the log shows (the full linker output is huge).
+            echo "=== LINK DIAGNOSTICS ==="
+            echo "--- RUSTFLAGS: $RUSTFLAGS"
+            echo "--- library files in the prefix:"
+            find "$FFMPEG_PREFIX" -name '*.a' -o -name '*.so*' | sed "s|$FFMPEG_PREFIX/||" | sort | head -60
+            echo "--- pkg-config --static --libs:"
+            # shellcheck disable=SC2086  # splitting $pkgs into package names is intended
+            pkg-config --static --libs $pkgs
+            echo "--- libavcodec.pc requirements:"
+            grep -E '^(Requires|Libs)' "$FFMPEG_PREFIX/lib/pkgconfig/libavcodec.pc" || true
+            echo "--- unresolved symbols grouped by name prefix:"
+            grep -oE 'undefined symbol: [A-Za-z0-9_]+' build.log | sed -E 's/undefined symbol: //' \
+              | sed -E 's/^(svt|opus|vpx|x264|x265|va|X|inflate|deflate|compress|uncompress|crc32|adler32|lzma|bz|BZ|drm|pthread|dl|clock|sin|cos|log|exp|pow).*/\1*/' \
+              | sort | uniq -c | sort -rn | head -40
+          fi
+          exit "$rc"
 
       - name: Package
         run: |
