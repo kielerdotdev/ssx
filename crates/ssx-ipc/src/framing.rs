@@ -2,8 +2,10 @@
 //!
 //! Why a hand-rolled reader: `BufRead::read_line` would happily buffer an unbounded line from a
 //! hostile or buggy peer, and blocks forever on a silent peer. Local sockets on Windows (named
-//! pipes) have no native read timeout in `interprocess`, so [`Conn`] uses native socket timeouts
-//! where the OS supports them (Unix) and falls back to non-blocking polling otherwise.
+//! pipes) have no native I/O timeout in `interprocess`, so [`Conn`] uses native socket timeouts
+//! where the OS supports them (Unix) and otherwise runs blocking I/O on helper threads
+//! (see [`crate::threaded`]). It must *not* fall back to non-blocking polling: a non-blocking
+//! pipe reports "no data yet" as `BrokenPipe`, which is indistinguishable from a hang-up.
 
 use std::io::{self, Read, Write};
 use std::time::{Duration, Instant};
@@ -12,52 +14,50 @@ use interprocess::local_socket::Stream;
 use interprocess::local_socket::traits::Stream as _;
 
 use crate::error::{Error, Result, TimeoutKind};
+use crate::threaded::Threaded;
 
 /// Default maximum length of one line (excluding the terminator): 4 MiB.
 pub const DEFAULT_MAX_LINE: usize = 4 * 1024 * 1024;
 
-const POLL_INTERVAL: Duration = Duration::from_millis(2);
 const MIN_TIMEOUT: Duration = Duration::from_millis(1);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Mode {
-    /// `SO_RCVTIMEO`/`SO_SNDTIMEO` style timeouts.
-    Native,
-    /// Non-blocking stream polled with short sleeps.
-    Polling,
+#[derive(Debug)]
+enum Io {
+    /// `SO_RCVTIMEO`/`SO_SNDTIMEO` style timeouts on the stream itself.
+    Native(Stream),
+    /// Plain blocking halves driven from helper threads.
+    Threaded(Threaded),
 }
 
 /// A connected stream with deadline-aware reads and writes.
 #[derive(Debug)]
 pub(crate) struct Conn {
-    stream: Stream,
-    mode: Mode,
+    io: Io,
 }
 
 impl Conn {
     pub(crate) fn new(stream: Stream) -> Result<Self> {
-        let mode = match stream.set_recv_timeout(Some(Duration::from_secs(3600))) {
-            Ok(()) => Mode::Native,
-            Err(e) if e.kind() == io::ErrorKind::Unsupported => Mode::Polling,
-            Err(e) => return Err(Error::io("configuring stream")(e)),
-        };
-        let conn = Self { stream, mode };
-        conn.prepare()?;
-        Ok(conn)
-    }
-
-    #[cfg(all(test, unix))]
-    pub(crate) fn new_polling(stream: Stream) -> Result<Self> {
-        let conn = Self { stream, mode: Mode::Polling };
-        conn.prepare()?;
-        Ok(conn)
-    }
-
-    fn prepare(&self) -> Result<()> {
-        if self.mode == Mode::Polling {
-            self.stream.set_nonblocking(true).map_err(Error::io("setting non-blocking mode"))?;
+        match stream.set_recv_timeout(Some(Duration::from_secs(3600))) {
+            Ok(()) => Ok(Self { io: Io::Native(stream) }),
+            Err(e) if e.kind() == io::ErrorKind::Unsupported => Ok(Self::new_threaded(stream)),
+            Err(e) => Err(Error::io("configuring stream")(e)),
         }
-        Ok(())
+    }
+
+    /// Uses helper threads even where native timeouts exist (tests exercise the Windows path
+    /// on Unix this way).
+    pub(crate) fn new_threaded(stream: Stream) -> Self {
+        let (recv, send) = stream.split();
+        Self { io: Io::Threaded(Threaded::new(recv, send)) }
+    }
+
+    /// A connection over arbitrary blocking halves (pipe-semantics test doubles).
+    #[cfg(test)]
+    pub(crate) fn from_halves(
+        read: impl Read + Send + 'static,
+        write: impl Write + Send + 'static,
+    ) -> Self {
+        Self { io: Io::Threaded(Threaded::new(read, write)) }
     }
 
     fn remaining(deadline: Instant) -> Option<Duration> {
@@ -70,20 +70,19 @@ impl Conn {
             let Some(left) = Self::remaining(deadline) else {
                 return Err(io::ErrorKind::TimedOut.into());
             };
-            if self.mode == Mode::Native {
-                self.stream.set_recv_timeout(Some(left.max(MIN_TIMEOUT)))?;
-            }
-            match self.stream.read(buf) {
+            let stream = match &mut self.io {
+                Io::Threaded(t) => return t.read_some(buf, deadline),
+                Io::Native(s) => s,
+            };
+            stream.set_recv_timeout(Some(left.max(MIN_TIMEOUT)))?;
+            match stream.read(buf) {
                 Ok(n) => return Ok(n),
                 Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
                 Err(e)
                     if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) =>
                 {
-                    if self.mode == Mode::Native {
-                        // The native timeout was set to the remaining time, so it is spent.
-                        return Err(io::ErrorKind::TimedOut.into());
-                    }
-                    std::thread::sleep(POLL_INTERVAL.min(left));
+                    // The native timeout was set to the remaining time, so it is spent.
+                    return Err(io::ErrorKind::TimedOut.into());
                 }
                 Err(e) => return Err(e),
             }
@@ -96,20 +95,19 @@ impl Conn {
             let Some(left) = Self::remaining(deadline) else {
                 return Err(io::ErrorKind::TimedOut.into());
             };
-            if self.mode == Mode::Native {
-                self.stream.set_send_timeout(Some(left.max(MIN_TIMEOUT)))?;
-            }
-            match self.stream.write(data) {
+            let stream = match &mut self.io {
+                Io::Threaded(t) => return t.write_all(data, deadline),
+                Io::Native(s) => s,
+            };
+            stream.set_send_timeout(Some(left.max(MIN_TIMEOUT)))?;
+            match stream.write(data) {
                 Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
                 Ok(n) => data = data.get(n..).unwrap_or_default(),
                 Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
                 Err(e)
                     if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) =>
                 {
-                    if self.mode == Mode::Native {
-                        return Err(io::ErrorKind::TimedOut.into());
-                    }
-                    std::thread::sleep(POLL_INTERVAL.min(left));
+                    return Err(io::ErrorKind::TimedOut.into());
                 }
                 Err(e) => return Err(e),
             }
@@ -232,13 +230,14 @@ mod tests {
     use interprocess::os::unix::uds_local_socket::Stream as UdsStream;
     use std::os::unix::net::UnixStream;
 
-    fn pair(polling: bool) -> (Conn, UnixStream) {
+    fn pair(threaded: bool) -> (Conn, UnixStream) {
         let (a, b) = UnixStream::pair().expect("pair");
         let s = Stream::UdSocket(UdsStream::from(a));
-        let conn = if polling { Conn::new_polling(s) } else { Conn::new(s) };
+        let conn = if threaded { Ok(Conn::new_threaded(s)) } else { Conn::new(s) };
         (conn.expect("conn"), b)
     }
 
+    /// Runs `f` with native timeouts (`false`) and with the helper-thread transport (`true`).
     fn both(f: impl Fn(bool)) {
         f(false);
         f(true);
@@ -246,8 +245,8 @@ mod tests {
 
     #[test]
     fn reads_lines_split_across_writes_and_crlf() {
-        both(|polling| {
-            let (mut conn, mut peer) = pair(polling);
+        both(|threaded| {
+            let (mut conn, mut peer) = pair(threaded);
             peer.write_all(b"one\r\ntw").expect("write");
             let t = std::thread::spawn(move || {
                 std::thread::sleep(Duration::from_millis(30));
@@ -266,15 +265,15 @@ mod tests {
 
     #[test]
     fn rejects_oversize_with_and_without_newline() {
-        both(|polling| {
-            let (mut conn, mut peer) = pair(polling);
+        both(|threaded| {
+            let (mut conn, mut peer) = pair(threaded);
             peer.write_all(&[b'a'; 200]).expect("write");
             let mut r = LineReader::new(100);
             let d = Duration::from_secs(2);
             let err = r.read_line(&mut conn, d, d).expect_err("oversize");
             assert!(matches!(err, Error::LineTooLong { max: 100 }), "{err}");
 
-            let (mut conn, mut peer) = pair(polling);
+            let (mut conn, mut peer) = pair(threaded);
             let mut data = vec![b'a'; 150];
             data.push(b'\n');
             peer.write_all(&data).expect("write");
@@ -297,8 +296,8 @@ mod tests {
 
     #[test]
     fn idle_and_slow_delivery_time_out() {
-        both(|polling| {
-            let (mut conn, mut peer) = pair(polling);
+        both(|threaded| {
+            let (mut conn, mut peer) = pair(threaded);
             let mut r = LineReader::new(100);
             let err = r
                 .read_line(&mut conn, Duration::from_millis(80), Duration::from_secs(5))

@@ -21,6 +21,7 @@ mod error;
 mod framing;
 mod instance;
 mod server;
+mod threaded;
 
 pub use client::{Client, ClientConfig};
 pub use endpoint::Location;
