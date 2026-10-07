@@ -23,11 +23,17 @@ fn the_preview_follows_the_patterns_the_way_the_engine_renders_them() {
     let mut h = window(app, vec2(1120.0, 1700.0));
     assert!(has(&h, "Preview: "));
     // the sandbox clock is 2025-03-09 14:05:06
-    assert!(has(&h, "/data/shots/Screenshots/2025-03/Screenshot_2025-03-09_14-05-06.png"));
+    // the preview shows the platform's own separators
+    let full = std::path::Path::new("/data/shots")
+        .join("Screenshots")
+        .join("2025-03")
+        .join("Screenshot_2025-03-09_14-05-06.png");
+    assert!(has(&h, &full.display().to_string()));
     set_text(&mut h, "File name pattern", "%t_%i{4}");
     assert!(has(&h, "Example_Domain_-_Firefox_0001.png"));
     set_text(&mut h, "Folder pattern", "%y/%mon");
-    assert!(has(&h, "/2025/March/"));
+    let sep = std::path::MAIN_SEPARATOR;
+    assert!(has(&h, &format!("{sep}2025{sep}March{sep}")));
     click(&mut h, "JPEG");
     assert!(has(&h, ".jpg"));
 }

@@ -45,6 +45,14 @@ pub struct State {
     pub sample: SampleInputs,
 }
 
+impl State {
+    /// Whether background work (the folder dialog) is running. Tests wait for this to become
+    /// `false` before looking at the result, which arrives from a worker thread.
+    pub fn busy(&self) -> bool {
+        self.folder_dialog.running()
+    }
+}
+
 /// A note about a folder the user typed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PathNote {

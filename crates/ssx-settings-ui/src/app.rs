@@ -201,7 +201,10 @@ impl SettingsApp {
 
     /// Whether any page has background work running (tests wait for this to become `false`).
     pub fn busy(&self) -> bool {
-        self.uploaders.busy() || self.history.busy() || self.integration.busy()
+        self.general.busy()
+            || self.uploaders.busy()
+            || self.history.busy()
+            || self.integration.busy()
     }
 
     /// Whether the window has asked to close.

@@ -46,6 +46,10 @@ fn home_files(fx: &Fixture) -> Vec<std::path::PathBuf> {
     files_below(&fx.root().join("home"))
 }
 
+// The three tests below drive the Linux file-manager page (Nautilus, Dolphin, Nemo, ... with
+// `.desktop`/script files below the sandbox home). Windows lists Explorer verbs and "Send to"
+// instead, which have their own test further down.
+#[cfg(target_os = "linux")]
 #[test]
 fn the_file_managers_are_listed_with_what_was_found() {
     let (h, _fx) = open();
@@ -57,12 +61,22 @@ fn the_file_managers_are_listed_with_what_was_found() {
     assert!(has_exact(&h, "no menu"), "nothing is installed yet");
 }
 
+#[cfg(windows)]
+#[test]
+fn the_windows_integrations_are_listed_instead_of_the_linux_file_managers() {
+    let (h, _fx) = open();
+    assert!(has_exact(&h, "Windows Explorer (classic menu)"));
+    assert!(has_exact(&h, "Windows \"Send to\" menu"));
+    assert!(!has_exact(&h, "Nautilus (GNOME Files)"));
+}
+
 #[test]
 fn opening_the_page_installs_nothing() {
     let (_h, fx) = open();
     assert!(home_files(&fx).is_empty());
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn install_reports_each_file_manager_and_remove_takes_everything_back() {
     let (mut h, fx) = open();
@@ -86,6 +100,7 @@ fn install_reports_each_file_manager_and_remove_takes_everything_back() {
     assert!(has_exact(&h, "no menu"));
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn file_managers_that_were_not_found_are_only_touched_when_asked() {
     let (mut h, fx) = open();
