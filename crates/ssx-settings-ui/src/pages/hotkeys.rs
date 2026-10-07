@@ -57,7 +57,9 @@ pub fn tilde(path: &Path, dirs: &Dirs) -> String {
     if let Some(h) = home
         && let Ok(rest) = path.strip_prefix(&h)
     {
-        return format!("~/{}", rest.display());
+        // Always `/`: these are Linux config paths, whatever separator `join` produced.
+        let rest: Vec<_> = rest.components().map(|c| c.as_os_str().to_string_lossy()).collect();
+        return format!("~/{}", rest.join("/"));
     }
     path.display().to_string()
 }

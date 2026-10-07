@@ -66,7 +66,7 @@ pub fn render(bindings: &[(Chord, Command)]) -> Result<String> {
 /// backslash-escaped instead: `include /home/my\ user/x.conf`.
 pub fn include_line(include_file: &Path) -> String {
     let mut out = String::from("include ");
-    for c in include_file.display().to_string().chars() {
+    for c in super::config_file_text(include_file).chars() {
         if !(c.is_ascii_alphanumeric()
             || matches!(c, '/' | '.' | '_' | '-' | '+' | ':' | '@' | ','))
         {

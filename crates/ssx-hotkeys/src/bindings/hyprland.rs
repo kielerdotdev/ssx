@@ -60,7 +60,7 @@ pub fn render(bindings: &[(Chord, Command)]) -> Result<String> {
 
 /// The line to add to `hyprland.conf` to load `file`.
 pub fn source_line(file: &Path) -> String {
-    format!("source = {}", file.display())
+    format!("source = {}", super::config_file_text(file))
 }
 
 #[cfg(test)]
