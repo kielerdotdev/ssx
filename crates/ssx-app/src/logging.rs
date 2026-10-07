@@ -172,7 +172,11 @@ mod tests {
     #[test]
     fn an_unwritable_data_dir_is_not_fatal() {
         let args = <Args as clap::Parser>::try_parse_from(["ssx-app"]).unwrap();
-        let g = init(Path::new("/proc/no/such/place"), &args);
+        // A data "directory" that is a regular file cannot hold a `logs` directory, on any OS.
+        let tmp = tempfile::tempdir().unwrap();
+        let not_a_dir = tmp.path().join("data");
+        std::fs::write(&not_a_dir, b"a file, not a directory").unwrap();
+        let g = init(&not_a_dir, &args);
         assert!(g.file.is_none());
     }
 }
