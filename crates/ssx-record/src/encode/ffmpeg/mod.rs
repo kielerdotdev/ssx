@@ -231,6 +231,12 @@ impl FfmpegEncoder {
         octx.set_metadata(meta);
 
         let mut opts = Dictionary::new();
+        // Without this libav keeps the whole recording in its I/O buffer and writes it in one
+        // go when the trailer is written (measured: a 12 s recording stayed at 48 bytes on disk
+        // until the very end). That defeated everything that relies on the file growing while it
+        // records: the maximum-size limit, the crash-safety of fragmented MP4, and memory use on
+        // long recordings. One write per packet is cheap (a few dozen a second).
+        opts.set("flush_packets", "1");
         if spec.container == Container::Mp4 {
             match spec.video_settings.mp4 {
                 Mp4Mode::Faststart => opts.set("movflags", "+faststart"),

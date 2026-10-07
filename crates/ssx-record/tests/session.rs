@@ -376,20 +376,45 @@ fn max_duration_stops_the_recording_by_itself() {
 }
 
 #[test]
+fn the_output_file_grows_while_recording() {
+    // Regression: libav used to buffer the whole recording and write it at the end, so the file
+    // stayed at its header (tens of bytes) until `stop()`. That broke the size limit, crash
+    // safety and memory use. The file must be visibly growing long before the recording ends.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("grow.mp4");
+    let cfg = sw_config(&path);
+    let s = start(cfg, realtime(1280, 720, Fps::FPS_30), vec![]);
+    let started = std::time::Instant::now();
+    let mut grew = false;
+    while started.elapsed() < Duration::from_secs(20) {
+        if std::fs::metadata(&path).map_or(0, |m| m.len()) > 20_000 {
+            grew = true;
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let finished_early = s.wait_finished(Duration::from_millis(0)).is_some();
+    let _ = s.stop();
+    assert!(grew, "the file stayed tiny while recording: libav is buffering the whole recording");
+    assert!(!finished_early, "the recording must still be running while the file grows");
+}
+
+#[test]
 fn max_size_stops_and_finalises_the_file() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("size.mp4");
     let mut cfg = sw_config(&path);
     cfg.video.quality = ssx_record::encode::Quality::BitrateKbps(6000);
-    cfg.limits = Limits { max_duration: None, max_bytes: Some(200_000) };
-    // Noisy content would be needed for a big file; the bars at 6 Mbit/s reach 200 kB in
-    // well under 10 s only with a high bitrate, so use a large picture.
+    cfg.limits = Limits { max_duration: None, max_bytes: Some(60_000) };
+    // The synthetic bars compress to roughly 12 kB per second even at a high bitrate setting,
+    // so a few tens of kilobytes take several seconds. (This test used a 200 kB limit before,
+    // which sat right at its own 15 s timeout and failed under CPU load.)
     let s = start(cfg, realtime(1280, 720, Fps::FPS_30), vec![]);
     let why = s.wait_finished(Duration::from_secs(15));
     let r = s.stop().unwrap();
     assert_eq!(why, Some(EndReason::MaxSize), "{r:?}");
     let size = std::fs::metadata(&path).unwrap().len();
-    assert!((150_000..1_500_000).contains(&size), "{size}");
+    assert!((50_000..1_500_000).contains(&size), "{size}");
     let rep = inspect(&path).unwrap();
     assert!(rep.seekable && rep.mp4.unwrap().has_moov());
 }
