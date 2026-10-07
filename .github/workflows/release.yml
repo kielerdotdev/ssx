@@ -137,10 +137,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libx264-dev libx265-dev libvpx-dev libopus-dev libva-dev libdrm-dev
 
-      - name: Cache the embedded FFmpeg
+      - name: Restore the embedded FFmpeg
         id: ffcache
         if: matrix.variant == 'static'
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.FFMPEG_PREFIX }}
           key: ffmpeg-static-linux-${{ hashFiles('crates/ssx-record/build/build-ffmpeg.sh') }}
@@ -151,6 +151,15 @@ jobs:
           # Portable code: never -march=native in a release artefact.
           EXTRA_CFLAGS: "-march=x86-64-v2"
         run: crates/ssx-record/build/build-ffmpeg.sh "$FFMPEG_PREFIX"
+
+      # Saved here, not at the end of the job: the later cargo build may fail while the FFmpeg
+      # prefix is perfectly good, and the default post-job save is skipped on failure.
+      - name: Save the embedded FFmpeg
+        if: matrix.variant == 'static' && steps.ffcache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.FFMPEG_PREFIX }}
+          key: ffmpeg-static-linux-${{ hashFiles('crates/ssx-record/build/build-ffmpeg.sh') }}
 
       - name: Build (dynamic FFmpeg)
         if: matrix.variant == 'dynamic'
@@ -163,14 +172,25 @@ jobs:
         env:
           FFMPEG_DIR: ${{ env.FFMPEG_PREFIX }}
           PKG_CONFIG_PATH: ${{ env.FFMPEG_PREFIX }}/lib/pkgconfig
-          # The embedded FFmpeg is built with VA-API (hardware encoding), whose libraries stay
-          # dynamic on purpose: VA-API loads the distribution's driver stack at run time. The
-          # static FFmpeg archive does not carry its own link dependencies, so name them here.
-          # --error-limit=0 makes the linker list every unresolved symbol, not just the first 20.
-          RUSTFLAGS: >-
-            -C link-arg=-lva -C link-arg=-lva-drm -C link-arg=-lva-x11
-            -C link-arg=-lX11 -C link-arg=-ldrm -C link-arg=-Wl,--error-limit=0
         run: |
+          set -euo pipefail
+          # The static FFmpeg archives do not carry their own link dependencies, so hand the linker
+          # exactly what FFmpeg's pkg-config files say they need (codec libraries built into the
+          # prefix, zlib, ...). VA-API and X11 stay dynamic on purpose: VA-API loads the
+          # distribution's driver stack at run time. --error-limit=0 lists every unresolved symbol.
+          pkgs=""
+          for p in libavcodec libavformat libavutil libswscale libswresample libavfilter libavdevice; do
+            if pkg-config --exists "$p"; then pkgs="$pkgs $p"; fi
+          done
+          link_args=""
+          # shellcheck disable=SC2046,SC2086  # splitting $pkgs and pkg-config output into words is intended
+          for flag in $(pkg-config --static --libs $pkgs); do
+            link_args="$link_args -C link-arg=$flag"
+          done
+          link_args="$link_args -C link-arg=-lva -C link-arg=-lva-drm -C link-arg=-lva-x11"
+          link_args="$link_args -C link-arg=-lX11 -C link-arg=-ldrm -C link-arg=-Wl,--error-limit=0"
+          export RUSTFLAGS="$link_args"
+          echo "RUSTFLAGS=$RUSTFLAGS"
           # shellcheck disable=SC2086  # $PACKAGES is a list of -p flags; splitting is intended
           cargo build --release --locked --no-default-features $PACKAGES \
             --features ssx-cli/ffmpeg-static,ssx-app/ffmpeg-static,ssx-app/file-dialog,ssx-settings-ui/ffmpeg-static
@@ -236,9 +256,13 @@ jobs:
           - variant: lite
             experimental: false
             features: ssx-cli/record,ssx-app/record,ssx-app/file-dialog,ssx-settings-ui/record
+            link_flags: ""
           - variant: full
             experimental: true
             features: ssx-cli/ffmpeg-static,ssx-app/ffmpeg-static,ssx-app/file-dialog,ssx-settings-ui/ffmpeg-static
+            # FFmpeg's Media Foundation encoder references GUIDs that live in these import
+            # libraries; vcpkg's static avcodec.lib does not pull them in by itself.
+            link_flags: "-C link-arg=mfuuid.lib -C link-arg=strmiids.lib"
     env:
       VERSION: ${{ needs.version.outputs.version }}
       VCPKGRS_TRIPLET: x64-windows-static-md
@@ -253,13 +277,13 @@ jobs:
         with:
           key: release-${{ matrix.variant }}
 
-      - name: Cache vcpkg FFmpeg
+      - name: Restore vcpkg FFmpeg
         id: vcpkgcache
         if: matrix.variant == 'full'
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: C:\vcpkg\installed
-          key: vcpkg-ffmpeg-${{ env.VCPKGRS_TRIPLET }}-v1
+          key: vcpkg-ffmpeg-${{ env.VCPKGRS_TRIPLET }}-v2
 
       - name: FFmpeg from vcpkg (static, x264/x265/vpx/opus, NVENC and AMF)
         if: matrix.variant == 'full' && steps.vcpkgcache.outputs.cache-hit != 'true'
@@ -268,9 +292,19 @@ jobs:
           "ffmpeg[x264,x265,vpx,opus,nvcodec,amf,avcodec,avformat,swscale,swresample,gpl]:${VCPKGRS_TRIPLET}"
           --clean-after-build
 
+      # Saved right after the 40-minute install, not at the end of the job: a later build failure
+      # must not throw the installed FFmpeg away (the default post-job save is skipped on failure).
+      - name: Save vcpkg FFmpeg
+        if: matrix.variant == 'full' && steps.vcpkgcache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: C:\vcpkg\installed
+          key: vcpkg-ffmpeg-${{ env.VCPKGRS_TRIPLET }}-v2
+
       - name: Build
         env:
           VCPKG_ROOT: C:\vcpkg
+          RUSTFLAGS: ${{ matrix.link_flags }}
         run: |
           # shellcheck disable=SC2086  # $PACKAGES is a list of -p flags; splitting is intended
           cargo build --release --locked --no-default-features $PACKAGES \

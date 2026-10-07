@@ -5,6 +5,11 @@ on:
     branches: [main, master, "claude/**"]
   pull_request:
 
+# A newer push supersedes a running CI for the same branch: hosted Windows runs take ~35 minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
