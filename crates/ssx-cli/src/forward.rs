@@ -249,9 +249,9 @@ mod tests {
     #[test]
     fn request_lines_carry_absolute_paths_verbatim() {
         let hostile = PathBuf::from("rel/a b \"quoted\" $(x) \n newline.png");
-        let line =
-            request_line(&[hostile.clone(), PathBuf::from("/abs/é.png")], PostAction::Upload)
-                .unwrap();
+        // `/abs/é.png` is drive-relative on Windows, which would be rewritten: use a real root.
+        let abs = std::env::temp_dir().join("é.png");
+        let line = request_line(&[hostile.clone(), abs.clone()], PostAction::Upload).unwrap();
         assert!(!line.contains('\n'), "no terminator: the transport adds it: {line:?}");
         let env: RequestEnvelope = decode_line(&line).unwrap();
         let Request::PostFiles { paths, action, wait } = env.request else {
@@ -260,7 +260,7 @@ mod tests {
         assert_eq!(action, PostAction::Upload);
         assert!(!wait);
         assert!(paths[0].is_absolute() && paths[0].ends_with(&hostile), "{paths:?}");
-        assert_eq!(paths[1], PathBuf::from("/abs/é.png"));
+        assert_eq!(paths[1], abs);
     }
 
     #[test]
