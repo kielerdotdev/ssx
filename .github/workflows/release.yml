@@ -442,6 +442,19 @@ jobs:
         run: |
           flags=()
           if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
+          cat > notes.md <<'EOF'
+          ## Downloads
+
+          | Platform | Archive | Notes |
+          |---|---|---|
+          | Windows x64 | `ssx-*-windows-*-full.zip` | Recommended: MP4/WebM/GIF recording with FFmpeg built in |
+          | Windows x64 | `ssx-*-windows-*-lite.zip` | No FFmpeg: screenshots, editor, uploads and GIF recording only |
+          | Linux x86_64 | `ssx-*-linux-*-static.tar.gz` | FFmpeg and codecs built in, no system FFmpeg needed (built on Ubuntu 24.04: needs glibc 2.39 or newer) |
+          | Linux x86_64 | `ssx-*-linux-*-dynamic.tar.gz` | Uses the system FFmpeg 6.x (Ubuntu 24.04 and derivatives) |
+
+          Unpack the archive and run `install.ps1` (Windows, PowerShell) or `./install.sh` (Linux), or run the
+          programs from `bin/` directly. `SHA256SUMS` lists the checksum of every archive.
+          EOF
           gh release create "$TAG" artifacts/* \
-            --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --notes-file notes.md \
             --title "ssx ${TAG#v}" "${flags[@]}"
