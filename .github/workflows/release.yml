@@ -330,6 +330,7 @@ jobs:
     env:
       VERSION: ${{ needs.version.outputs.version }}
       VCPKGRS_TRIPLET: x64-windows-static-md
+      VCPKG_FFMPEG: "ffmpeg[x264,x265,vpx,opus,nvcodec,amf,avcodec,avformat,swscale,swresample,gpl]"
     defaults:
       run:
         shell: bash
@@ -347,14 +348,46 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: C:\vcpkg\installed
-          key: vcpkg-ffmpeg-${{ env.VCPKGRS_TRIPLET }}-v2
+          key: vcpkg-ffmpeg-${{ env.VCPKGRS_TRIPLET }}-v3
 
       - name: FFmpeg from vcpkg (static, x264/x265/vpx/opus, NVENC and AMF)
+        id: vcpkg1
         if: matrix.variant == 'full' && steps.vcpkgcache.outputs.cache-hit != 'true'
+        # A failure here is retried below: the usual cause is a source download whose hash changed.
+        continue-on-error: true
         run: >
-          "C:/vcpkg/vcpkg.exe" install
-          "ffmpeg[x264,x265,vpx,opus,nvcodec,amf,avcodec,avformat,swscale,swresample,gpl]:${VCPKGRS_TRIPLET}"
-          --clean-after-build
+          "C:/vcpkg/vcpkg.exe" install "${VCPKG_FFMPEG}:${VCPKGRS_TRIPLET}" --clean-after-build
+
+      # vcpkg's x264 port downloads a GitLab-generated archive and checks its SHA-512; GitLab
+      # regenerates those archives, so the download can suddenly "have an unexpected hash". Retry
+      # with the same x264 commit fetched through git, which is verified by commit id instead.
+      - name: FFmpeg from vcpkg, retry with x264 from git
+        if: matrix.variant == 'full' && steps.vcpkgcache.outputs.cache-hit != 'true' && steps.vcpkg1.outcome == 'failure'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $overlay = Join-Path $env:RUNNER_TEMP 'vcpkg-overlay'
+          $dest = Join-Path $overlay 'x264'
+          Remove-Item $overlay -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory $overlay | Out-Null
+          Copy-Item 'C:\vcpkg\ports\x264' $dest -Recurse
+          $portfile = Join-Path $dest 'portfile.cmake'
+          $text = Get-Content $portfile -Raw
+          $m = [regex]::Match($text, '(?s)vcpkg_from_gitlab\((.*?)\r?\n\)')
+          if (-not $m.Success) { throw 'the x264 port no longer uses vcpkg_from_gitlab: update this workaround' }
+          $ref = [regex]::Match($m.Groups[1].Value, '\bREF\s+(\S+)').Groups[1].Value
+          if ($ref -notmatch '^[0-9a-f]{40}$') { throw "the x264 port's REF is not a commit id: '$ref'" }
+          $patches = [regex]::Matches($m.Groups[1].Value, '\S+\.(?:patch|diff)')
+          $new = "vcpkg_from_git(`n    OUT_SOURCE_PATH SOURCE_PATH`n    URL https://code.videolan.org/videolan/x264.git`n    REF $ref"
+          if ($patches.Count -gt 0) {
+            $new += "`n    PATCHES`n" + (($patches | ForEach-Object { '        ' + $_.Value }) -join "`n")
+          }
+          $new += "`n)"
+          Set-Content $portfile $text.Replace($m.Value, $new) -NoNewline
+          Write-Host "--- overlay x264 portfile:"
+          Get-Content $portfile | Select-Object -First 40 | Write-Host
+          & 'C:/vcpkg/vcpkg.exe' install "$($env:VCPKG_FFMPEG):$($env:VCPKGRS_TRIPLET)" --clean-after-build --overlay-ports=$overlay
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed with exit code $LASTEXITCODE" }
 
       # Saved right after the 40-minute install, not at the end of the job: a later build failure
       # must not throw the installed FFmpeg away (the default post-job save is skipped on failure).
@@ -363,7 +396,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: C:\vcpkg\installed
-          key: vcpkg-ffmpeg-${{ env.VCPKGRS_TRIPLET }}-v2
+          key: vcpkg-ffmpeg-${{ env.VCPKGRS_TRIPLET }}-v3
 
       - name: Build
         env:
