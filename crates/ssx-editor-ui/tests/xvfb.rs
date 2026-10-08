@@ -99,6 +99,45 @@ fn real_window_paints_draws_undoes_saves_and_exits_cleanly() {
         r#"#!/bin/bash
 set -u
 cd "{d}"
+# Software rendering on a loaded machine can take seconds to repaint, and selections animate, so a
+# fixed sleep is either too slow or too fast. shoot_settled REF OUT MIN waits (canvas region only)
+# until the screen differs from REF by more than MIN pixels, then until it stops changing
+# (a blinking caret is a few pixels, hence the tolerance), and leaves that final frame in OUT.
+# Fails (status 1) if the screen never moved within TRIES polls of 0.4 s (default 75).
+canvas() {{ echo "$1[1280x640+0+120]"; }}
+changed_pixels() {{
+  compare -metric AE -fuzz 10% "$(canvas "$1")" "$(canvas "$2")" null: 2>&1 | grep -oE '^[0-9]+' || echo 999999
+}}
+shoot_settled() {{
+  ref=$1; out=$2; min=$3; moved=0; prev=""
+  for _ in $(seq 1 "${{4:-75}}"); do
+    import -window root cur.png
+    if [ "$moved" = 0 ]; then
+      [ "$(changed_pixels "$ref" cur.png)" -gt "$min" ] && moved=1
+    elif [ -n "$prev" ] && [ "$(changed_pixels prev.png cur.png)" -lt 80 ]; then
+      break
+    fi
+    cp cur.png prev.png; prev=1
+    sleep 0.4
+  done
+  cp cur.png "$out"
+  [ "$moved" = 1 ]
+}}
+# The first frame: wait until the image is on screen and the window has stopped changing.
+shoot_painted() {{
+  prev=""
+  for _ in $(seq 1 100); do
+    import -window root cur.png
+    sd=$(identify -format '%[fx:standard_deviation]' "$(canvas cur.png)" 2>/dev/null || echo 0)
+    if [ "$(awk -v v="$sd" 'BEGIN {{ print (v > 0.08) ? 1 : 0 }}')" = 1 ] \
+       && [ -n "$prev" ] && [ "$(changed_pixels prev.png cur.png)" -lt 80 ]; then
+      break
+    fi
+    cp cur.png prev.png; prev=1
+    sleep 0.4
+  done
+  cp cur.png "$1"
+}}
 "{bin}" "{input}" --output "{out}" --json --ephemeral > result.json 2> stderr.txt &
 PID=$!
 WID=""
@@ -110,30 +149,31 @@ done
 # Without a window manager nothing focuses the window; do what a WM would.
 xdotool windowfocus "$WID" 2>/dev/null || true
 xdotool mousemove 640 420
-sleep 4
-import -window root shot1.png
-xdotool key r
-sleep 0.4
-xdotool mousemove 400 250
-sleep 0.3
-xdotool mousedown 1
-for p in "440 270" "480 290" "520 310" "560 330"; do xdotool mousemove $p; sleep 0.25; done
-xdotool mouseup 1
-sleep 1.5
-import -window root shot2.png
+shoot_painted shot1.png
+# Keys and clicks sent while the window is still starting up are lost on a loaded machine, and the
+# drag then does nothing: repeat the (idempotent until it works) gesture instead of trusting one go.
+for attempt in 1 2 3 4; do
+  xdotool windowfocus "$WID" 2>/dev/null || true
+  xdotool key r
+  sleep 0.4
+  xdotool mousemove 400 250
+  sleep 0.3
+  xdotool mousedown 1
+  for p in "440 270" "480 290" "520 310" "560 330"; do xdotool mousemove $p; sleep 0.25; done
+  xdotool mouseup 1
+  shoot_settled shot1.png shot2.png 400 30 && break
+done
 xdotool key ctrl+z
-sleep 1.5
-import -window root shot3.png
+shoot_settled shot2.png shot3.png 400
 xdotool key ctrl+y
-sleep 0.8
+shoot_settled shot3.png shot3r.png 400
 xdotool key t
 sleep 0.3
 xdotool mousemove 700 650
 xdotool click 1
 sleep 0.6
 xdotool type --delay 90 "Hello"
-sleep 1.2
-import -window root shot4.png
+shoot_settled shot3r.png shot4.png 150
 xdotool key Escape
 sleep 0.4
 xdotool key ctrl+s
@@ -168,15 +208,24 @@ if kill -0 $PID 2>/dev/null; then echo "still-running" > status.txt; kill $PID; 
 
     if let Some(keep) = common::dump_dir() {
         let _ = std::fs::create_dir_all(&keep);
-        for n in ["shot1.png", "shot2.png", "shot3.png", "shot4.png", "stderr.txt", "result.json"] {
+        for n in [
+            "shot1.png",
+            "shot2.png",
+            "shot3.png",
+            "shot3r.png",
+            "shot4.png",
+            "stderr.txt",
+            "result.json",
+        ] {
             let _ = std::fs::copy(d.join(n), keep.join(format!("xvfb-{n}")));
         }
     }
     let stderr = std::fs::read_to_string(d.join("stderr.txt")).unwrap_or_default();
-    let (s1, s2, s3, s4) = (
+    let (s1, s2, s3, s3r, s4) = (
         load(&d.join("shot1.png")),
         load(&d.join("shot2.png")),
         load(&d.join("shot3.png")),
+        load(&d.join("shot3r.png")),
         load(&d.join("shot4.png")),
     );
     // 1. It painted the image: the dashboard's dark navy header is on screen.
@@ -197,8 +246,9 @@ if kill -0 $PID 2>/dev/null; then echo "still-running" > status.txt; kill $PID; 
         "undo did not restore the picture: {}",
         canvas_diff(&s1, &s3)
     );
-    // 4. Typing produced text (red glyph pixels appear near the click).
-    assert!(canvas_diff(&s3, &s4) > 200, "typed text is not visible");
+    // 4. Redo brought the rectangle back, and typing then produced text near the click.
+    assert!(canvas_diff(&s3, &s3r) > 300, "redo did not bring the rectangle back");
+    assert!(canvas_diff(&s3r, &s4) > 200, "typed text is not visible");
     // 5. Ctrl+S wrote the output; Ctrl+Enter finished with the documented outcome.
     assert!(out.exists(), "Ctrl+S did not write the output; stderr:\n{stderr}");
     let saved = image::open(&out).unwrap();

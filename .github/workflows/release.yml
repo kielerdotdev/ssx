@@ -134,8 +134,12 @@ jobs:
       - name: Codec development packages (static)
         if: matrix.variant == 'static'
         run: |
-          sudo apt-get install -y --no-install-recommends \
-            libx264-dev libx265-dev libvpx-dev libopus-dev libva-dev libdrm-dev
+          # Only the libraries FFmpeg talks to at run time (VA-API) come from the distribution.
+          # x264, opus, libvpx and SVT-AV1 are built from source into the prefix by
+          # build-ffmpeg.sh; installing the distribution's -dev packages as well would put a second,
+          # older ABI of them in /usr/lib where the linker finds it first (x264_encoder_open_164 vs
+          # the _165 FFmpeg was compiled against).
+          sudo apt-get install -y --no-install-recommends libva-dev libdrm-dev
 
       - name: Restore the embedded FFmpeg
         id: ffcache
@@ -173,7 +177,10 @@ jobs:
           FFMPEG_DIR: ${{ env.FFMPEG_PREFIX }}
           PKG_CONFIG_PATH: ${{ env.FFMPEG_PREFIX }}/lib/pkgconfig:${{ env.FFMPEG_PREFIX }}/lib/x86_64-linux-gnu/pkgconfig:${{ env.FFMPEG_PREFIX }}/lib64/pkgconfig
         run: |
-          set -uo pipefail
+          # GitHub's default shell runs with -e: without this the failing build would exit before
+          # the diagnostics below get printed.
+          set +e
+          set -u
           # The static FFmpeg archives do not carry their own link dependencies, so hand the linker
           # exactly what FFmpeg's pkg-config files say they need (codec libraries built into the
           # prefix, zlib, ...). VA-API and X11 stay dynamic on purpose: VA-API loads the
@@ -185,8 +192,9 @@ jobs:
             if pkg-config --exists "$p"; then pkgs="$pkgs $p"; fi
           done
           link_args=""
+          # The prefix first, so its static codec libraries win over anything in /usr/lib.
           for d in lib lib/x86_64-linux-gnu lib64; do
-            if [ -d "$FFMPEG_PREFIX/$d" ]; then link_args="$link_args -C link-arg=-L$FFMPEG_PREFIX/$d"; fi
+            if [ -d "$FFMPEG_PREFIX/$d" ]; then link_args="$link_args -L native=$FFMPEG_PREFIX/$d -C link-arg=-L$FFMPEG_PREFIX/$d"; fi
           done
           # shellcheck disable=SC2046,SC2086  # splitting $pkgs and pkg-config output into words is intended
           for flag in $(pkg-config --static --libs $pkgs); do
@@ -205,6 +213,8 @@ jobs:
             # Printed last so it is what the end of the log shows (the full linker output is huge).
             echo "=== LINK DIAGNOSTICS ==="
             echo "--- RUSTFLAGS: $RUSTFLAGS"
+            echo "--- codec libraries outside the prefix (these must not shadow it):"
+            find /usr/lib /usr/local/lib -maxdepth 2 \( -name 'libx264*' -o -name 'libx265*' -o -name 'libvpx*' -o -name 'libopus*' -o -name 'libSvt*' \) 2>/dev/null | sort | head -30
             echo "--- library files in the prefix:"
             find "$FFMPEG_PREFIX" -name '*.a' -o -name '*.so*' | sed "s|$FFMPEG_PREFIX/||" | sort | head -60
             echo "--- pkg-config --static --libs:"
