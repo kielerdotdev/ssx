@@ -102,9 +102,9 @@ negatives, rolls off highlights on luminance (hue preserved), applies the sRGB c
 | Tray daemon, IPC, batching, hot-reload | Live under Xvfb and sway; tray against a mock StatusNotifier watcher |
 | Hotkey generators: sway, GNOME (gsettings) | Live; Hyprland and KDE **from documentation** |
 | File-manager integrations | Golden files + real `sh`/`dash`/`bash`/GLib argument passing; **no real file manager** |
-| **Windows** (capture, WGC/DDA/GDI, HDR, overlay, tray, registry verbs, WASAPI) | **Compile + lint only — never run** |
+| **Windows** (capture, WGC/DDA/GDI, HDR, overlay, tray, registry verbs, WASAPI) | Builds, lints, unit/integration tests and packaged-binary smoke tests pass on GitHub runners; capture, HDR, overlay and tray have **never run on a real desktop** |
 | **macOS** | Not implemented (compiles as stubs) |
-| **Static FFmpeg embedding** | Scripts and CI job written, **never run** (sandbox cannot fetch FFmpeg sources) |
+| **Static FFmpeg embedding** | Linux (FFmpeg built from source) and Windows (vcpkg) builds, packaging and smoke tests pass on GitHub runners; the packaged programs link no libav*/codec shared libraries. Only start-up and a test capture were exercised, not real recordings on a desktop |
 
 The manual checklists for everything marked fixtures/mock/compile are in the READMEs of
 `ssx-app`, `ssx-overlay`, `ssx-capture-portal`, `ssx-capture-win` and `ssx-record`.

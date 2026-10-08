@@ -15,16 +15,18 @@ name: Release
 #                    its derivatives. It will NOT start on distributions with another FFmpeg major
 #                    version (Debian 12 has 5.1, Debian 13 and Ubuntu 25.04 have 7.1); those need
 #                    the static variant.
-#   linux   static   FFmpeg built from source and embedded (crates/ssx-record/build). EXPERIMENTAL:
-#                    this recipe has never run; the job is allowed to fail and the release simply
-#                    omits the archive. The job proves the embedding by failing if any binary still
-#                    links libav*/x264/x265/vpx/opus.
+#   linux   static   FFmpeg built from source and embedded (crates/ssx-record/build). Required.
+#                    The job proves the embedding by failing if any binary still links
+#                    libav*/x264/x265/vpx/opus, and a probe step checks every static codec in the
+#                    prefix links with the toolchain's lld before the long cargo build starts.
 #   windows lite     no FFmpeg: screenshots, editor, uploads, GIF recording; MP4/WebM recording is
 #                    unavailable. Required.
-#   windows full     FFmpeg from vcpkg, statically linked. EXPERIMENTAL, same rules as linux static.
+#   windows full     FFmpeg from vcpkg, statically linked. Required.
 #
-# Nothing here has been run on GitHub's runners yet. The Windows programs have never been run on
-# Windows at all; the smoke tests below are the first time they will start there.
+# All four builds run on GitHub's runners and pass their smoke tests there: the archive's installer
+# installs and uninstalls, `--version` runs, and on Linux a real capture under Xvfb is asserted.
+# On Windows `doctor` runs but is informational (a hosted runner has no real desktop), so no
+# capture, HDR or tray run on a real Windows desktop has been verified.
 
 on:
   push:
@@ -101,7 +103,7 @@ jobs:
           - variant: dynamic
             experimental: false
           - variant: static
-            experimental: true
+            experimental: false
     env:
       VERSION: ${{ needs.version.outputs.version }}
       FFMPEG_PREFIX: ${{ github.workspace }}/ffmpeg-static
@@ -320,7 +322,7 @@ jobs:
             features: ssx-cli/record,ssx-app/record,ssx-app/file-dialog,ssx-settings-ui/record
             link_flags: ""
           - variant: full
-            experimental: true
+            experimental: false
             features: ssx-cli/ffmpeg-static,ssx-app/ffmpeg-static,ssx-app/file-dialog,ssx-settings-ui/ffmpeg-static
             # FFmpeg's Media Foundation encoder references GUIDs that live in these import
             # libraries; vcpkg's static avcodec.lib does not pull them in by itself.
@@ -415,7 +417,7 @@ jobs:
   publish:
     name: Publish release
     if: startsWith(github.ref, 'refs/tags/v')
-    # A required build failing blocks publishing; experimental variants that failed are just absent.
+    # Any failing build blocks publishing (experimental variants, if any are added, are just absent).
     needs: [version, linux, windows]
     runs-on: ubuntu-latest
     permissions:
