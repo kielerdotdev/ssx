@@ -76,8 +76,11 @@ build_vpx() {
 
 build_svtav1() {
   fetch https://gitlab.com/AOMediaCodec/SVT-AV1.git "$SVTAV1_REF" svtav1
+  # No LTO: SVT-AV1's release build defaults to it, and a static archive of GCC LTO objects has no
+  # symbol table lld (rustc's linker on Linux) can read, so every svt_av1_* symbol links as undefined.
   (cd "$WORK/svtav1" && cmake -S . -B build -DCMAKE_INSTALL_PREFIX="$PREFIX" -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_APPS=OFF -DBUILD_TESTING=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DSVT_AV1_LTO=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF \
     -DCMAKE_BUILD_TYPE=Release && cmake --build build -j"$JOBS" && cmake --install build)
 }
 

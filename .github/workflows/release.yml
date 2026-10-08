@@ -165,6 +165,32 @@ jobs:
           path: ${{ env.FFMPEG_PREFIX }}
           key: ffmpeg-static-linux-${{ hashFiles('crates/ssx-record/build/build-ffmpeg.sh') }}
 
+      # Fast failure (seconds, not the ~9 minutes of the cargo build): every static codec library in
+      # the prefix must be linkable by lld, which is what rustc uses, and must export its symbols.
+      - name: Verify the embedded FFmpeg prefix
+        if: matrix.variant == 'static'
+        run: |
+          set +e
+          fail=0
+          check() { # library symbol
+            printf 'extern int %s();\nint main(void) { return %s(); }\n' "$2" "$2" > probe.c
+            if cc -fuse-ld=lld probe.c -L"$FFMPEG_PREFIX/lib" -l"$1" -lpthread -lm -ldl -lstdc++ -o probe 2> probe.err; then
+              echo "ok: -l$1 provides $2"
+            else
+              echo "::error::-l$1 does not provide $2 for lld"; cat probe.err; fail=1
+              echo "--- members: $(ar t "$FFMPEG_PREFIX/lib/lib$1.a" | wc -l); defined (nm, first matches):"
+              nm -g --defined-only "$FFMPEG_PREFIX/lib/lib$1.a" 2>&1 | grep -m5 "$2" || echo "none"
+              echo "--- LTO sections in the first member:"
+              first=$(ar t "$FFMPEG_PREFIX/lib/lib$1.a" | head -1)
+              (cd "$(mktemp -d)" && ar x "$FFMPEG_PREFIX/lib/lib$1.a" "$first" && readelf -S "$first" | grep -c gnu.lto)
+            fi
+          }
+          check SvtAv1Enc svt_av1_enc_init_handle
+          check x264 x264_encoder_encode
+          check opus opus_encoder_create
+          check vpx vpx_codec_version
+          exit "$fail"
+
       - name: Build (dynamic FFmpeg)
         if: matrix.variant == 'dynamic'
         run: |

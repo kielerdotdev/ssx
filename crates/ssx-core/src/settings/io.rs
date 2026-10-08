@@ -35,7 +35,7 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> io::Result<()> {
         f.write_all(bytes)?;
         f.sync_all()?;
         drop(f);
-        std::fs::rename(&tmp, path)
+        rename_over(&tmp, path)
     })();
     if let Err(e) = result {
         let _ = std::fs::remove_file(&tmp);
@@ -43,6 +43,33 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> io::Result<()> {
     }
     sync_dir(dir);
     Ok(())
+}
+
+/// `rename` that survives Windows' transient failures.
+///
+/// `MoveFileEx(REPLACE_EXISTING)` fails with "access denied" or a sharing violation while another
+/// writer (or an antivirus scanner, or a reader that opened the file a moment ago) holds the
+/// target, even though a retry a few milliseconds later succeeds. Two processes saving the
+/// settings at once (the daemon and the settings window) hit exactly that. Other platforms have no
+/// such window, so an error there is final.
+fn rename_over(from: &Path, to: &Path) -> io::Result<()> {
+    const ATTEMPTS: u32 = 20;
+    let mut delay = std::time::Duration::from_millis(1);
+    for attempt in 1.. {
+        match std::fs::rename(from, to) {
+            Err(e) if cfg!(windows) && attempt < ATTEMPTS && is_transient(&e) => {
+                std::thread::sleep(delay);
+                delay = (delay * 2).min(std::time::Duration::from_millis(25));
+            }
+            result => return result,
+        }
+    }
+    unreachable!("the loop returns on its last attempt")
+}
+
+/// `ERROR_ACCESS_DENIED`, `ERROR_SHARING_VIOLATION`, `ERROR_LOCK_VIOLATION`.
+fn is_transient(e: &io::Error) -> bool {
+    e.kind() == io::ErrorKind::PermissionDenied || matches!(e.raw_os_error(), Some(5 | 32 | 33))
 }
 
 #[cfg(unix)]
@@ -101,6 +128,20 @@ mod tests {
         assert_eq!(leftovers, 1, "temp file removed");
     }
 
+    /// Reads the file, retrying the transient "access denied" Windows reports while a rename
+    /// replaces it; anything else (a missing or short file) is a real failure.
+    fn read_retrying(p: &Path) -> Vec<u8> {
+        for _ in 0..200 {
+            match std::fs::read(p) {
+                Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
+                    std::thread::sleep(std::time::Duration::from_millis(2));
+                }
+                other => return other.unwrap(),
+            }
+        }
+        std::fs::read(p).unwrap()
+    }
+
     #[test]
     fn concurrent_writers_never_produce_torn_files() {
         let tmp = tempfile::tempdir().unwrap();
@@ -112,7 +153,7 @@ mod tests {
                     let body = vec![b'a' + i as u8; 10_000];
                     for _ in 0..20 {
                         atomic_write(&p, &body).unwrap();
-                        let read = std::fs::read(&*p).unwrap();
+                        let read = read_retrying(&p);
                         assert_eq!(read.len(), 10_000);
                         assert!(read.iter().all(|b| *b == read[0]), "torn file");
                     }
