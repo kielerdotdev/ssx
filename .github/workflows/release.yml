@@ -172,9 +172,11 @@ jobs:
         run: |
           set +e
           fail=0
+          # Link the way rustc does: through cc, with the lld that ships with the Rust toolchain.
+          lld_dir="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld"
           check() { # library symbol
             printf 'extern int %s();\nint main(void) { return %s(); }\n' "$2" "$2" > probe.c
-            if cc -fuse-ld=lld probe.c -L"$FFMPEG_PREFIX/lib" -l"$1" -lpthread -lm -ldl -lstdc++ -o probe 2> probe.err; then
+            if cc -B"$lld_dir" -fuse-ld=lld probe.c -L"$FFMPEG_PREFIX/lib" -l"$1" -lpthread -lm -ldl -lstdc++ -o probe 2> probe.err; then
               echo "ok: -l$1 provides $2"
             else
               echo "::error::-l$1 does not provide $2 for lld"; cat probe.err; fail=1
