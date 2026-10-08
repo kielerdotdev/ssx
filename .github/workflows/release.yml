@@ -455,6 +455,12 @@ jobs:
           Unpack the archive and run `install.ps1` (Windows, PowerShell) or `./install.sh` (Linux), or run the
           programs from `bin/` directly. `SHA256SUMS` lists the checksum of every archive.
           EOF
-          gh release create "$TAG" artifacts/* \
-            --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --notes-file notes.md \
-            --title "ssx ${TAG#v}" "${flags[@]}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # A release (or draft) was already created for this tag in the web UI: attach the files
+            # to it and leave its title and notes alone.
+            gh release upload "$TAG" artifacts/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" artifacts/* \
+              --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --notes-file notes.md \
+              --title "ssx ${TAG#v}" "${flags[@]}"
+          fi
